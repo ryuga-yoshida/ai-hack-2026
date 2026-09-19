@@ -195,6 +195,7 @@ def save_extracted(conn: sqlite3.Connection, events: list[Event]) -> tuple[int, 
     戻り値: (保存した Event 数, 生成した Task 数)"""
     db.save_events(conn, events)
     created = 0
+    new_tasks: list[tuple[Task, Event]] = []
     for ev in events:
         if ev.kind == "task_hint" and ev.confidence >= config.TASK_AUTOGEN_CONFIDENCE:
             task = Task(id=new_id(), title=ev.text, assignee=ev.actor,
@@ -204,4 +205,26 @@ def save_extracted(conn: sqlite3.Connection, events: list[Event]) -> tuple[int, 
                                     to_type="task", to_id=task.id, relation="implements",
                                     confidence=ev.confidence, method="explicit"))
             created += 1
+            new_tasks.append((task, ev))
+    _link_tasks_to_decisions(conn, new_tasks, [e for e in events if e.kind == "decision"])
     return len(events), created
+
+
+def _link_tasks_to_decisions(conn: sqlite3.Connection, tasks: list[tuple[Task, Event]],
+                             decisions: list[Event]) -> None:
+    """同じ抽出バッチ内で、タスクに最も近い決定を follows で紐付ける（LLM 不使用・埋め込みのみ）。
+    これで 決定 → タスク → 発言 → 変更 の統合グラフが繋がる。"""
+    if not tasks or not decisions:
+        return
+    from app import vec   # 循環 import 回避
+    vec.embed_missing(conn)
+    for task, hint in tasks:
+        best, best_sim = None, 0.0
+        for d in decisions:
+            sim = vec.similarity(conn, hint.id, d.id)
+            if sim is not None and sim > best_sim:
+                best, best_sim = d, sim
+        if best and best_sim >= config.LINK_EMBED_THRESHOLD:
+            db.save_link(conn, Link(id=new_id(), from_type="event", from_id=best.id, to_type="task",
+                                    to_id=task.id, relation="follows", confidence=round(best_sim, 3),
+                                    method="embedding"))

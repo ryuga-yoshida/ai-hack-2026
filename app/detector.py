@@ -94,6 +94,8 @@ def find_candidates(conn: sqlite3.Connection, change: Event) -> list[Event]:
     since = change.occurred_at - timedelta(days=config.DETECT_LOOKBACK_DAYS)
     hits = vec.search(conn, change.text, kind="decision", top_k=config.DETECT_CANDIDATE_TOP_K,
                       since=since, until=change.occurred_at, exclude_ids=seen)
+    if hits is None:
+        raise RuntimeError("埋め込みが取得できないため候補を絞れません")
     out += [e for e, s in hits if s >= config.DETECT_CANDIDATE_THRESHOLD]
     return out
 

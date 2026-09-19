@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}ダッシュボード{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-bold">検知結果</h1>
+  <form method="post" action="/tick"><button class="text-sm border rounded px-3 py-1 bg-white">今すぐ巡回</button></form>
+</div>
+{% include "_findings.html" %}
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}コスト{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">コスト</h1>
+<div class="bg-white border rounded-lg p-5 text-sm space-y-3">
+  <div class="text-lg">本デモの全処理コスト: <b>${{ '%.4f' % s.total_usd }}</b></div>
+  <div>内訳: {% for k, v in s.by_task.items() %}{{ k }} ${{ '%.4f' % v }}{% if not loop.last %} / {% endif %}{% endfor %}</div>
+  <div>呼び出し回数: {% for k, v in s.calls.items() %}{{ k }} {{ v }}{% if not loop.last %} / {% endif %}{% endfor %}</div>
+  <div>LLM を使わなかった処理: 分割・正規化・差分の自然言語化・候補絞り込み・紐付け第1〜3段・時系列ガード・stalled / orphan 検知</div>
+  {% if s.if_all_high %}
+  <div class="text-lg">全て high で実行した場合: <b>${{ '%.4f' % s.if_all_high }}</b>
+    （{{ '%.1f' % (s.if_all_high / s.total_usd if s.total_usd else 0) }}倍、削減率 {{ (s.savings_ratio * 100)|round|int }}%）</div>
+  {% endif %}
+  <div class="pt-3 border-t">紐付けの内訳: {% for k, v in link.items() %}{{ k }} {{ v }}{% if not loop.last %} / {% endif %}{% endfor %}
+    <span class="text-gray-500">（LLM 不使用 {{ link.explicit + link.context + link.assignee }} / LLM {{ link.llm }}）</span></div>
+</div>
+{% endblock %}

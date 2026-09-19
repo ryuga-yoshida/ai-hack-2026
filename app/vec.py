@@ -34,8 +34,9 @@ def _unit(v: np.ndarray) -> np.ndarray:
 
 def search(conn: sqlite3.Connection, query: str, kind: str, top_k: int,
            since: datetime | None = None, until: datetime | None = None,
-           exclude_ids: set[str] | None = None) -> list[tuple[Event, float]]:
-    """query に近い kind の Event を (Event, cos類似度) の降順で top_k 件返す"""
+           exclude_ids: set[str] | None = None) -> list[tuple[Event, float]] | None:
+    """query に近い kind の Event を (Event, cos類似度) の降順で top_k 件返す。
+    query の埋め込みが得られない（API 不通・replay のキャッシュ欠落）ときは None を返す。"""
     sql = ("SELECT e.*, m.vector FROM events e JOIN embeddings m ON m.event_id = e.id "
            "WHERE e.kind = ?")
     params: list = [kind]
@@ -45,10 +46,10 @@ def search(conn: sqlite3.Connection, query: str, kind: str, top_k: int,
         sql += " AND e.occurred_at <= ?"; params.append(db.to_iso(until))
     rows = conn.execute(sql, params).fetchall()
     rows = [r for r in rows if not exclude_ids or r["id"] not in exclude_ids]
-    if not rows:
-        return []
     q = router.embed([query])[0]
     if q.shape[0] <= 1:
+        return None
+    if not rows:
         return []
     q = _unit(q)
     mat = np.stack([_unit(np.frombuffer(r["vector"], dtype=np.float32)) for r in rows])

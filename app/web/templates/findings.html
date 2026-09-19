@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}検知結果一覧{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">検知結果一覧（{{ cards|length }}件）</h1>
+{% include "_findings.html" %}
+{% endblock %}

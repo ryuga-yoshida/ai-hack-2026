@@ -5,6 +5,7 @@
 """
 import json
 import logging
+import re
 import sqlite3
 from datetime import timedelta
 
@@ -37,12 +38,24 @@ def _open_tasks(conn: sqlite3.Connection) -> list[Task]:
 
 # ---------- 第1段: 明示的な参照（コストゼロ） ----------
 
+_WORD = re.compile(r"[一-龥ァ-ヶA-Za-z0-9ー]{2,}")
+
+
+def _content_words(title: str) -> list[str]:
+    return [w for w in _WORD.findall(title) if w not in ("する", "こと", "ため", "今週", "来週", "次回")]
+
+
 def by_explicit(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | None:
     text = msg.text
     for t in _open_tasks(conn):
         if t.id in text:
             return (t.id, 1.0)
         if len(t.title) >= 3 and t.title in text:
+            return (t.id, 1.0)
+        # タイトルの内容語（4文字以上）が含まれる、または内容語が2語以上一致
+        words = _content_words(t.title)
+        hits = [w for w in words if w in text]
+        if any(len(w) >= 4 for w in hits) or len(hits) >= 2:
             return (t.id, 1.0)
         for a in t.artifacts:
             stem = a.rsplit(".", 1)[0]

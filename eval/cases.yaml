@@ -1,0 +1,45 @@
+# 正解ラベル付き評価セット。expect: null は「検知してはいけない」ケース。
+# match は replay 後の DB からケースに対応する Finding を探す条件。
+#   ref: artifact_change Event の ref。この Event を根拠に含む Finding を対象にする
+#   task_title_contains: stalled 用。タスクのタイトルで対象を探す
+- id: 1
+  desc: 決定と異なる数値に変更（9/15「第3四半期は据え置き」に対し 9/18 に商品A 1200→1500）
+  match: { ref: "売上見込_v2.xlsx:売上見込!D5" }
+  expect: { kind: contradiction, severity: high }
+- id: 2
+  desc: 決定通りに反映された変更（9/8「商品Bの第1四半期を850に」に対し 9/18 に 800→850）
+  match: { ref: "売上見込_v2.xlsx:売上見込!B3" }
+  expect: null
+- id: 3
+  desc: 決定より前に行われた変更（9/18 に商品Cの行を削除。終了決定は 9/19）
+  match: { ref: "売上見込_v2.xlsx:売上見込!A3" }
+  expect: null
+- id: 4
+  desc: 後の会議で決定が覆されている（9/8「商品D 第3四半期 300」→ 9/17 チャットで 350 に変更決定 → 9/19 に 300→350）
+  match: { ref: "売上見込_v3.xlsx:売上見込!D2" }
+  expect: null
+- id: 5
+  desc: どの決定にも紐付かない変更（在庫表の商品F 安全在庫 100→150）
+  match: { ref: "在庫表_v2.xlsx:在庫!B5" }
+  expect: { kind: orphan_change }
+- id: 6
+  desc: 決定されたが7日間動きなし（9/15 定例で高橋に振られた予算会議資料の作成）
+  match: { task_title_contains: "予算会議" }
+  expect: { kind: stalled }
+- id: 7
+  desc: チャットで変更理由が説明済み（商品D 第4四半期 400→450。9/19 チャットで鈴木が了承）
+  match: { ref: "売上見込_v3.xlsx:売上見込!E2" }
+  expect: { kind: contradiction, severity: low }
+  accept_null: true
+- id: 8
+  desc: 数式のみ変更（合計 第1四半期の数式を書き換え。値は同じ）
+  match: { ref: "売上見込_v3.xlsx:売上見込!B12", diff_kind: formula }
+  expect: { kind: contradiction, severity: medium }
+- id: 9
+  desc: 別商品の似た数値変更（在庫表の商品A 安全在庫 1200→1500。売上見込の主役と同じ数字だが別の話）
+  match: { ref: "在庫表_v2.xlsx:在庫!B2" }
+  expect: null
+- id: 10
+  desc: 同じ日の決定と変更（9/19 10:02 商品C終了の決定 → 同日 15:00 に在庫表から商品Cを削除）
+  match: { ref: "在庫表_v2.xlsx:在庫!A4" }
+  expect: null

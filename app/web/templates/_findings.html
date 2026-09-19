@@ -1,0 +1,52 @@
+{% if not cards %}
+<p class="text-sm text-gray-500">検知結果はまだありません。<code>python -m app.cli replay</code> を実行してください。</p>
+{% endif %}
+{% for c in cards %}
+{% set f = c.finding %}
+<div class="bg-white border rounded-lg p-5 mb-4 {% if f.status == 'dismissed' %}opacity-50{% endif %}">
+  <div class="flex items-center gap-2 mb-3">
+    <span class="px-2 py-0.5 rounded text-xs font-semibold
+      {% if f.kind == 'contradiction' %}bg-red-100 text-red-800{% elif f.kind == 'stalled' %}bg-yellow-100 text-yellow-800{% else %}bg-gray-200 text-gray-700{% endif %}">
+      {{ {'contradiction': '矛盾', 'stalled': '停滞', 'orphan_change': '根拠なし変更'}[f.kind] }}
+    </span>
+    <span class="text-xs px-2 py-0.5 rounded border">severity {{ f.severity }}</span>
+    <span class="text-xs px-2 py-0.5 rounded border">confidence {{ '%.2f' % f.confidence }}</span>
+    <span class="text-xs text-gray-500">状態 {{ f.status }}</span>
+    {% if c.task %}<a href="/tasks/{{ c.task.id }}" class="text-xs text-blue-600 ml-auto">タスク: {{ c.task.title }} →</a>{% endif %}
+  </div>
+  <div class="font-medium mb-3">{{ f.summary }}</div>
+
+  <ol class="text-sm space-y-2 border-l-2 pl-3">
+  {% for ev in c.evidence %}
+    <li>
+      <span class="text-gray-500">{{ ev.occurred_at.strftime('%m/%d %H:%M') }}</span>
+      <span class="font-semibold">[{{ {'decision': '決定', 'task_hint': 'タスク', 'utterance': '会話', 'artifact_change': '変更'}[ev.kind] }}]</span>
+      {{ ev.text }}
+      {% if ev.actor %}<span class="text-gray-500">— {{ ev.actor }}</span>{% endif %}
+      <div class="text-xs text-gray-500">
+        出典 <code>{{ ev.ref }}</code>
+        {% if ev.quote %}<span class="ml-2">原文「{{ ev.quote }}」</span>{% endif %}
+        {% if ev.kind == 'artifact_change' and ev.meta.get('old') is not none %}
+          <span class="ml-2">{{ ev.meta.get('row_key') }} / {{ ev.meta.get('column_label') }}: <b>{{ ev.meta.get('old') }}</b> → <b>{{ ev.meta.get('new') }}</b></span>
+        {% endif %}
+      </div>
+    </li>
+  {% endfor %}
+  </ol>
+
+  {% if f.reason %}<div class="text-sm mt-3"><span class="text-gray-500">判定理由:</span> {{ f.reason }}</div>{% endif %}
+  <div class="text-xs text-gray-500 mt-1">判定モデル: {{ f.model_used or 'ルールベース（LLM 不使用）' }}</div>
+
+  {% if f.status in ('pending', 'notified') %}
+  <div class="flex gap-2 mt-3 text-sm">
+    <form method="post" action="/findings/{{ f.id }}/ack"><button class="border rounded px-3 py-1 bg-white">確認済み</button></form>
+    <form method="post" action="/findings/{{ f.id }}/dismiss" class="flex gap-2">
+      <input name="note" placeholder="却下理由（任意）" class="border rounded px-2 py-1 w-56">
+      <button class="border rounded px-3 py-1 bg-white">却下</button>
+    </form>
+  </div>
+  {% elif c.dismiss_note %}
+  <div class="text-xs text-gray-500 mt-2">却下理由: {{ c.dismiss_note }}</div>
+  {% endif %}
+</div>
+{% endfor %}

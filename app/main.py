@@ -30,10 +30,54 @@ def render(name: str, request: Request, **ctx) -> HTMLResponse:
 
 # ---------- ダッシュボード（M7 で矛盾カードを載せる） ----------
 
+def finding_cards(conn: sqlite3.Connection, where: str = "", params: tuple = ()) -> list[dict]:
+    rows = conn.execute(f"SELECT * FROM findings {where} ORDER BY created_at DESC, rowid DESC", params).fetchall()
+    cards = []
+    for r in rows:
+        f = db.row_to_finding(r)
+        evidence = [e for e in (db.get_event(conn, i) for i in f.evidence) if e]
+        evidence.sort(key=lambda e: e.occurred_at)
+        cards.append({"finding": f, "evidence": evidence, "dismiss_note": r["dismiss_note"],
+                      "task": db.get_task(conn, f.task_id) if f.task_id else None})
+    return cards
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
-    return render("placeholder.html", request, title="ダッシュボード",
-                  note="検知結果（Finding）は M7 で表示します。")
+    conn = get_conn()
+    return render("index.html", request,
+                  cards=finding_cards(conn, "WHERE status IN ('notified', 'pending')"))
+
+
+@app.get("/findings", response_class=HTMLResponse)
+def findings_page(request: Request):
+    conn = get_conn()
+    return render("findings.html", request, cards=finding_cards(conn))
+
+
+@app.post("/findings/{finding_id}/ack")
+def ack_finding(finding_id: str):
+    conn = get_conn()
+    conn.execute("UPDATE findings SET status='acknowledged' WHERE id=?", (finding_id,))
+    conn.commit()
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/findings/{finding_id}/dismiss")
+def dismiss_finding(finding_id: str, note: str = Form("")):
+    conn = get_conn()
+    conn.execute("UPDATE findings SET status='dismissed', dismiss_note=? WHERE id=?",
+                 (note.strip() or None, finding_id))
+    conn.commit()
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/tick")
+def manual_tick():
+    from app import agent
+    conn = get_conn()
+    agent.tick(conn)
+    return RedirectResponse("/", status_code=303)
 
 
 # ---------- タスクボード ----------
@@ -68,7 +112,45 @@ def task_detail(request: Request, task_id: str):
     if not task:
         raise HTTPException(404)
     return render("task_detail.html", request, task=task, statuses=STATUSES,
-                  timeline=[])  # タイムラインは M7 で links を辿って埋める
+                  timeline=task_timeline(conn, task))
+
+
+LABELS = {"decision": ("決定", "border-red-400"), "task_hint": ("タスク候補", "border-gray-300"),
+          "utterance": ("発言", "border-blue-300"), "artifact_change": ("変更", "border-orange-400")}
+
+
+def task_timeline(conn: sqlite3.Connection, task: Task) -> list[dict]:
+    """タスクに紐付く全 Event と Finding を時刻順に並べる。links を辿るだけ。"""
+    items, seen = [], set()
+
+    def add(ev, label=None, color=None):
+        if ev.id in seen:
+            return
+        seen.add(ev.id)
+        lb, cl = LABELS.get(ev.kind, (ev.kind, "border-gray-300"))
+        items.append({"when": ev.occurred_at, "label": label or lb, "color": color or cl,
+                      "text": ev.text, "actor": ev.actor, "ref": ev.ref})
+
+    rows = conn.execute(
+        "SELECT e.*, l.relation FROM links l JOIN events e ON e.id = l.from_id "
+        "WHERE l.to_type='task' AND l.to_id=? AND l.from_type='event'", (task.id,)).fetchall()
+    for r in rows:
+        add(db.row_to_event(r))
+    created = conn.execute("SELECT created_at FROM tasks WHERE id=?", (task.id,)).fetchone()["created_at"]
+    items.append({"when": db.from_iso(created), "label": "タスク生成", "color": "border-green-400",
+                  "text": task.title, "actor": task.assignee, "ref": None})
+    for r in conn.execute("SELECT * FROM findings WHERE task_id=?", (task.id,)).fetchall():
+        f = db.row_to_finding(r)
+        for eid in f.evidence:
+            if ev := db.get_event(conn, eid):
+                add(ev)
+        items.append({"when": db.from_iso(r["created_at"]) if f.kind == "stalled" else
+                      max((db.get_event(conn, i).occurred_at for i in f.evidence if db.get_event(conn, i)), default=db.from_iso(r["created_at"])),
+                      "label": "検知", "color": "border-red-600", "text": f.summary, "actor": None, "ref": None})
+    items.sort(key=lambda x: x["when"])
+    for it in items:
+        it["when"] = it["when"].strftime("%m/%d %H:%M")
+    return items
 
 
 class TaskPatch(BaseModel):
@@ -117,8 +199,11 @@ def post_chat(channel: str = Form("general"), actor: str = Form(...), text: str 
     return RedirectResponse(f"/chat?channel={channel}", status_code=303)
 
 
-# ---------- 以降は後続マイルストーンで実装 ----------
+# ---------- コスト ----------
 
 @app.get("/cost", response_class=HTMLResponse)
 def cost_page(request: Request):
-    return render("placeholder.html", request, title="コスト", note="M6 で実装します。")
+    from app import linker
+    from app.llm import cost
+    conn = get_conn()
+    return render("cost.html", request, s=cost.summary(conn), link=linker.method_breakdown(conn))
