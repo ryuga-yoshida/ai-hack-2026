@@ -199,7 +199,7 @@ def save_extracted(conn: sqlite3.Connection, events: list[Event]) -> tuple[int, 
         if ev.kind == "task_hint" and ev.confidence >= config.TASK_AUTOGEN_CONFIDENCE:
             task = Task(id=new_id(), title=ev.text, assignee=ev.actor,
                         created_from=ev.id, status="todo")
-            db.save_task(conn, task)
+            db.save_task(conn, task, at=ev.occurred_at)
             db.save_link(conn, Link(id=new_id(), from_type="event", from_id=ev.id,
                                     to_type="task", to_id=task.id, relation="implements",
                                     confidence=ev.confidence, method="explicit"))

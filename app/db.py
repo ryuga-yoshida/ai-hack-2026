@@ -202,8 +202,9 @@ def list_events(conn: sqlite3.Connection, kind: str | None = None,
 
 # ---------- Task ----------
 
-def save_task(conn: sqlite3.Connection, t: Task) -> None:
-    ts = now_iso()
+def save_task(conn: sqlite3.Connection, t: Task, at: datetime | None = None) -> None:
+    """at を渡すと created_at / updated_at をその時刻にする（抽出由来のタスクは発言時刻を使う）"""
+    ts = to_iso(at) if at else now_iso()
     conn.execute(
         """INSERT INTO tasks
            (id, title, description, assignee, status, due_date, created_from, artifacts, created_at, updated_at)

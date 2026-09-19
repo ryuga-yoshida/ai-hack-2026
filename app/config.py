@@ -52,3 +52,7 @@ CHAT_CHUNK_MESSAGES = 20       # チャットは同一チャンネルの連続 2
 
 # --- マスキング用の登場人物（fixtures の5名） ---
 PERSONS = ["鈴木", "山田", "田中", "佐藤", "高橋"]
+
+# --- 検知（追加） ---
+DETECT_CANDIDATE_THRESHOLD = 0.35  # 候補とみなす最低類似度（未満なら orphan_change）
+DETECT_SUPERSEDE_SIM = 0.85        # これ以上似た新しい決定があれば古い決定は上書き済みとみなす
