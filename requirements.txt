@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+jinja2
+openpyxl
+httpx
+pydantic
+python-dotenv
+pyyaml
+numpy

@@ -1,0 +1,35 @@
+"""設定・閾値の一元管理。数値はここ以外に直書きしない。"""
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")
+
+# --- 環境変数 ---
+DB_PATH = Path(os.getenv("DB_PATH", "./data/app.db"))
+ORCA_API_KEY = os.getenv("ORCA_API_KEY", "")
+ORCA_BASE_URL = os.getenv("ORCA_BASE_URL", "")
+ORCA_MODEL_HIGH = os.getenv("ORCA_MODEL_HIGH", "")
+ORCA_MODEL_MID = os.getenv("ORCA_MODEL_MID", "")
+ORCA_MODEL_EMBED = os.getenv("ORCA_MODEL_EMBED", "")
+GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "")
+
+FIXTURES_DIR = ROOT / "fixtures"
+
+# --- 紐付け ---
+LINK_CONTEXT_WINDOW_MIN = 30      # 会話文脈を継承する時間
+LINK_EMBED_TOP_K = 3
+LINK_EMBED_THRESHOLD = 0.55
+
+# --- 検知 ---
+DETECT_CANDIDATE_TOP_K = 5
+DETECT_LOOKBACK_DAYS = 30
+DETECT_NOTIFY_THRESHOLD = 0.8     # これ以上で自動通知
+DETECT_REVIEW_THRESHOLD = 0.5     # これ以上で確認キュー
+
+TASK_AUTOGEN_CONFIDENCE = 0.7
+STALLED_DAYS = 7
+DISMISS_PENALTY = 0.7
+FALLBACK_PENALTY = 0.9
