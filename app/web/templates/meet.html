@@ -1,28 +1,55 @@
 {% extends "base.html" %}
 {% block title %}会議室{% endblock %}
+{% block actions %}<button @click="$dispatch('open-new-meeting')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">＋ 会議を始める</button>{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold mb-4">会議室</h1>
-<p class="text-sm text-gray-600 mb-4">各参加者が自分のブラウザで会議室を開いて名前を入れると、自分のマイクだけを録音します。終了時に全員分をまとめて文字起こしし、議事録として取り込みます。</p>
+<div class="max-w-4xl space-y-6">
+  <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
+    各参加者が自分のブラウザで会議室を開くと、<b>自分のマイクだけ</b>を録音します。終了すると全員分をまとめて文字起こしし、時刻順に統合して議事録にします。議事録は次の巡回で決定・タスクに自動で分解されます。
+  </div>
 
-<form method="post" action="/meet" class="bg-white border rounded p-4 mb-6 flex flex-wrap gap-2 items-end text-sm">
-  <label class="flex flex-col">会議名<input name="title" value="定例会議" required class="border rounded px-2 py-1 w-64"></label>
-  <label class="flex flex-col">あなたの名前<input name="me" required placeholder="鈴木" class="border rounded px-2 py-1 w-28"></label>
-  <button class="bg-blue-600 text-white rounded px-3 py-1">会議を始める</button>
-</form>
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-left text-xs text-gray-500"><tr><th class="px-4 py-2">開始</th><th class="px-4 py-2">会議名</th><th class="px-4 py-2">状態</th><th class="px-4 py-2">参加者</th><th class="px-4 py-2 text-right">発言</th><th class="px-4 py-2 text-right">決定</th><th></th></tr></thead>
+      <tbody>
+      {% for m in meetings %}
+      <tr class="border-t border-gray-100 hover:bg-gray-50">
+        <td class="px-4 py-2.5 text-gray-600">{{ m.started_at|dt }}</td>
+        <td class="px-4 py-2.5 font-medium"><a href="/meet/{{ m.id }}" class="hover:underline">{{ m.title }}</a></td>
+        <td class="px-4 py-2.5"><span class="text-xs px-2 py-0.5 rounded-full {% if m.status == 'recording' %}bg-red-100 text-red-700{% elif m.status == 'processing' %}bg-amber-100 text-amber-700{% elif m.status == 'done' %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-600{% endif %}">{{ {'recording': '● 進行中', 'processing': '文字起こし中', 'done': '議事録あり', 'failed': '失敗'}[m.status] }}</span></td>
+        <td class="px-4 py-2.5 text-gray-600">{{ m.participants|join('・') }}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_lines }}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_decisions }}</td>
+        <td class="px-4 py-2.5 text-right"><a href="/meet/{{ m.id }}{% if m.status == 'recording' and me %}?me={{ me }}{% endif %}" class="text-indigo-600 hover:underline">{% if m.status == 'recording' %}参加{% else %}開く{% endif %} →</a></td>
+      </tr>
+      {% endfor %}
+      {% for m in fixtures %}
+      <tr class="border-t border-gray-100 hover:bg-gray-50">
+        <td class="px-4 py-2.5 text-gray-600">{{ m.started_at|dt }}</td>
+        <td class="px-4 py-2.5 font-medium"><a href="/meet/{{ m.id }}" class="hover:underline">{{ m.title }}</a> <span class="text-[10px] text-gray-400 border rounded px-1">取込済</span></td>
+        <td class="px-4 py-2.5"><span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">議事録あり</span></td>
+        <td class="px-4 py-2.5 text-gray-600">—</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_lines }}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_decisions }}</td>
+        <td class="px-4 py-2.5 text-right"><a href="/meet/{{ m.id }}" class="text-indigo-600 hover:underline">開く →</a></td>
+      </tr>
+      {% endfor %}
+      {% if not meetings and not fixtures %}<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">まだ会議はありません。</td></tr>{% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
 
-<h2 class="font-semibold text-sm mb-2">会議一覧</h2>
-<table class="w-full text-sm bg-white border rounded">
-  <tr class="text-left text-gray-500"><th class="p-2">開始</th><th class="p-2">会議名</th><th class="p-2">状態</th><th class="p-2">参加者</th><th class="p-2"></th></tr>
-  {% for m in meetings %}
-  <tr class="border-t">
-    <td class="p-2">{{ m.started_at[:16].replace('T', ' ') }}</td>
-    <td class="p-2">{{ m.title }}</td>
-    <td class="p-2">{{ {'recording': '進行中', 'processing': '文字起こし中', 'done': '議事録あり', 'failed': '失敗'}[m.status] }}</td>
-    <td class="p-2 text-gray-600">{{ m.participants|join('・') }}</td>
-    <td class="p-2"><a href="/meet/{{ m.id }}" class="text-blue-600">開く →</a></td>
-  </tr>
-  {% else %}
-  <tr class="border-t"><td class="p-2 text-gray-500" colspan="5">まだ会議はありません。</td></tr>
-  {% endfor %}
-</table>
+<div x-data="{ open: false }" @open-new-meeting.window="open = true" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/meet" class="bg-white rounded-xl shadow-xl p-6 w-[420px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">会議を始める</h3>
+      <input name="title" value="定例会議" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <input name="me" value="{{ me }}" placeholder="あなたの名前" required list="people" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
+      <p class="text-xs text-gray-500">開始するとマイクの許可を求めます。他の参加者には会議室の URL を共有してください。</p>
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">開始</button></div>
+    </form>
+  </div>
+</div>
 {% endblock %}

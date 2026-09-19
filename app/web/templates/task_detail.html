@@ -1,49 +1,99 @@
 {% extends "base.html" %}
 {% block title %}{{ task.title }}{% endblock %}
+{% block heading %}<a href="/tasks" class="text-gray-400 hover:text-gray-600 mr-2">タスク</a><span class="text-gray-300 mr-2">/</span>{{ task.title|truncate(40) }}{% endblock %}
 {% block content %}
-<a href="/tasks" class="text-sm text-blue-600">← タスク一覧</a>
-<h1 class="text-xl font-bold mt-2">{{ task.title }}</h1>
-<div class="text-sm text-gray-600 mt-1">
-  ID {{ task.id }} · 担当 {{ task.assignee or "未割当" }} · 期限 {{ task.due_date or "なし" }}
-  {% if task.artifacts %} · 成果物 {{ task.artifacts|join(", ") }}{% endif %}
+<div class="grid grid-cols-3 gap-6" x-data="detail()">
+  <div class="col-span-2 space-y-6">
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <input x-model="t.title" @change="save({title: t.title}, 'タイトルを更新しました')" class="w-full text-xl font-semibold border-0 focus:ring-0 px-0 bg-transparent">
+      <textarea x-model="t.description" @change="save({description: t.description}, '説明を更新しました')" placeholder="説明を追加…" rows="3" class="mt-2 w-full text-sm border border-transparent hover:border-gray-200 focus:border-gray-300 rounded-lg px-2 py-1 bg-transparent"></textarea>
+      {% if meta.origin %}
+      <div class="mt-3 text-xs text-gray-500 bg-gray-50 rounded-lg p-3">
+        <span class="font-semibold">{{ '会議' if meta.origin.source == 'meet' else 'チャット' }}から自動生成</span> · {{ meta.origin.occurred_at|dt }} · {{ meta.origin.actor }}
+        {% if meta.origin.quote %}<div class="mt-1">原文「{{ meta.origin.quote }}」</div>{% endif %}
+        <code class="text-[11px]">{{ meta.origin.ref }}</code>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold mb-4">タイムライン <span class="text-xs text-gray-400 font-normal">決定 → タスク → 発言 → 変更 → 検知 が1本に並びます</span></h2>
+      {% if timeline %}
+      <ol class="relative border-l-2 border-gray-200 ml-2 space-y-4">
+      {% for item in timeline %}
+        <li class="ml-5">
+          <span class="absolute -left-[7px] w-3 h-3 rounded-full {{ item.color }} ring-4 ring-white"></span>
+          <div class="text-xs text-gray-500">{{ item.when|dt }} <span class="ml-1 font-semibold text-gray-700">[{{ item.label }}]</span>{% if item.actor %}<span class="ml-1">{{ item.actor }}</span>{% endif %}</div>
+          <div class="text-sm mt-0.5 {% if item.kind == 'finding' %}text-red-700 font-medium{% endif %}">{{ item.text|linkify }}</div>
+          {% if item.quote %}<div class="text-xs text-gray-500 mt-0.5">原文「{{ item.quote }}」</div>{% endif %}
+          {% if item.kind == 'artifact_change' and item.meta.get('old') is not none %}<div class="text-xs text-gray-500">{{ item.meta.get('row_key') }} / {{ item.meta.get('column_label') }}: <b>{{ item.meta.get('old') }}</b> → <b>{{ item.meta.get('new') }}</b></div>{% endif %}
+          {% if item.ref %}<code class="text-[11px] text-gray-400">{{ item.ref }}</code>{% endif %}
+          {% if item.kind == 'finding' %}<a href="/findings?status=all#finding-{{ item.meta.finding_id }}" class="text-xs text-indigo-600 hover:underline ml-1">検知を見る →</a>{% endif %}
+        </li>
+      {% endfor %}
+      </ol>
+      {% else %}<p class="text-sm text-gray-500">紐付く出来事はまだありません。</p>{% endif %}
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold mb-3">コメント</h2>
+      <form method="post" action="/tasks/{{ task.id }}/comment" class="flex gap-2">
+        <input name="actor" value="{{ me }}" placeholder="名前" required class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-28">
+        <input name="text" placeholder="コメントを書く（#tasks チャンネルに投稿され、このタスクに紐付きます）" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+        <button class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-2">送信</button>
+      </form>
+    </div>
+  </div>
+
+  <aside class="space-y-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm space-y-3">
+      <div>
+        <label class="text-xs text-gray-500">状態</label>
+        <select x-model="t.status" @change="save({status: t.status}, '状態を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+          {% for s, l in STATUSES %}<option value="{{ s }}">{{ l }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">担当者</label>
+        <select x-model="t.assignee" @change="save({assignee: t.assignee}, '担当者を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+          <option value="">未割当</option>{% for p in PEOPLE %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">期限</label>
+        <input type="date" x-model="t.due_date" @change="save({due_date: t.due_date || null}, '期限を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5">
+      </div>
+      <div>
+        <label class="text-xs text-gray-500">成果物 <span class="text-gray-400">（チャットに貼られた SPO リンクから自動登録）</span></label>
+        <div class="mt-1 space-y-1">
+          <template x-for="(a, i) in t.artifacts" :key="a">
+            <div class="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1"><span class="flex-1 truncate">📎 <span x-text="a"></span></span>
+              <button @click="t.artifacts.splice(i,1); save({artifacts: t.artifacts}, '成果物を外しました')" class="text-gray-400 hover:text-red-600">×</button></div>
+          </template>
+          <form @submit.prevent="if (newArt.trim()) { t.artifacts.push(newArt.trim()); newArt=''; save({artifacts: t.artifacts}, '成果物を追加しました') }" class="flex gap-1">
+            <input x-model="newArt" placeholder="ファイル名を追加" class="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs"><button class="text-xs border border-gray-300 rounded-lg px-2">追加</button>
+          </form>
+        </div>
+      </div>
+      <div class="text-xs text-gray-400 pt-2 border-t">ID {{ task.id }}</div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <div class="flex justify-between"><span class="text-gray-500">紐付いた発言</span><b>{{ meta.n_msgs }}</b></div>
+      <div class="flex justify-between mt-1"><span class="text-gray-500">未対応の検知</span><b class="{% if meta.n_findings %}text-red-600{% endif %}">{{ meta.n_findings }}</b></div>
+    </div>
+  </aside>
 </div>
-{% if task.description %}<p class="mt-2 text-sm">{{ task.description }}</p>{% endif %}
-
-<div class="mt-4 flex gap-2 items-center text-sm">
-  <span>状態:</span>
-  <select id="status" class="border rounded px-2 py-1">
-    {% for s, label in statuses %}
-    <option value="{{ s }}" {% if s == task.status %}selected{% endif %}>{{ label }}</option>
-    {% endfor %}
-  </select>
-  <input id="assignee" value="{{ task.assignee or '' }}" placeholder="担当" class="border rounded px-2 py-1 w-24">
-  <button onclick="save()" class="bg-blue-600 text-white rounded px-3 py-1">更新</button>
-</div>
-
-<h2 class="font-semibold mt-8 mb-2">タイムライン</h2>
-{% if timeline %}
-<ul class="text-sm">
-{% for item in timeline %}
-  <li class="border-l-2 pl-3 py-1 {{ item.color }}">
-    <span class="text-gray-500">{{ item.when }}</span>
-    <span class="font-medium">[{{ item.label }}]</span>
-    {{ item.text }}
-    {% if item.actor %}<span class="text-gray-500">（{{ item.actor }}）</span>{% endif %}
-    {% if item.ref %}<span class="text-gray-400 text-xs">{{ item.ref }}</span>{% endif %}
-  </li>
-{% endfor %}
-</ul>
-{% else %}
-<p class="text-sm text-gray-500">紐付く出来事はまだありません。</p>
-{% endif %}
-
+{% endblock %}
+{% block scripts %}
 <script>
-async function save() {
-  const body = { status: document.getElementById("status").value,
-                 assignee: document.getElementById("assignee").value || null };
-  const r = await fetch("/tasks/{{ task.id }}", { method: "PATCH",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (r.ok) location.reload(); else alert("更新に失敗しました");
+function detail() {
+  return {
+    t: { title: {{ task.title|tojson }}, description: {{ (task.description or '')|tojson }}, status: {{ task.status|tojson }},
+         assignee: {{ (task.assignee or '')|tojson }}, due_date: {{ (task.due_date.isoformat() if task.due_date else '')|tojson }},
+         artifacts: {{ task.artifacts|tojson }} },
+    newArt: '',
+    async save(body, msg) { await Alpine.$data(document.body).patch('/tasks/{{ task.id }}', body, msg); },
+  };
 }
 </script>
 {% endblock %}

@@ -105,6 +105,14 @@ CREATE TABLE IF NOT EXISTS sync_state (
     last_synced   TEXT NOT NULL
 );
 
+-- エージェントの活動ログ（UI のリアルタイム表示用）
+CREATE TABLE IF NOT EXISTS agent_logs (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    at            TEXT NOT NULL,
+    level         TEXT NOT NULL DEFAULT 'info',   -- info | finding | action | warn
+    message       TEXT NOT NULL
+);
+
 -- 処理済みフラグ（増分処理用）。stage = extract | link | detect
 CREATE TABLE IF NOT EXISTS processed (
     stage         TEXT NOT NULL,
@@ -352,3 +360,15 @@ def mark_processed(conn: sqlite3.Connection, stage: str, key: str, result: dict 
     conn.execute("INSERT OR REPLACE INTO processed (stage, key, result, done_at) VALUES (?,?,?,?)",
                  (stage, key, json.dumps(result, ensure_ascii=False) if result else None, now_iso()))
     conn.commit()
+
+
+# ---------- agent_logs ----------
+
+def add_log(conn: sqlite3.Connection, message: str, level: str = "info") -> None:
+    conn.execute("INSERT INTO agent_logs (at, level, message) VALUES (?,?,?)", (now_iso(), level, message))
+    conn.commit()
+
+
+def recent_logs(conn: sqlite3.Connection, after_id: int = 0, limit: int = 200) -> list[dict]:
+    rows = conn.execute("SELECT * FROM agent_logs WHERE id > ? ORDER BY id DESC LIMIT ?", (after_id, limit)).fetchall()
+    return [dict(r) for r in reversed(rows)]

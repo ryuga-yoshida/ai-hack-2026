@@ -84,6 +84,13 @@ def last_linked_message(conn: sqlite3.Connection, channel: str, before) -> tuple
 
 
 def by_context(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | None:
+    # スレッド返信: 親メッセージが紐付いていれば同じタスク
+    if parent := msg.meta.get("reply_to"):
+        r = conn.execute(
+            "SELECT to_id FROM links WHERE from_type='event' AND from_id=? AND to_type='task' AND relation='discusses' LIMIT 1",
+            (parent,)).fetchone()
+        if r:
+            return (r["to_id"], 0.9)
     prev = last_linked_message(conn, msg.meta.get("channel", ""), before=msg.occurred_at)
     if prev and (msg.occurred_at - prev[0].occurred_at) < timedelta(minutes=config.LINK_CONTEXT_WINDOW_MIN):
         return (prev[1], 0.8)

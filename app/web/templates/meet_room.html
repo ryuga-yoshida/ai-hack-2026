@@ -1,97 +1,110 @@
 {% extends "base.html" %}
 {% block title %}{{ m.title }}{% endblock %}
+{% block heading %}<a href="/meet" class="text-gray-400 hover:text-gray-600 mr-2">会議室</a><span class="text-gray-300 mr-2">/</span>{{ m.title }}
+  <span id="status" class="ml-3 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-normal">{{ {'recording': '● 進行中', 'processing': '文字起こし中', 'done': '議事録あり', 'failed': '失敗'}[m.status] }}</span>{% endblock %}
 {% block content %}
-<a href="/meet" class="text-sm text-blue-600">← 会議室一覧</a>
-<div class="flex items-center gap-3 mt-2">
-  <h1 class="text-xl font-bold">{{ m.title }}</h1>
-  <span class="text-sm text-gray-500">{{ m.started_at[:16].replace('T', ' ') }} 開始</span>
-  <span id="status" class="text-sm px-2 py-0.5 rounded bg-gray-200"></span>
-</div>
-<div class="text-sm text-gray-600 mt-1">参加者: <span id="participants">{{ participants|join('・') }}</span></div>
+<div class="grid grid-cols-3 gap-6">
+  <div class="col-span-2 space-y-4">
+    {% if m.status == 'recording' %}
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div class="flex items-center gap-4">
+        <div class="text-sm">あなた: <b>{{ me or '（名前未入力）' }}</b></div>
+        {% if not me %}
+        <form method="get" class="flex gap-2"><input name="me" placeholder="名前" required class="text-sm border border-gray-300 rounded-lg px-2 py-1 w-28"><button class="text-sm border border-gray-300 rounded-lg px-3">参加</button></form>
+        {% else %}
+        <span id="timer" class="font-mono text-gray-500">00:00</span>
+        <span id="rec" class="text-xs text-gray-500"></span>
+        <button id="endBtn" class="ml-auto bg-red-600 text-white rounded-lg px-4 py-2 text-sm hover:bg-red-700">会議を終了して議事録を作る</button>
+        {% endif %}
+      </div>
+      <p class="text-xs text-gray-500 mt-3">このページを開いている間、あなたのマイクだけを録音しています。他の参加者には URL を共有してください: <code class="bg-gray-100 rounded px-1" id="url"></code></p>
+    </div>
+    {% endif %}
 
-{% if m.status == 'recording' %}
-<div class="bg-white border rounded p-4 mt-4 text-sm">
-  <div class="flex items-center gap-3">
-    <div>あなた: <b>{{ me or '（名前未入力）' }}</b></div>
-    {% if not me %}
-    <form method="get" class="flex gap-2"><input name="me" placeholder="名前" class="border rounded px-2 py-1 w-28"><button class="border rounded px-2 py-1">参加</button></form>
-    {% else %}
-    <span id="timer" class="font-mono text-gray-500">00:00</span>
-    <button id="endBtn" class="bg-red-600 text-white rounded px-3 py-1 ml-auto">会議を終了して議事録を作る</button>
+    {% if m.status == 'processing' %}
+    <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-600">
+      <div class="animate-pulse">全員分の録音を文字起こししています…（このページは自動で更新されます）</div></div>
+    {% elif m.status == 'failed' %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-5 text-sm text-red-700">文字起こしに失敗しました: {{ m.error }}</div>
+    {% endif %}
+
+    {% if lines %}
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold mb-3">議事録（文字起こし）<span class="text-xs text-gray-400 font-normal ml-2">{{ lines|length }} 発言</span></h2>
+      <div class="space-y-1.5 text-sm max-h-[70vh] overflow-y-auto scrollbar-thin pr-2">
+        {% for l in lines %}
+        <div class="flex gap-3"><span class="text-xs text-gray-400 w-10 shrink-0 pt-0.5">{{ l.time }}</span>
+          {% set colors = ['text-indigo-700','text-emerald-700','text-amber-700','text-rose-700','text-sky-700'] %}
+          <span class="font-semibold w-12 shrink-0 {{ colors[(PEOPLE.index(l.actor) if l.actor in PEOPLE else 4) % 5] }}">{{ l.actor }}</span>
+          <span class="text-gray-800">{{ l.text }}</span></div>
+        {% endfor %}
+      </div>
+    </div>
     {% endif %}
   </div>
-  <p class="text-xs text-gray-500 mt-2">このページを開いている間、あなたのマイクだけを録音しています（他の参加者の音声は各自のブラウザが録音）。終了ボタンを押すと録音をアップロードし、全員分を統合して文字起こしします。</p>
-</div>
-{% endif %}
 
-<div id="result" class="mt-6">
-{% if m.status == 'done' %}
-<h2 class="font-semibold mb-2">議事録（文字起こし）</h2>
-<pre class="bg-white border rounded p-4 text-sm whitespace-pre-wrap">{{ m.transcript }}</pre>
-<form method="post" action="/tick" class="mt-3"><button class="border rounded px-3 py-1 bg-white text-sm">今すぐ巡回（抽出 → タスク生成 → 検知）</button></form>
-{% elif m.status == 'processing' %}
-<p class="text-sm text-gray-600">文字起こし中です…（このページは自動で更新されます）</p>
-{% elif m.status == 'failed' %}
-<p class="text-sm text-red-600">文字起こしに失敗しました: {{ m.error }}</p>
-{% endif %}
+  <aside class="space-y-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <div class="text-xs text-gray-500">開始</div><div>{{ m.started_at|dt }}</div>
+      <div class="text-xs text-gray-500 mt-2">参加者</div>
+      <div id="participants" class="flex flex-wrap gap-1 mt-1">{% for p in participants %}<span class="px-2 py-0.5 rounded-full bg-gray-100 text-xs">{{ p }}</span>{% endfor %}</div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <h2 class="font-semibold text-sm mb-2">抽出された決定・タスク</h2>
+      {% if extracted %}
+      <ul class="space-y-2">
+        {% for e in extracted %}
+        <li class="flex gap-2"><span class="text-[10px] px-1.5 rounded shrink-0 h-fit mt-0.5 {% if e.kind == 'decision' %}bg-rose-100 text-rose-700{% else %}bg-gray-200 text-gray-700{% endif %}">{{ '決定' if e.kind == 'decision' else 'タスク' }}</span>
+          <div><div>{{ e.text }}</div><div class="text-[11px] text-gray-400">{{ e.occurred_at|dt(False) }} {{ e.actor }} · 原文「{{ e.quote|truncate(40) }}」</div></div></li>
+        {% endfor %}
+      </ul>
+      {% elif m.status == 'done' %}
+      <p class="text-gray-500 text-xs">まだ巡回されていません。右上の「今すぐ巡回」で抽出されます。</p>
+      {% else %}<p class="text-gray-400 text-xs">会議終了後に抽出されます。</p>{% endif %}
+    </div>
+  </aside>
 </div>
-
+{% endblock %}
+{% block scripts %}
 <script>
-const meetingId = "{{ m.id }}", me = "{{ me }}", status = "{{ m.status }}";
+const meetingId = "{{ m.id }}", me = {{ me|tojson }}, status = "{{ m.status }}";
 const $ = id => document.getElementById(id);
+if ($('url')) $('url').textContent = location.origin + '/meet/' + meetingId;
 let rec, chunks = [], recStartedAt = null, tick0 = null;
-
-function pickMime() {
-  for (const c of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'])
-    if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
-  return '';
-}
+function pickMime() { for (const c of ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']) if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c; return ''; }
 async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     const mime = pickMime();
     rec = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
     rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-    recStartedAt = new Date();
-    rec.start(2000);   // 2秒ごとに flush（タブを閉じても直前まで保持）
-    $('status').textContent = '● 録音中';
-    $('status').className = 'text-sm px-2 py-0.5 rounded bg-red-100 text-red-700';
+    recStartedAt = new Date(); rec.start(2000);
+    $('status').textContent = '● 録音中'; $('status').className = 'ml-3 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-normal';
     tick0 = Date.now();
     setInterval(() => { const s = Math.floor((Date.now() - tick0) / 1000); $('timer').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }, 1000);
-  } catch (e) { $('status').textContent = 'マイク取得失敗: ' + e.message; }
+  } catch (e) { $('rec').textContent = 'マイク取得失敗: ' + e.message; }
 }
-function stopRecording() {
-  return new Promise(resolve => {
-    if (!rec || rec.state === 'inactive') return resolve(new Blob(chunks, { type: rec ? rec.mimeType : 'audio/webm' }));
-    rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType }));
-    rec.stop();
-  });
-}
+function stopRecording() { return new Promise(resolve => { if (!rec || rec.state === 'inactive') return resolve(new Blob(chunks, { type: rec ? rec.mimeType : 'audio/webm' })); rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType })); rec.stop(); }); }
 async function endMeeting() {
   const btn = $('endBtn'); btn.disabled = true; btn.textContent = '録音をアップロード中…';
   const blob = await stopRecording();
   if (blob.size > 3000) {
-    const fd = new FormData();
-    fd.append('speaker', me); fd.append('rec_started_at', recStartedAt.toISOString());
-    fd.append('audio', blob, 'track.webm');
+    const fd = new FormData(); fd.append('speaker', me); fd.append('rec_started_at', recStartedAt.toISOString()); fd.append('audio', blob, 'track.webm');
     const r = await fetch(`/meet/${meetingId}/audio`, { method: 'POST', body: fd });
     if (!r.ok) { btn.textContent = 'アップロード失敗'; return; }
   }
-  btn.textContent = '文字起こし中…（少々お待ちください）';
-  await fetch(`/meet/${meetingId}/finalize`, { method: 'POST' });
-  poll();
+  btn.textContent = '文字起こし中…'; await fetch(`/meet/${meetingId}/finalize`, { method: 'POST' }); poll();
 }
 async function poll() {
   const r = await fetch(`/meet/${meetingId}/status`); const j = await r.json();
-  $('participants').textContent = j.participants.join('・');
+  $('participants').innerHTML = j.participants.map(p => `<span class="px-2 py-0.5 rounded-full bg-gray-100 text-xs">${p}</span>`).join('');
   if (j.status === 'done' || j.status === 'failed') { location.href = `/meet/${meetingId}`; return; }
   setTimeout(poll, 2000);
 }
-if (status === 'recording' && me) { startRecording(); $('endBtn').onclick = endMeeting; setInterval(async () => {
-  const r = await fetch(`/meet/${meetingId}/status`); const j = await r.json();
-  $('participants').textContent = j.participants.join('・');
-  if (j.status !== 'recording') location.href = `/meet/${meetingId}`;
-}, 5000); }
+if (status === 'recording' && me) { startRecording(); $('endBtn').onclick = endMeeting;
+  setInterval(async () => { const r = await fetch(`/meet/${meetingId}/status`); const j = await r.json();
+    $('participants').innerHTML = j.participants.map(p => `<span class="px-2 py-0.5 rounded-full bg-gray-100 text-xs">${p}</span>`).join('');
+    if (j.status !== 'recording') location.href = `/meet/${meetingId}`; }, 5000); }
 if (status === 'processing') poll();
 </script>
 {% endblock %}

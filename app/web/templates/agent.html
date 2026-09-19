@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}エージェント{% endblock %}
+{% block content %}
+<div class="grid grid-cols-3 gap-6" x-data="agentPage()" x-init="start()">
+  <div class="col-span-2 bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-100 h-[calc(100vh-7rem)] flex flex-col">
+    <div class="flex items-center justify-between text-gray-400 mb-2">
+      <span>活動ログ（リアルタイム）</span>
+      <span x-text="agent.running ? '● 巡回中' : (agent.enabled ? '● 待機中（' + agent.interval + '秒間隔）' : '停止中')" :class="agent.running ? 'text-emerald-400' : 'text-gray-400'"></span>
+    </div>
+    <div class="flex-1 overflow-y-auto scrollbar-thin space-y-0.5" x-ref="log">
+      <template x-for="l in logs" :key="l.id">
+        <div class="flex gap-2"><span class="text-gray-500 shrink-0" x-text="l.at.slice(11,19)"></span>
+          <span :class="{'text-red-400 font-semibold': l.level==='finding', 'text-indigo-300': l.level==='action', 'text-amber-300': l.level==='warn', 'text-gray-100': l.level==='info'}" x-text="l.message" class="break-all"></span></div>
+      </template>
+      <div x-show="!logs.length" class="text-gray-500">まだ活動はありません。「今すぐ巡回」か自動巡回をオンにしてください。</div>
+    </div>
+  </div>
+
+  <aside class="space-y-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm space-y-3">
+      <div class="flex items-center justify-between">
+        <div><div class="font-semibold">自動巡回</div><div class="text-xs text-gray-500">人間の指示なしに取込→抽出→紐付け→検知を繰り返します</div></div>
+        <button @click="toggle()" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="agent.enabled ? 'bg-emerald-500' : 'bg-gray-300'">
+          <span class="inline-block h-5 w-5 transform rounded-full bg-white transition" :class="agent.enabled ? 'translate-x-5' : 'translate-x-0.5'"></span></button>
+      </div>
+      <div class="flex items-center gap-2 text-xs"><span class="text-gray-500">間隔</span>
+        <select x-model.number="interval" @change="if (agent.enabled) toggle(true)" class="border border-gray-300 rounded px-2 py-1 bg-white"><option value="30">30秒</option><option value="60">1分</option><option value="300">5分</option></select></div>
+      <div class="text-xs text-gray-500">巡回回数 <b class="text-gray-800" x-text="agent.ticks"></b> · 最終 <span x-text="agent.last_tick ? agent.last_tick.slice(5,16).replace('T',' ') : '—'"></span></div>
+      <template x-if="agent.last_result">
+        <div class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2">前回: 取込 <b x-text="agent.last_result.fetched"></b> · 抽出 <b x-text="agent.last_result.extracted"></b> · 紐付け <b x-text="agent.last_result.linked"></b> · Finding <b x-text="agent.last_result.findings"></b></div>
+      </template>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <h2 class="font-semibold text-sm mb-2">エージェントが自分で決めること</h2>
+      <table class="w-full text-xs">
+        <tr class="text-gray-500"><td class="py-1">判断</td><td>選択肢</td></tr>
+        <tr class="border-t"><td class="py-1">この変更は調べる価値があるか</td><td>調査 / 無視</td></tr>
+        <tr class="border-t"><td class="py-1">矛盾を指摘すべきか</td><td>通知 / 確認キュー / 記録のみ</td></tr>
+        <tr class="border-t"><td class="py-1">誰に伝えるか</td><td>変更者 / 決定者 / 両方</td></tr>
+        <tr class="border-t"><td class="py-1">深刻度</td><td>high / medium / low</td></tr>
+        <tr class="border-t"><td class="py-1">発言はどのタスクの話か</td><td>5段で判定・紐付けない</td></tr>
+      </table>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <h2 class="font-semibold text-sm mb-2">増分処理の状態</h2>
+      <div class="text-xs space-y-1 text-gray-600">
+        {% for src, at in sync.items() %}<div class="flex justify-between"><span>{{ src }} 取込済</span><span>{{ at|dt }}</span></div>{% endfor %}
+        {% for st, n in processed.items() %}<div class="flex justify-between"><span>{{ {'extract':'抽出','link':'紐付け','detect':'検知'}.get(st, st) }} 処理済</span><b>{{ n }}</b></div>{% endfor %}
+      </div>
+      <div class="mt-3 text-xs text-gray-600">紐付けの内訳: {% for k, v in link.items() %}{{ k }} {{ v }}{% if not loop.last %} / {% endif %}{% endfor %}</div>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function agentPage() {
+  return {
+    logs: {{ logs|tojson }}, agent: {{ agent_state|tojson }}, interval: {{ agent_state.interval }},
+    start() { this.scroll(); setInterval(() => this.poll(), 2000); },
+    scroll() { this.$nextTick(() => { const l = this.$refs.log; l.scrollTop = l.scrollHeight; }); },
+    async poll() {
+      const last = this.logs.length ? this.logs[this.logs.length - 1].id : 0;
+      const [a, b] = await Promise.all([fetch(`/api/agent/logs?after_id=${last}`), fetch('/api/agent/status')]);
+      const j = await a.json(); const s = await b.json();
+      if (j.logs.length) { this.logs.push(...j.logs); this.logs = this.logs.slice(-300); this.scroll(); }
+      this.agent = s.state; Alpine.$data(document.body).agent = s.state;
+    },
+    async toggle(keepEnabled) {
+      const enabled = keepEnabled ? true : !this.agent.enabled;
+      const r = await fetch('/api/agent/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled, interval: this.interval }) });
+      const j = await r.json(); this.agent = j.state; Alpine.$data(document.body).agent = j.state;
+    },
+  };
+}
+</script>
+{% endblock %}

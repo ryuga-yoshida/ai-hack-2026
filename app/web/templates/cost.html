@@ -1,17 +1,64 @@
 {% extends "base.html" %}
 {% block title %}コスト{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>{% endblock %}
 {% block content %}
-<h1 class="text-xl font-bold mb-4">コスト</h1>
-<div class="bg-white border rounded-lg p-5 text-sm space-y-3">
-  <div class="text-lg">本デモの全処理コスト: <b>${{ '%.4f' % s.total_usd }}</b></div>
-  <div>内訳: {% for k, v in s.by_task.items() %}{{ k }} ${{ '%.4f' % v }}{% if not loop.last %} / {% endif %}{% endfor %}</div>
-  <div>呼び出し回数: {% for k, v in s.calls.items() %}{{ k }} {{ v }}{% if not loop.last %} / {% endif %}{% endfor %}</div>
-  <div>LLM を使わなかった処理: 分割・正規化・差分の自然言語化・候補絞り込み・紐付け第1〜3段・時系列ガード・stalled / orphan 検知</div>
-  {% if s.if_all_high %}
-  <div class="text-lg">全て high で実行した場合: <b>${{ '%.4f' % s.if_all_high }}</b>
-    （{{ '%.1f' % (s.if_all_high / s.total_usd if s.total_usd else 0) }}倍、削減率 {{ (s.savings_ratio * 100)|round|int }}%）</div>
-  {% endif %}
-  <div class="pt-3 border-t">紐付けの内訳: {% for k, v in link.items() %}{{ k }} {{ v }}{% if not loop.last %} / {% endif %}{% endfor %}
-    <span class="text-gray-500">（LLM 不使用 {{ link.explicit + link.context + link.assignee }} / LLM {{ link.llm }}）</span></div>
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="bg-white border border-gray-200 rounded-xl p-5">
+    <div class="text-xs text-gray-500">本デモの全処理コスト</div>
+    <div class="text-3xl font-semibold mt-1">${{ '%.4f' % s.total_usd }}</div>
+    <div class="text-xs text-gray-500 mt-1">{% for k, v in s.by_task.items() %}{{ k }} ${{ '%.4f' % v }}{% if not loop.last %} · {% endif %}{% endfor %}</div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl p-5">
+    <div class="text-xs text-gray-500">全て high で実行した場合</div>
+    <div class="text-3xl font-semibold mt-1">${{ '%.4f' % s.if_all_high }}</div>
+    <div class="text-xs mt-1"><b class="text-emerald-700 text-base">{{ '%.1f' % (s.if_all_high / s.total_usd if s.total_usd else 0) }}倍</b> <span class="text-gray-500">削減率 {{ (s.savings_ratio*100)|round|int }}%</span></div>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl p-5">
+    <div class="text-xs text-gray-500">呼び出し回数</div>
+    <div class="flex gap-4 mt-2">{% for k, v in s.calls.items() %}<span><b class="text-2xl">{{ v }}</b> <span class="text-xs text-gray-500">{{ k }}</span></span>{% endfor %}</div>
+    <div class="text-xs text-gray-500 mt-1">LLM 不使用: 分割・正規化・差分の自然言語化・候補絞り込み・紐付け第1〜3段・時系列ガード・stalled / orphan</div>
+  </div>
 </div>
+
+<div class="grid grid-cols-2 gap-6">
+  <div class="bg-white border border-gray-200 rounded-xl p-5">
+    <h2 class="font-semibold text-sm mb-3">処理別コスト（実測 vs 全部 high）</h2>
+    <canvas id="byTask" height="180"></canvas>
+  </div>
+  <div class="bg-white border border-gray-200 rounded-xl p-5">
+    <h2 class="font-semibold text-sm mb-3">モデルの使い分け（OrcaRouter）</h2>
+    <table class="w-full text-xs">
+      <thead class="text-gray-500 text-left"><tr><th class="py-1">処理</th><th>tier</th><th>モデル</th><th class="text-right">単価 入/出 ($/1M)</th></tr></thead>
+      <tbody>
+        <tr class="border-t"><td class="py-1.5">チャンク分割・差分の自然言語化・候補絞り込み・紐付け1〜3段・時系列ガード・stalled/orphan</td><td colspan="3" class="text-emerald-700 font-semibold">LLM 不使用</td></tr>
+        <tr class="border-t"><td class="py-1.5">決定・タスクの抽出 / 紐付け第5段</td><td>mid</td><td>{{ models.mid }}</td><td class="text-right">{{ prices.get(models.mid, {}).get('input', '?') }} / {{ prices.get(models.mid, {}).get('output', '?') }}</td></tr>
+        <tr class="border-t"><td class="py-1.5">埋め込み</td><td>embed</td><td>{{ models.embed }}</td><td class="text-right">{{ prices.get(models.embed, {}).get('input', '?') }} / —</td></tr>
+        <tr class="border-t"><td class="py-1.5"><b>矛盾判定</b></td><td><b>high</b></td><td>{{ models.high }}</td><td class="text-right">{{ prices.get(models.high, {}).get('input', '?') }} / {{ prices.get(models.high, {}).get('output', '?') }}</td></tr>
+      </tbody>
+    </table>
+    <div class="mt-4 text-xs text-gray-600">紐付けの内訳: {% for k, v in link.items() %}{{ k }} <b>{{ v }}</b>{% if not loop.last %} / {% endif %}{% endfor %}
+      <span class="text-gray-400">（LLM 不使用 {{ link.explicit + link.context + link.assignee }} / LLM {{ link.llm }}）</span></div>
+  </div>
+</div>
+
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden mt-6">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-xs text-gray-500 text-left"><tr><th class="px-4 py-2">処理</th><th class="px-4 py-2">tier</th><th class="px-4 py-2">モデル</th><th class="px-4 py-2 text-right">回数</th><th class="px-4 py-2 text-right">入力トークン</th><th class="px-4 py-2 text-right">出力トークン</th><th class="px-4 py-2 text-right">コスト</th></tr></thead>
+    <tbody>{% for r in rows %}<tr class="border-t border-gray-100"><td class="px-4 py-2">{{ r.task }}</td><td class="px-4 py-2">{{ r.tier }}</td><td class="px-4 py-2 text-gray-600">{{ r.model }}</td><td class="px-4 py-2 text-right">{{ r.n }}</td><td class="px-4 py-2 text-right">{{ '{:,}'.format(r.i) }}</td><td class="px-4 py-2 text-right">{{ '{:,}'.format(r.o) }}</td><td class="px-4 py-2 text-right">${{ '%.4f' % r.c }}</td></tr>{% else %}<tr><td colspan="7" class="px-4 py-6 text-center text-gray-400">まだ LLM を呼んでいません</td></tr>{% endfor %}</tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const byTask = {{ s.by_task|tojson }};
+const labels = Object.keys(byTask);
+const highRatio = {{ (s.if_all_high / s.total_usd) if s.total_usd else 1 }};
+new Chart(document.getElementById('byTask'), {
+  type: 'bar',
+  data: { labels, datasets: [
+    { label: '実測', data: labels.map(k => byTask[k]), backgroundColor: '#6366f1' },
+    { label: '全部 high（試算）', data: labels.map(k => byTask[k] * highRatio), backgroundColor: '#e5e7eb' } ] },
+  options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { ticks: { callback: v => '$' + v.toFixed(3) } } } }
+});
+</script>
 {% endblock %}

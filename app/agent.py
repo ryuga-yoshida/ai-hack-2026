@@ -18,9 +18,65 @@ from app.models import Event, Finding
 log = logging.getLogger("agent")
 
 
+_log_conn: sqlite3.Connection | None = None
+
+
 def say(msg: str, at: datetime | None = None) -> None:
-    """デモ用の1行ログ（標準出力）"""
+    """1行ログ。標準出力と agent_logs（UI のリアルタイム表示）の両方に出す"""
     print(f"[{(at or datetime.now()):%H:%M:%S}] {msg}", flush=True)
+    if _log_conn is not None:
+        level = ("finding" if msg.startswith("FINDING") else "action" if msg.startswith(("action", "review", "record"))
+                 else "warn" if "失敗" in msg or "スキップ" in msg else "info")
+        try:
+            db.add_log(_log_conn, msg, level)
+        except Exception:
+            pass
+
+
+# ---------- バックグラウンド巡回（UI から ON/OFF） ----------
+
+import threading
+
+state = {"enabled": False, "interval": 60, "running": False, "last_tick": None, "ticks": 0, "last_result": None}
+_thread: threading.Thread | None = None
+_stop = threading.Event()
+
+
+def _loop():
+    while not _stop.is_set():
+        if state["enabled"]:
+            conn = db.connect()
+            db.init_db(conn)
+            try:
+                state["running"] = True
+                r = tick(conn)
+                state["ticks"] += 1
+                state["last_tick"] = datetime.now().replace(microsecond=0).isoformat()
+                state["last_result"] = {"fetched": r.fetched, "extracted": r.extracted, "linked": r.linked,
+                                        "findings": len(r.findings), "actions": r.actions}
+            except Exception as e:
+                log.exception("background tick failed")
+                say(f"tick 失敗: {e}")
+            finally:
+                state["running"] = False
+                conn.close()
+        _stop.wait(state["interval"])
+
+
+def set_enabled(enabled: bool, interval: int | None = None) -> dict:
+    global _thread
+    state["enabled"] = enabled
+    if interval:
+        state["interval"] = max(10, int(interval))
+    if enabled and (_thread is None or not _thread.is_alive()):
+        _stop.clear()
+        _thread = threading.Thread(target=_loop, daemon=True, name="agent-loop")
+        _thread.start()
+    if enabled:
+        say(f"自動巡回を開始（{state['interval']}秒間隔）")
+    else:
+        say("自動巡回を停止")
+    return dict(state)
 
 
 @dataclass
@@ -213,13 +269,17 @@ def stage_detect(conn, stats: TickResult, now: datetime | None = None) -> None:
 
 def tick(conn: sqlite3.Connection, now: datetime | None = None,
          events_override: list[Event] | None = None) -> TickResult:
+    global _log_conn
     router.bind(conn)
+    _log_conn = conn
     stats = TickResult()
+    say("巡回開始" if events_override is None else f"再生: {now:%Y-%m-%d} の出来事を投入")
     stage_fetch(conn, stats, events_override)     # 1. 取込
     stage_extract(conn, stats)                     # 2. 抽出（新規 utterance のみ）
     stage_embed(conn, stats)                       # 3. 埋め込み（未生成のみ）
     stage_link(conn, stats)                        # 4. 紐付け（新規 utterance のみ）
     stage_detect(conn, stats, now)                 # 5-6. 検知（新規 artifact_change＋定期）
+    say(f"巡回終了: 取込{stats.fetched} 抽出{stats.extracted} 紐付け{stats.linked} Finding{len(stats.findings)}")
     return stats
 
 

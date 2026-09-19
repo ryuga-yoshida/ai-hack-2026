@@ -1,27 +1,90 @@
 {% extends "base.html" %}
 {% block title %}タスク{% endblock %}
-{% block content %}
-<h1 class="text-xl font-bold mb-4">タスク</h1>
-
-<form method="post" action="/tasks" class="bg-white border rounded p-4 mb-6 flex flex-wrap gap-2 items-end text-sm">
-  <label class="flex flex-col">タイトル<input name="title" required class="border rounded px-2 py-1 w-64"></label>
-  <label class="flex flex-col">担当<input name="assignee" class="border rounded px-2 py-1 w-24"></label>
-  <label class="flex flex-col">期限<input name="due_date" type="date" class="border rounded px-2 py-1"></label>
-  <label class="flex flex-col">成果物<input name="artifacts" placeholder="売上見込.xlsx" class="border rounded px-2 py-1 w-40"></label>
-  <button class="bg-blue-600 text-white rounded px-3 py-1">作成</button>
+{% block actions %}
+<form method="get" class="flex items-center gap-2">
+  <input name="q" value="{{ q }}" placeholder="検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-40">
+  <select name="assignee" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+    <option value="">全員</option>
+    {% for a in assignees %}<option value="{{ a }}" {% if a == assignee %}selected{% endif %}>{{ a }}</option>{% endfor %}
+  </select>
 </form>
-
-<div class="grid grid-cols-4 gap-4">
-{% for status, label in statuses %}
-  <div>
-    <h2 class="font-semibold text-sm mb-2">{{ label }} <span class="text-gray-400">({{ by_status[status]|length }})</span></h2>
-    {% for t in by_status[status] %}
-    <a href="/tasks/{{ t.id }}" class="block bg-white border rounded p-3 mb-2 text-sm hover:bg-gray-100">
-      <div class="font-medium">{{ t.title }}</div>
-      <div class="text-gray-500 text-xs mt-1">{{ t.assignee or "未割当" }}{% if t.due_date %} · {{ t.due_date }}{% endif %}</div>
-    </a>
+<button @click="$dispatch('open-new-task')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">＋ タスク</button>
+{% endblock %}
+{% block main_class %}p-6 overflow-x-auto{% endblock %}
+{% block content %}
+<div class="grid grid-cols-4 gap-4 min-w-[900px]" x-data="kanban()">
+{% for status, label in STATUSES %}
+  <div class="bg-gray-100 rounded-xl p-3 min-h-[60vh]" data-status="{{ status }}"
+       @dragover.prevent="over = '{{ status }}'" @dragleave="over = null" @drop.prevent="drop('{{ status }}')"
+       :class="over === '{{ status }}' && 'ring-2 ring-indigo-400'">
+    <div class="flex items-center justify-between mb-3 px-1">
+      <h2 class="text-sm font-semibold flex items-center gap-2">
+        <span class="w-2.5 h-2.5 rounded-full {% if status == 'todo' %}bg-gray-400{% elif status == 'in_progress' %}bg-indigo-500{% elif status == 'blocked' %}bg-red-500{% else %}bg-emerald-500{% endif %}"></span>
+        {{ label }}</h2>
+      <span class="text-xs text-gray-500">{{ by_status[status]|length }}</span>
+    </div>
+    <div class="space-y-2">
+    {% for m in by_status[status] %}{% set t = m.task %}
+      <a href="/tasks/{{ t.id }}" draggable="true" @dragstart="drag('{{ t.id }}')" @dragend="dragging = null"
+         class="block bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md hover:border-indigo-300 transition cursor-grab {% if t.status == 'done' %}opacity-70{% endif %}"
+         id="task-{{ t.id }}">
+        <div class="text-sm font-medium leading-snug">{{ t.title }}</div>
+        <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
+          <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>
+          <span>{{ t.assignee or "未割当" }}</span>
+          {% if t.due_date %}<span class="{% if m.overdue %}text-red-600 font-medium{% endif %}">期限 {{ t.due_date.strftime('%m/%d') }}</span>{% endif %}
+          <span class="ml-auto flex items-center gap-2">
+            {% if m.n_findings %}<span class="text-red-600 font-semibold" title="未対応の検知">⚠ {{ m.n_findings }}</span>{% endif %}
+            {% if m.n_msgs %}<span title="紐付いた発言">💬 {{ m.n_msgs }}</span>{% endif %}
+            {% if t.artifacts %}<span title="成果物">📎 {{ t.artifacts|length }}</span>{% endif %}
+          </span>
+        </div>
+        {% if m.origin %}<div class="mt-1.5 text-[11px] text-gray-400 truncate">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成 · {{ m.origin.occurred_at|dt }}</div>{% endif %}
+      </a>
     {% endfor %}
+    </div>
   </div>
 {% endfor %}
 </div>
+
+<!-- 新規タスク モーダル -->
+<div x-data="{ open: false }" @open-new-task.window="open = true" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/tasks" class="bg-white rounded-xl shadow-xl p-6 w-[480px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">新しいタスク</h3>
+      <input name="title" required placeholder="タイトル" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <textarea name="description" placeholder="説明（任意）" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+      <div class="grid grid-cols-3 gap-2">
+        <select name="assignee" class="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white"><option value="">担当者</option>{% for p in PEOPLE %}<option>{{ p }}</option>{% endfor %}</select>
+        <input name="due_date" type="date" class="border border-gray-300 rounded-lg px-2 py-2 text-sm">
+        <select name="status" class="border border-gray-300 rounded-lg px-2 py-2 text-sm bg-white">{% for s, l in STATUSES %}<option value="{{ s }}">{{ l }}</option>{% endfor %}</select>
+      </div>
+      <input name="artifacts" placeholder="成果物（ファイル名、カンマ区切り）例: 売上見込.xlsx" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button>
+        <button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">作成</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function kanban() {
+  return {
+    dragging: null, over: null,
+    drag(id) { this.dragging = id; },
+    async drop(status) {
+      const id = this.dragging; this.over = null; if (!id) return;
+      const card = document.getElementById('task-' + id);
+      const col = document.querySelector(`[data-status="${status}"] .space-y-2`);
+      if (card && col && card.parentElement !== col) col.prepend(card);
+      const j = await window.shellPatch(`/tasks/${id}`, { status }, '状態を更新しました');
+      if (!j) location.reload();
+    },
+  };
+}
+window.shellPatch = (url, body, msg) => Alpine.$data(document.body).patch(url, body, msg);
+</script>
 {% endblock %}

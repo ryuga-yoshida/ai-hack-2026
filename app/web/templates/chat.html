@@ -1,26 +1,114 @@
 {% extends "base.html" %}
 {% block title %}チャット{% endblock %}
-{% block content %}
-<h1 class="text-xl font-bold mb-4">チャット</h1>
-<div class="flex gap-2 text-sm mb-4">
-  {% for ch in channels %}
-  <a href="/chat?channel={{ ch }}" class="px-2 py-1 rounded border {% if ch == channel %}bg-gray-800 text-white{% else %}bg-white{% endif %}">#{{ ch }}</a>
-  {% endfor %}
-</div>
-
-<div class="bg-white border rounded p-4 mb-4 text-sm space-y-2 max-h-[28rem] overflow-y-auto">
-  {% for m in messages %}
-  <div><span class="text-gray-400">{{ m.posted_at[5:16].replace("T", " ") }}</span>
-    <span class="font-semibold">{{ m.actor }}</span>: {{ m.text|linkify }}</div>
-  {% else %}
-  <div class="text-gray-500">まだ発言はありません。</div>
-  {% endfor %}
-</div>
-
-<form method="post" action="/chat" class="flex gap-2 text-sm">
-  <input name="channel" value="{{ channel }}" class="border rounded px-2 py-1 w-28">
-  <input name="actor" placeholder="発言者" required class="border rounded px-2 py-1 w-24">
-  <input name="text" placeholder="発言" required class="border rounded px-2 py-1 flex-1">
-  <button class="bg-blue-600 text-white rounded px-3 py-1">投稿</button>
+{% block heading %}チャット <span class="text-gray-400 font-normal">#{{ channel }}</span>{% if descs.get(channel) %}<span class="text-sm text-gray-400 font-normal ml-2">{{ descs.get(channel) }}</span>{% endif %}{% endblock %}
+{% block actions %}
+<form method="get" action="/chat" class="flex items-center gap-2">
+  <input type="hidden" name="channel" value="{{ channel }}">
+  <input name="q" value="{{ q }}" placeholder="メッセージを検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-48">
 </form>
+{% endblock %}
+{% block main_class %}p-0 flex min-h-0{% endblock %}
+{% block content %}
+<div class="flex flex-1 min-h-0 h-[calc(100vh-3.5rem)]" x-data="chatPage()">
+  <!-- チャンネル -->
+  <aside class="w-56 shrink-0 bg-gray-100 border-r border-gray-200 flex flex-col">
+    <div class="px-4 py-3 text-xs font-semibold text-gray-500 flex items-center justify-between">チャンネル
+      <button @click="newCh = !newCh" class="text-gray-400 hover:text-gray-700 text-base leading-none" title="チャンネルを作成">＋</button></div>
+    <form method="post" action="/chat/channels" x-show="newCh" x-cloak class="px-3 pb-2 space-y-1">
+      <input name="name" placeholder="channel-name" required class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+      <input name="description" placeholder="説明（任意）" class="w-full text-xs border border-gray-300 rounded px-2 py-1">
+      <button class="w-full text-xs bg-indigo-600 text-white rounded py-1">作成</button>
+    </form>
+    <nav class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm">
+      {% for ch in channels %}
+      <a href="/chat?channel={{ ch }}" class="flex items-center justify-between px-2 py-1.5 rounded-lg {% if ch == channel %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
+        <span># {{ ch }}</span><span class="text-xs text-gray-400">{{ counts.get(ch, 0) }}</span></a>
+      {% endfor %}
+    </nav>
+    <div class="px-4 py-3 text-xs text-gray-500 border-t border-gray-200">
+      <div class="font-semibold mb-1">メンバー</div>
+      {% for p in PEOPLE %}<div class="flex items-center gap-1.5 py-0.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>{{ p }}</div>{% endfor %}
+    </div>
+  </aside>
+
+  <!-- メッセージ -->
+  <section class="flex-1 min-w-0 flex flex-col bg-white">
+    {% if q %}
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="text-sm text-gray-500 mb-2">「{{ q }}」の検索結果 {{ results|length }} 件 <a href="/chat?channel={{ channel }}" class="text-indigo-600 ml-2">閉じる</a></div>
+      {% for m in results %}<div class="text-xs text-gray-400 px-4 pt-2"># {{ m.channel }}</div>{% with compact=true %}{% include "_message.html" %}{% endwith %}{% endfor %}
+    </div>
+    {% else %}
+    <div class="flex-1 overflow-y-auto py-3 scrollbar-thin" id="msglist" x-ref="list">
+      {% set ns = namespace(day=None) %}
+      {% for m in messages %}
+        {% if m.posted_at[:10] != ns.day %}{% set ns.day = m.posted_at[:10] %}
+        <div class="flex items-center gap-3 px-4 my-3"><div class="flex-1 h-px bg-gray-200"></div><span class="text-xs text-gray-400">{{ ns.day }}</span><div class="flex-1 h-px bg-gray-200"></div></div>
+        {% endif %}
+        {% with compact=false %}{% include "_message.html" %}{% endwith %}
+      {% else %}
+      <div class="text-center text-sm text-gray-400 mt-20">まだ発言はありません。最初のメッセージを投稿しましょう。</div>
+      {% endfor %}
+      <div id="live"></div>
+    </div>
+    <form method="post" action="/chat" class="border-t border-gray-200 p-3" x-data="{ attach: false }">
+      <input type="hidden" name="channel" value="{{ channel }}">
+      <div class="flex gap-2">
+        <input name="actor" value="{{ me }}" placeholder="名前" required list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-24">
+        <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
+        <input name="text" placeholder="#{{ channel }} にメッセージを送信（@名前 でメンション）" required autocomplete="off" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+        <button type="button" @click="attach = !attach" class="text-sm border border-gray-300 rounded-lg px-3 bg-white hover:bg-gray-50" title="ファイルのリンクを添付">📎</button>
+        <button class="text-sm bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700">送信</button>
+      </div>
+      <div x-show="attach" x-cloak class="flex gap-2 mt-2">
+        <input name="attachment_url" placeholder="SharePoint / Drive のファイル URL" class="flex-1 text-xs border border-gray-300 rounded-lg px-3 py-1.5">
+        <input name="attachment_name" placeholder="表示名（任意）" class="w-40 text-xs border border-gray-300 rounded-lg px-3 py-1.5">
+      </div>
+    </form>
+    {% endif %}
+  </section>
+
+  <!-- スレッド -->
+  {% if thread %}
+  <aside class="w-96 shrink-0 border-l border-gray-200 bg-white flex flex-col">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between text-sm font-semibold">スレッド
+      <a href="/chat?channel={{ channel }}" class="text-gray-400 hover:text-gray-700">×</a></div>
+    <div class="flex-1 overflow-y-auto py-2">
+      {% with m=thread.root, compact=true %}{% include "_message.html" %}{% endwith %}
+      <div class="mx-4 my-1 text-xs text-gray-400 border-b border-gray-200 pb-1">{{ thread.replies|length }} 件の返信</div>
+      {% for m in thread.replies %}{% with compact=true %}{% include "_message.html" %}{% endwith %}{% endfor %}
+    </div>
+    <form method="post" action="/chat" class="border-t border-gray-200 p-3 flex gap-2">
+      <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="reply_to" value="{{ thread.root.id }}">
+      <input name="actor" value="{{ me }}" placeholder="名前" required class="text-sm border border-gray-300 rounded-lg px-2 py-2 w-20">
+      <input name="text" placeholder="返信…" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+      <button class="text-sm bg-indigo-600 text-white rounded-lg px-3">送信</button>
+    </form>
+  </aside>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const ME = {{ me|tojson }};
+function chatPage() {
+  return {
+    newCh: false, last: {{ (messages[-1].posted_at if messages else '')|tojson }},
+    init() {
+      const l = this.$refs.list; if (l) l.scrollTop = l.scrollHeight;
+      {% if not q %}setInterval(() => this.poll(), 4000);{% endif %}
+    },
+    async poll() {
+      const r = await fetch(`/api/chat/messages?channel={{ channel }}&after=${encodeURIComponent(this.last)}`);
+      const j = await r.json();
+      if (j.messages.length) { location.reload(); }   // 新着があれば描画し直す（サーバー描画を正とする）
+    },
+  };
+}
+async function react(id, emoji) {
+  const actor = ME || prompt('名前を入力してください') || '匿名';
+  const r = await fetch(`/api/chat/${id}/react`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emoji, actor }) });
+  if (r.ok) location.reload();
+}
+</script>
 {% endblock %}
