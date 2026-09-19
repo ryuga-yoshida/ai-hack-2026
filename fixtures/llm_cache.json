@@ -15136,5 +15136,176 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "judge"
+ },
+ "b6beb6aecb16e3e737361dfe": {
+  "tier": "high",
+  "content": "{\n  \"contradicts\": true,\n  \"confidence\": 0.85,\n  \"reason\": \"決定は商品Dの追加と商品Bの修正のみを認め、他の数字は触らないとしているが、商品Hの第2四半期が420から480へ変更されており、会話でも商品Hの変更理由や承認は確認できない。後続の許可は商品Dの第4四半期450のみに限定されている。\",\n  \"severity\": \"high\"\n}",
+  "usage": {
+   "prompt_tokens": 1306,
+   "completion_tokens": 137,
+   "total_tokens": 1443,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1304,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1306,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1304,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "ef234b83284ab24f5203a9b9": {
+  "tier": "high",
+  "content": "```json\n{\n  \"contradicts\": true,\n  \"confidence\": 0.8,\n  \"reason\": \"決定では商品Dの追加と商品Bの修正以外の数字は変更しないと明示されたが、商品Hの第2四半期が420から480へ変更されており、会話中でも商品Hの変更理由や承認は確認できない。\",\n  \"severity\": \"high\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1306,
+   "completion_tokens": 124,
+   "total_tokens": 1430,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1304,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1306,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1304,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "74ea204a6e91be217a35ab19": {
+  "tier": "mid",
+  "content": "{\n  \"items\": []\n}",
+  "usage": {
+   "prompt_tokens": 308,
+   "completion_tokens": 296,
+   "total_tokens": 604,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 308,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 9,
+    "audio_tokens": 0,
+    "reasoning_tokens": 287
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "dd6e91767990024d94bfc730": {
+  "tier": "high",
+  "content": "```json\n{\n  \"contradicts\": true,\n  \"confidence\": 0.85,\n  \"reason\": \"決定は商品Dの追加と商品Bの修正のみに変更を限定していたが、商品Hの第2四半期が480から420へ変更されており、会話中にも商品Hの変更理由や承認が見当たらない。\",\n  \"severity\": \"high\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1345,
+   "completion_tokens": 123,
+   "total_tokens": 1468,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1343,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1345,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1343,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "b069dabf90245a81ea870e38": {
+  "tier": "high",
+  "content": "```json\n{\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定事項の対象は商品Aの第3四半期だが、変更されたのは商品Iの第3四半期であり対象が別物。会話にも商品Iの据え置き等を示す記述はない。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1272,
+   "completion_tokens": 118,
+   "total_tokens": 1390,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1270,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1272,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1270,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "9b983e5c827712382399a553": {
+  "tier": "high",
+  "content": "```json\n{\n  \"contradicts\": true,\n  \"confidence\": 0.85,\n  \"reason\": \"決定では商品Dの追加と商品Bの修正以外の数字は変更しないとされているが、商品Iの第3四半期が130から200へ変更されており、会話上もこの変更の理由や合意、後続決定による許可は見当たらない。\",\n  \"severity\": \"high\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1399,
+   "completion_tokens": 132,
+   "total_tokens": 1531,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1397,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1399,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1397,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
  }
 }

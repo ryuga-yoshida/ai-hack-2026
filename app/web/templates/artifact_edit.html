@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ base }}.xlsx を編集{% endblock %}
+{% block heading %}<a href="/artifacts" class="text-gray-400 hover:text-gray-600 mr-2">成果物</a><span class="text-gray-300 mr-2">/</span>{{ base }}.xlsx <span class="text-xs text-gray-400 font-normal ml-2">v{{ version }} を編集中 → 保存すると v{{ version + 1 }}</span>{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4/dist/index.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspreadsheet-ce@4/dist/jspreadsheet.min.css">
+<script src="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsuites@4/dist/jsuites.min.css">
+<style>.jexcel td.formula { background:#f3f4f6; color:#6b7280; } .jexcel { font-size: 13px; }</style>
+{% endblock %}
+{% block actions %}
+<input id="actor" value="{{ me }}" placeholder="更新者" list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-28">
+<datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
+<select id="channel" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option><option value="general">#general に共有</option><option value="sales">#sales に共有</option></select>
+<button id="saveBtn" onclick="save()" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">保存して新しい版にする</button>
+{% endblock %}
+{% block content %}
+<div class="bg-white border border-gray-200 rounded-xl p-4">
+  <div class="text-xs text-gray-500 mb-3">セルをダブルクリックで編集。灰色のセルは数式（<span id="ftip">自動計算</span>）。行の追加・削除は右クリック。保存すると新しい版として取り込まれ、決定事項と突き合わせます。</div>
+  <div id="sheet"></div>
+  <div id="msg" class="text-sm mt-3 text-gray-600"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let wb, sheetName, formulas = {}, grid;
+async function load() {
+  const buf = await (await fetch('/artifacts/file/{{ latest }}')).arrayBuffer();
+  wb = XLSX.read(buf, { cellFormula: true, cellNF: false });
+  sheetName = wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const data = [], cellStyle = {};
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const row = [];
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c }); const cell = ws[addr];
+      if (cell && cell.f) { formulas[addr] = cell.f; cellStyle[addr] = 'formula'; }
+      row.push(cell ? (cell.v ?? '') : '');
+    }
+    data.push(row);
+  }
+  const cols = [];
+  for (let c = range.s.c; c <= range.e.c; c++) cols.push({ type: c === 0 ? 'text' : 'numeric', width: c === 0 ? 140 : 110, title: XLSX.utils.encode_col(c) });
+  grid = jspreadsheet(document.getElementById('sheet'), {
+    data, columns: cols, minDimensions: [cols.length, data.length], allowInsertColumn: false, allowDeleteColumn: false,
+    tableOverflow: true, tableHeight: '60vh',
+  });
+  for (const addr of Object.keys(formulas)) {
+    try { grid.setReadOnly(addr, true); } catch (e) {}
+    const el = grid.getCell ? grid.getCell(addr) : null; if (el) el.classList.add('formula');
+  }
+}
+// 数式の簡易評価: SUM(範囲)・セル参照・四則演算のみ（このデモの表で使われている範囲）
+function cellVal(addr, table) { const v = table[addr]; return typeof v === 'number' ? v : (parseFloat(v) || 0); }
+function evalFormula(f, table) {
+  let expr = f.replace(/SUM\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)/gi, (m, c1, r1, c2, r2) => {
+    let s = 0; for (let r = +r1; r <= +r2; r++) s += cellVal(c1 + r, table); return String(s);
+  });
+  expr = expr.replace(/[A-Z]+\d+/g, a => String(cellVal(a, table)));
+  if (!/^[\d+\-*/(). ]+$/.test(expr)) return null;
+  try { return Function('"use strict"; return (' + expr + ')')(); } catch { return null; }
+}
+async function save() {
+  const actor = document.getElementById('actor').value.trim();
+  if (!actor) { alert('更新者を入力してください'); return; }
+  const btn = document.getElementById('saveBtn'); btn.disabled = true; btn.textContent = '保存中…';
+  const data = grid.getData();
+  // 現在の値表（数式セルは再計算）
+  const table = {};
+  data.forEach((row, r) => row.forEach((v, c) => { const addr = XLSX.utils.encode_col(c) + (r + 1); table[addr] = (v === '' || v === null) ? '' : (isNaN(v) ? v : Number(v)); }));
+  for (const [addr, f] of Object.entries(formulas)) { const v = evalFormula(f, table); if (v !== null) table[addr] = v; }
+  const ws = {}; let maxR = 0, maxC = 0;
+  data.forEach((row, r) => row.forEach((v, c) => {
+    const addr = XLSX.utils.encode_col(c) + (r + 1); const val = table[addr];
+    if (val === '' && !formulas[addr]) return;
+    const cell = typeof val === 'number' ? { t: 'n', v: val } : { t: 's', v: String(val) };
+    if (formulas[addr]) cell.f = formulas[addr];
+    ws[addr] = cell; maxR = Math.max(maxR, r); maxC = Math.max(maxC, c);
+  }));
+  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+  const out = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(out, ws, sheetName);
+  const bytes = XLSX.write(out, { type: 'array', bookType: 'xlsx' });
+  const fd = new FormData();
+  fd.append('file', new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), '{{ base }}.xlsx');
+  fd.append('actor', actor); fd.append('channel', document.getElementById('channel').value); fd.append('note', '{{ base }} をブラウザで更新しました');
+  const r = await fetch('/artifacts/upload', { method: 'POST', body: fd, redirect: 'follow' });
+  if (r.ok) { Alpine.$data(document.body).toast('新しい版として保存しました。数秒後に検知結果を確認してください'); setTimeout(() => location.href = '/artifacts', 1200); }
+  else { document.getElementById('msg').textContent = '保存に失敗しました'; btn.disabled = false; btn.textContent = '保存して新しい版にする'; }
+}
+load();
+</script>
+{% endblock %}

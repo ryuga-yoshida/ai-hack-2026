@@ -17,6 +17,10 @@ ORCA_MODEL_MID = os.getenv("ORCA_MODEL_MID", "")
 ORCA_MODEL_EMBED = os.getenv("ORCA_MODEL_EMBED", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "")
 APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")   # チャットに貼る会議 URL の基点
+# 監視フォルダ（OneDrive の同期フォルダやデスクトップの任意フォルダ）。ここに置いた .xlsx を本物の Excel で保存すると
+# 新しい版として取り込む。未設定なら監視しない
+ARTIFACT_WATCH_DIR = os.getenv("ARTIFACT_WATCH_DIR", "")
+ARTIFACT_WATCH_ACTOR = os.getenv("ARTIFACT_WATCH_ACTOR", "山田")   # 監視フォルダ経由の更新者（OneDrive は更新者を教えてくれない）
 
 FIXTURES_DIR = ROOT / "fixtures"
 

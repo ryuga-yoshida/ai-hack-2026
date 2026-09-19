@@ -7,7 +7,7 @@ from html import escape
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from pydantic import BaseModel
@@ -750,6 +750,26 @@ def artifact_rows(conn: sqlite3.Connection) -> list[dict]:
 def artifacts_page(request: Request):
     conn = get_conn()
     return render("artifacts.html", request, conn, artifacts=artifact_rows(conn), me=get_me(request))
+
+
+@app.get("/artifacts/file/{filename}")
+def artifact_file(filename: str):
+    d = config.FIXTURES_DIR / "excel"
+    path = d / Path(filename).name
+    if not path.exists() or path.suffix != ".xlsx":
+        raise HTTPException(404)
+    return FileResponse(path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=path.name)
+
+
+@app.get("/artifacts/{base}/edit", response_class=HTMLResponse)
+def artifact_edit(request: Request, base: str):
+    """ブラウザ上で編集（Excel Online の代わり）。保存すると新しい版として取り込まれる"""
+    from app.connectors.excel import version_series
+    series = version_series(config.FIXTURES_DIR / "excel").get(base)
+    if not series:
+        raise HTTPException(404)
+    return render("artifact_edit.html", request, get_conn(), base=base, latest=series[-1][1].name,
+                  version=series[-1][0], me=get_me(request))
 
 
 @app.post("/artifacts/upload")

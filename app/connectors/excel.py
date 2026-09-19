@@ -66,3 +66,37 @@ class ExcelAdapter:
                         },
                     ))
         return events
+
+
+# ---------- 監視フォルダからの取り込み（OneDrive / デスクトップの Excel） ----------
+
+def snapshot_new_version(src: Path, actor: str, dest_dir: Path | None = None,
+                         url: str | None = None) -> Path | None:
+    """監視フォルダのファイルを <base>_vN.xlsx として版フォルダにコピーし versions.json に記録する。
+    直前の版と内容が同じなら何もしない（保存しただけで中身が変わっていない場合）"""
+    import hashlib
+    import shutil
+    dest_dir = dest_dir or (config.FIXTURES_DIR / "excel")
+    base = re.sub(r"_v\d+(?=\.xlsx$)", "", src.name)[:-5]
+    series = version_series(dest_dir).get(base, [])
+    data = src.read_bytes()
+    if series and hashlib.sha1(series[-1][1].read_bytes()).hexdigest() == hashlib.sha1(data).hexdigest():
+        return None
+    n = (series[-1][0] + 1) if series else 1
+    dest = dest_dir / f"{base}_v{n}.xlsx"
+    dest.write_bytes(data)
+    vp = dest_dir / "versions.json"
+    versions = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else {}
+    prev = next((versions[s[1].name] for s in reversed(series) if s[1].name in versions), {})
+    versions[dest.name] = {"actor": actor, "at": datetime.now().replace(microsecond=0).isoformat(),
+                           "url": url or prev.get("url") or f"file://{src}"}
+    vp.write_text(json.dumps(versions, ensure_ascii=False, indent=2), encoding="utf-8")
+    return dest
+
+
+def watch_signature(dir_: Path) -> dict[str, float]:
+    """監視フォルダ内の .xlsx（版番号なし・一時ファイル除く）の更新時刻"""
+    if not dir_ or not dir_.exists():
+        return {}
+    return {p.name: p.stat().st_mtime for p in dir_.glob("*.xlsx")
+            if not p.name.startswith(("~$", ".")) and not re.search(r"_v\d+\.xlsx$", p.name)}

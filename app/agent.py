@@ -61,12 +61,49 @@ def _excel_signature() -> dict[str, float]:
     return {p.name: p.stat().st_mtime for p in d.glob("*.xlsx")} if d.exists() else {}
 
 
+_watch_sig: dict[str, float] = {}
+_watch_seen_at: dict[str, float] = {}
+
+
+def _poll_watch_dir() -> list[str]:
+    """監視フォルダ（OneDrive / デスクトップ）で保存されたファイルを新しい版として取り込む。
+    Excel は保存中に何度か書き込むため、更新から 2 秒静止してから取り込む"""
+    global _watch_sig
+    from pathlib import Path
+    from app.connectors.excel import snapshot_new_version, watch_signature
+    if not config.ARTIFACT_WATCH_DIR:
+        return []
+    d = Path(config.ARTIFACT_WATCH_DIR).expanduser()
+    sig = watch_signature(d)
+    out = []
+    now = time.time()
+    for name, mtime in sig.items():
+        if _watch_sig.get(name) == mtime:
+            continue
+        if now - mtime < 2:
+            continue   # まだ書き込み中かもしれない
+        _watch_sig[name] = mtime
+        try:
+            dest = snapshot_new_version(d / name, config.ARTIFACT_WATCH_ACTOR)
+        except Exception as e:
+            log.warning("watch snapshot failed %s: %s", name, e)
+            continue
+        if dest:
+            out.append(f"{name} を保存（{config.ARTIFACT_WATCH_ACTOR}）→ {dest.name}")
+    for name in list(_watch_sig):
+        if name not in sig:
+            _watch_sig.pop(name)
+    return out
+
+
 def _loop():
     global _file_sig
     _file_sig = _excel_signature()
     while not _stop.is_set():
         if state["enabled"]:
             reasons = []
+            # OneDrive / デスクトップの監視フォルダで Excel が保存されたら版としてスナップショット
+            reasons += ["Excel を保存: " + r for r in _poll_watch_dir()]
             # 成果物の新版（SharePoint 代替のフォルダ）をファイル監視で検出
             sig = _excel_signature()
             if sig != _file_sig:
@@ -103,8 +140,17 @@ def _loop():
                 time.sleep(1.5)     # 連続イベントをまとめる（デバウンス）
                 break
             waited += 3
-            if state["enabled"] and _excel_signature() != _file_sig:
+            if state["enabled"] and (_excel_signature() != _file_sig or
+                                     (config.ARTIFACT_WATCH_DIR and _watch_changed())):
                 break
+
+
+def _watch_changed() -> bool:
+    from pathlib import Path
+    from app.connectors.excel import watch_signature
+    sig = watch_signature(Path(config.ARTIFACT_WATCH_DIR).expanduser())
+    now = time.time()
+    return any(_watch_sig.get(n) != m and now - m >= 2 for n, m in sig.items())
 
 
 def _log_conn_set(conn):

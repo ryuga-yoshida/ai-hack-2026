@@ -4,7 +4,7 @@
 {% block content %}
 <div class="max-w-5xl space-y-4">
   <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
-    ここは SharePoint の共有フォルダの代わりです。新しい版を置くとエージェントが<b>自動で差分を取り</b>（行の挿入・削除があってもセル単位で追跡）、決定と突き合わせます。自動巡回が ON なら数秒で検知結果に反映されます。
+    ここは SharePoint の共有フォルダの代わりです。<b>ブラウザで編集</b>・<b>アップロード</b>・<b>監視フォルダ（OneDrive やデスクトップ）で Excel を保存</b>のどれでも、新しい版としてエージェントが<b>自動で差分を取り</b>（行の挿入・削除があってもセル単位で追跡）、決定と突き合わせます。自動巡回が ON なら数秒で検知結果に反映されます。
   </div>
   {% for a in artifacts %}
   <div class="bg-white border border-gray-200 rounded-xl p-5">
@@ -15,6 +15,8 @@
         <div class="text-xs text-gray-500 truncate">{{ a.latest.url }}</div>
       </div>
       <div class="ml-auto flex items-center gap-2 text-xs">
+        <a href="/artifacts/{{ a.base }}/edit" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ ブラウザで編集</a>
+        <a href="/artifacts/file/{{ a.latest.file }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">↓ ダウンロード</a>
         {% for t in a.tags %}<a href="/tags/{{ t.name }}" class="px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
         {% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[220px]">⇢ {{ t.title }}</a>{% endfor %}
       </div>
