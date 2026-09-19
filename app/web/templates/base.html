@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}進行管理エージェント{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <nav class="bg-white border-b px-6 py-3 flex gap-6 text-sm">
+    <a href="/" class="font-bold">進行管理エージェント</a>
+    <a href="/" class="hover:underline">ダッシュボード</a>
+    <a href="/tasks" class="hover:underline">タスク</a>
+    <a href="/chat" class="hover:underline">チャット</a>
+    <a href="/cost" class="hover:underline">コスト</a>
+  </nav>
+  <main class="max-w-5xl mx-auto p-6">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

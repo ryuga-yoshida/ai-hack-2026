@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}タスク{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">タスク</h1>
+
+<form method="post" action="/tasks" class="bg-white border rounded p-4 mb-6 flex flex-wrap gap-2 items-end text-sm">
+  <label class="flex flex-col">タイトル<input name="title" required class="border rounded px-2 py-1 w-64"></label>
+  <label class="flex flex-col">担当<input name="assignee" class="border rounded px-2 py-1 w-24"></label>
+  <label class="flex flex-col">期限<input name="due_date" type="date" class="border rounded px-2 py-1"></label>
+  <label class="flex flex-col">成果物<input name="artifacts" placeholder="売上見込.xlsx" class="border rounded px-2 py-1 w-40"></label>
+  <button class="bg-blue-600 text-white rounded px-3 py-1">作成</button>
+</form>
+
+<div class="grid grid-cols-4 gap-4">
+{% for status, label in statuses %}
+  <div>
+    <h2 class="font-semibold text-sm mb-2">{{ label }} <span class="text-gray-400">({{ by_status[status]|length }})</span></h2>
+    {% for t in by_status[status] %}
+    <a href="/tasks/{{ t.id }}" class="block bg-white border rounded p-3 mb-2 text-sm hover:bg-gray-100">
+      <div class="font-medium">{{ t.title }}</div>
+      <div class="text-gray-500 text-xs mt-1">{{ t.assignee or "未割当" }}{% if t.due_date %} · {{ t.due_date }}{% endif %}</div>
+    </a>
+    {% endfor %}
+  </div>
+{% endfor %}
+</div>
+{% endblock %}

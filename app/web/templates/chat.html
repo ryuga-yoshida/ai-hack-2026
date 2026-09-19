@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}チャット{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">チャット</h1>
+<div class="flex gap-2 text-sm mb-4">
+  {% for ch in channels %}
+  <a href="/chat?channel={{ ch }}" class="px-2 py-1 rounded border {% if ch == channel %}bg-gray-800 text-white{% else %}bg-white{% endif %}">#{{ ch }}</a>
+  {% endfor %}
+</div>
+
+<div class="bg-white border rounded p-4 mb-4 text-sm space-y-2 max-h-[28rem] overflow-y-auto">
+  {% for m in messages %}
+  <div><span class="text-gray-400">{{ m.posted_at[5:16].replace("T", " ") }}</span>
+    <span class="font-semibold">{{ m.actor }}</span>: {{ m.text }}</div>
+  {% else %}
+  <div class="text-gray-500">まだ発言はありません。</div>
+  {% endfor %}
+</div>
+
+<form method="post" action="/chat" class="flex gap-2 text-sm">
+  <input name="channel" value="{{ channel }}" class="border rounded px-2 py-1 w-28">
+  <input name="actor" placeholder="発言者" required class="border rounded px-2 py-1 w-24">
+  <input name="text" placeholder="発言" required class="border rounded px-2 py-1 flex-1">
+  <button class="bg-blue-600 text-white rounded px-3 py-1">投稿</button>
+</form>
+{% endblock %}

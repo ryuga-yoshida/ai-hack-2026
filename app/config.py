@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
 # --- 環境変数 ---
-DB_PATH = Path(os.getenv("DB_PATH", "./data/app.db"))
+_db = Path(os.getenv("DB_PATH", "./data/app.db"))
+DB_PATH = _db if _db.is_absolute() else ROOT / _db   # 相対パスはリポジトリ直下基準
 ORCA_API_KEY = os.getenv("ORCA_API_KEY", "")
 ORCA_BASE_URL = os.getenv("ORCA_BASE_URL", "")
 ORCA_MODEL_HIGH = os.getenv("ORCA_MODEL_HIGH", "")

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ task.title }}{% endblock %}
+{% block content %}
+<a href="/tasks" class="text-sm text-blue-600">← タスク一覧</a>
+<h1 class="text-xl font-bold mt-2">{{ task.title }}</h1>
+<div class="text-sm text-gray-600 mt-1">
+  ID {{ task.id }} · 担当 {{ task.assignee or "未割当" }} · 期限 {{ task.due_date or "なし" }}
+  {% if task.artifacts %} · 成果物 {{ task.artifacts|join(", ") }}{% endif %}
+</div>
+{% if task.description %}<p class="mt-2 text-sm">{{ task.description }}</p>{% endif %}
+
+<div class="mt-4 flex gap-2 items-center text-sm">
+  <span>状態:</span>
+  <select id="status" class="border rounded px-2 py-1">
+    {% for s, label in statuses %}
+    <option value="{{ s }}" {% if s == task.status %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <input id="assignee" value="{{ task.assignee or '' }}" placeholder="担当" class="border rounded px-2 py-1 w-24">
+  <button onclick="save()" class="bg-blue-600 text-white rounded px-3 py-1">更新</button>
+</div>
+
+<h2 class="font-semibold mt-8 mb-2">タイムライン</h2>
+{% if timeline %}
+<ul class="text-sm">
+{% for item in timeline %}
+  <li class="border-l-2 pl-3 py-1 {{ item.color }}">
+    <span class="text-gray-500">{{ item.when }}</span>
+    <span class="font-medium">[{{ item.label }}]</span>
+    {{ item.text }}
+    {% if item.actor %}<span class="text-gray-500">（{{ item.actor }}）</span>{% endif %}
+    {% if item.ref %}<span class="text-gray-400 text-xs">{{ item.ref }}</span>{% endif %}
+  </li>
+{% endfor %}
+</ul>
+{% else %}
+<p class="text-sm text-gray-500">紐付く出来事はまだありません。</p>
+{% endif %}
+
+<script>
+async function save() {
+  const body = { status: document.getElementById("status").value,
+                 assignee: document.getElementById("assignee").value || null };
+  const r = await fetch("/tasks/{{ task.id }}", { method: "PATCH",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (r.ok) location.reload(); else alert("更新に失敗しました");
+}
+</script>
+{% endblock %}
