@@ -35,7 +35,7 @@ class TickResult:
 
 
 def adapters(conn: sqlite3.Connection):
-    return [MeetAdapter(), ChatAdapter(conn), ExcelAdapter()]
+    return [MeetAdapter(conn=conn), ChatAdapter(conn), ExcelAdapter()]
 
 
 # ---------- アクション決定（エージェントが自分で決める部分） ----------

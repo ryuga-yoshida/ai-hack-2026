@@ -3,14 +3,14 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from pydantic import BaseModel
 
 from app import db
-from app.connectors import chat
+from app.connectors import chat, meet
 from app.models import Task, new_id
 
 app = FastAPI(title="進行管理エージェント")
@@ -214,6 +214,84 @@ def post_chat(channel: str = Form("general"), actor: str = Form(...), text: str 
     db.save_events(conn, adapter.fetch(db.last_synced(conn, adapter.name)))
     db.update_sync_state(conn, adapter.name)
     return RedirectResponse(f"/chat?channel={channel}", status_code=303)
+
+
+# ---------- 自作 Meet（会議室） ----------
+
+@app.get("/meet", response_class=HTMLResponse)
+def meet_page(request: Request):
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM meetings ORDER BY started_at DESC").fetchall()
+    meetings = []
+    for r in rows:
+        ps = [p[0] for p in conn.execute(
+            "SELECT name FROM meeting_participants WHERE meeting_id=? ORDER BY joined_at", (r["id"],))]
+        meetings.append({**dict(r), "participants": ps})
+    return render("meet.html", request, meetings=meetings)
+
+
+@app.post("/meet")
+def create_meeting(title: str = Form("定例会議"), me: str = Form(...)):
+    conn = get_conn()
+    mid = meet.create_meeting(conn, title)
+    meet.join(conn, mid, me.strip())
+    return RedirectResponse(f"/meet/{mid}?me={me.strip()}", status_code=303)
+
+
+@app.get("/meet/{meeting_id}", response_class=HTMLResponse)
+def meet_room(request: Request, meeting_id: str, me: str = ""):
+    conn = get_conn()
+    m = conn.execute("SELECT * FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+    if not m:
+        raise HTTPException(404)
+    if me.strip():
+        meet.join(conn, meeting_id, me.strip())
+    ps = [p[0] for p in conn.execute(
+        "SELECT name FROM meeting_participants WHERE meeting_id=? ORDER BY joined_at", (meeting_id,))]
+    return render("meet_room.html", request, m=dict(m), me=me.strip(), participants=ps)
+
+
+@app.get("/meet/{meeting_id}/status")
+def meet_status(meeting_id: str):
+    conn = get_conn()
+    m = conn.execute("SELECT status, error FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+    if not m:
+        raise HTTPException(404)
+    ps = [p[0] for p in conn.execute(
+        "SELECT name FROM meeting_participants WHERE meeting_id=? ORDER BY joined_at", (meeting_id,))]
+    tracks = conn.execute("SELECT COUNT(*) FROM meeting_tracks WHERE meeting_id=?", (meeting_id,)).fetchone()[0]
+    return {"status": m["status"], "error": m["error"], "participants": ps, "tracks": tracks}
+
+
+@app.post("/meet/{meeting_id}/audio")
+async def meet_audio(meeting_id: str, speaker: str = Form(...), rec_started_at: str = Form(...),
+                     audio: UploadFile = File(...)):
+    conn = get_conn()
+    data = await audio.read()
+    from datetime import datetime, timezone
+    started = datetime.fromisoformat(rec_started_at.replace("Z", "+00:00")).astimezone().replace(tzinfo=None)
+    mime = (audio.content_type or "audio/webm").split(";")[0]
+    tid = meet.add_track(conn, meeting_id, speaker.strip(), mime, data, started)
+    return {"ok": True, "track": tid, "bytes": len(data)}
+
+
+def _finalize_job(meeting_id: str) -> None:
+    conn = get_conn()
+    try:
+        meet.finalize(conn, meeting_id)
+    except Exception:
+        pass   # 失敗は meetings.status='failed' に記録済み
+
+
+@app.post("/meet/{meeting_id}/finalize")
+def meet_finalize(meeting_id: str, background: BackgroundTasks):
+    conn = get_conn()
+    if not conn.execute("SELECT 1 FROM meetings WHERE id=?", (meeting_id,)).fetchone():
+        raise HTTPException(404)
+    conn.execute("UPDATE meetings SET status='processing' WHERE id=?", (meeting_id,))
+    conn.commit()
+    background.add_task(_finalize_job, meeting_id)
+    return {"ok": True}
 
 
 # ---------- コスト ----------

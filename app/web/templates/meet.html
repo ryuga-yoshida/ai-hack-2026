@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}会議室{% endblock %}
+{% block content %}
+<h1 class="text-xl font-bold mb-4">会議室</h1>
+<p class="text-sm text-gray-600 mb-4">各参加者が自分のブラウザで会議室を開いて名前を入れると、自分のマイクだけを録音します。終了時に全員分をまとめて文字起こしし、議事録として取り込みます。</p>
+
+<form method="post" action="/meet" class="bg-white border rounded p-4 mb-6 flex flex-wrap gap-2 items-end text-sm">
+  <label class="flex flex-col">会議名<input name="title" value="定例会議" required class="border rounded px-2 py-1 w-64"></label>
+  <label class="flex flex-col">あなたの名前<input name="me" required placeholder="鈴木" class="border rounded px-2 py-1 w-28"></label>
+  <button class="bg-blue-600 text-white rounded px-3 py-1">会議を始める</button>
+</form>
+
+<h2 class="font-semibold text-sm mb-2">会議一覧</h2>
+<table class="w-full text-sm bg-white border rounded">
+  <tr class="text-left text-gray-500"><th class="p-2">開始</th><th class="p-2">会議名</th><th class="p-2">状態</th><th class="p-2">参加者</th><th class="p-2"></th></tr>
+  {% for m in meetings %}
+  <tr class="border-t">
+    <td class="p-2">{{ m.started_at[:16].replace('T', ' ') }}</td>
+    <td class="p-2">{{ m.title }}</td>
+    <td class="p-2">{{ {'recording': '進行中', 'processing': '文字起こし中', 'done': '議事録あり', 'failed': '失敗'}[m.status] }}</td>
+    <td class="p-2 text-gray-600">{{ m.participants|join('・') }}</td>
+    <td class="p-2"><a href="/meet/{{ m.id }}" class="text-blue-600">開く →</a></td>
+  </tr>
+  {% else %}
+  <tr class="border-t"><td class="p-2 text-gray-500" colspan="5">まだ会議はありません。</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

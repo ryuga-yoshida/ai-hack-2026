@@ -56,3 +56,8 @@ PERSONS = ["鈴木", "山田", "田中", "佐藤", "高橋"]
 # --- 検知（追加） ---
 DETECT_CANDIDATE_THRESHOLD = 0.35  # 候補とみなす最低類似度（未満なら orphan_change）
 DETECT_SUPERSEDE_SIM = 0.85        # これ以上似た新しい決定があれば古い決定は上書き済みとみなす
+
+# --- 自作 Meet（音声文字起こし） ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_STT_MODEL = os.getenv("GEMINI_STT_MODEL", "gemini-2.5-flash")
+MODEL_PRICES["stt"] = {"input": 1.00, "output": 2.50}   # 音声入力の単価（USD / 1M tokens。要確認）

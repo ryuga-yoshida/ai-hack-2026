@@ -78,7 +78,7 @@ class CostLog:
     id: str
     task: str
     model: str
-    tier: Literal["high", "mid", "embed"]
+    tier: Literal["high", "mid", "embed", "stt"]
     input_tokens: int
     output_tokens: int
     cost_usd: float

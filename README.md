@@ -19,7 +19,7 @@ uvicorn app.main:app        # UI を見る場合 → http://localhost:8000
 
 `replay` は記録済みの LLM レスポンス（`fixtures/llm_cache.json`）だけで動くため、API キーなしで追体験できる。
 
-実際に LLM を呼ぶ場合は `.env.example` を `.env` にコピーして OrcaRouter のキーとモデル名を設定し、`python -m app.cli run`（1回巡回）または `python -m app.cli watch`（5分間隔で巡回）を使う。
+実際に LLM を呼ぶ場合は `.env.example` を `.env` にコピーして OrcaRouter のキーとモデル名（会議室の文字起こしを使うなら `GEMINI_API_KEY` も）を設定し、`python -m app.cli run`（1回巡回）または `python -m app.cli watch`（5分間隔で巡回）を使う。
 
 ```bash
 python -m app.cli evaluate  # 評価セット（10ケース）で検知率・誤検知・見逃しを出す
@@ -46,7 +46,8 @@ python -m app.cli cost      # コスト集計（全て high で回した場合�
 
 | モジュール | 役割 |
 | --- | --- |
-| `app/connectors/` | Meet（Drive API・未設定時は fixtures）/ 自作チャット / Excel 差分。Confluence・Slack・SharePoint は同じ IF の空実装 |
+| `app/connectors/` | 会議（自作 Meet / Drive API / fixtures）/ 自作チャット / Excel 差分。Confluence・Slack・SharePoint は同じ IF の空実装 |
+| `app/stt.py` | 自作 Meet の音声文字起こし（Gemini Files API。会議終了時に話者ごとの録音を一括処理） |
 | `app/excel_diff.py` | 行キーで対応付けるセル差分エンジン。行挿入で座標がズレても偽差分を出さない |
 | `app/extract.py` | チャンク分割 → マスク → 抽出（mid）→ 引用検証 → 重複除去 → Task 自動生成 |
 | `app/linker.py` | 明示参照 → 会話文脈 → 担当者 → 埋め込み → LLM の順で紐付け。紐付かないのも正解 |
@@ -56,7 +57,7 @@ python -m app.cli cost      # コスト集計（全て high で回した場合�
 
 ### 業務の流れとの対応
 
-1. 会議をする → 文字起こしが取り込まれる（Meet）
+1. 会議をする → 文字起こしが取り込まれる（自作の会議室 `/meet`: 各参加者のブラウザが自分のマイクを録音し、終了時に Gemini で話者別に文字起こしして時刻順に統合。Drive 上の文字起こしドキュメント／fixtures も同じ Event になる）
 2. 議事録から決定とタスクが自動で切り出され、タスクボードに積まれる（人力での作成・編集も可）
 3. チャットの発言は、どのタスクの話かを自動判定して紐付く（「例の数字」も直前の文脈から解決）
 4. 成果物は SharePoint に置き、更新した人がチャットにリンクを貼る → そのファイルがタスクの成果物として登録される
