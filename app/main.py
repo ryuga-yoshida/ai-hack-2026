@@ -48,7 +48,11 @@ def render(name: str, request: Request, **ctx) -> HTMLResponse:
 # ---------- ダッシュボード（M7 で矛盾カードを載せる） ----------
 
 def finding_cards(conn: sqlite3.Connection, where: str = "", params: tuple = ()) -> list[dict]:
-    rows = conn.execute(f"SELECT * FROM findings {where} ORDER BY created_at DESC, rowid DESC", params).fetchall()
+    rows = conn.execute(
+        f"SELECT * FROM findings {where} ORDER BY "
+        "CASE severity WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END, "
+        "CASE kind WHEN 'contradiction' THEN 0 WHEN 'orphan_change' THEN 1 ELSE 2 END, "
+        "confidence DESC, created_at DESC", params).fetchall()
     cards = []
     for r in rows:
         f = db.row_to_finding(r)
