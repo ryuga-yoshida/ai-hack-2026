@@ -180,11 +180,15 @@ def embed(texts: list[str], task: str = "embed") -> list[np.ndarray]:
         else:
             missing.append(i)
     if missing and not CACHE_ONLY:
-        r = httpx.post(f"{config.ORCA_BASE_URL.rstrip('/')}/embeddings", headers=_headers(),
-                       json={"model": model_for("embed"), "input": [texts[i] for i in missing]},
-                       timeout=config.LLM_TIMEOUT_SEC)
-        r.raise_for_status()
-        data = r.json()
+        try:
+            r = httpx.post(f"{config.ORCA_BASE_URL.rstrip('/')}/embeddings", headers=_headers(),
+                           json={"model": model_for("embed"), "input": [texts[i] for i in missing]},
+                           timeout=config.LLM_TIMEOUT_SEC)
+            r.raise_for_status()
+            data = r.json()
+        except (httpx.HTTPError, LLMError) as e:   # 埋め込みが取れなくてもシステムは止めない
+            log.warning("embed failed: %s", e)
+            return [v if v is not None else np.zeros(1, dtype=np.float32) for v in out]
         usage = data.get("usage", {})
         _record(task, "embed", usage)
         for j, item in enumerate(sorted(data["data"], key=lambda d: d["index"])):

@@ -104,6 +104,15 @@ CREATE TABLE IF NOT EXISTS sync_state (
     source        TEXT PRIMARY KEY,
     last_synced   TEXT NOT NULL
 );
+
+-- 処理済みフラグ（増分処理用）。stage = extract | link | detect
+CREATE TABLE IF NOT EXISTS processed (
+    stage         TEXT NOT NULL,
+    key           TEXT NOT NULL,   -- meeting_id / event id など
+    result        TEXT,            -- JSON
+    done_at       TEXT NOT NULL,
+    PRIMARY KEY (stage, key)
+);
 """
 
 
@@ -329,4 +338,16 @@ def update_sync_state(conn: sqlite3.Connection, source: str,
         "INSERT OR REPLACE INTO sync_state (source, last_synced) VALUES (?,?)",
         (source, to_iso(at) if at else now_iso()),
     )
+    conn.commit()
+
+
+# ---------- processed ----------
+
+def is_processed(conn: sqlite3.Connection, stage: str, key: str) -> bool:
+    return conn.execute("SELECT 1 FROM processed WHERE stage=? AND key=?", (stage, key)).fetchone() is not None
+
+
+def mark_processed(conn: sqlite3.Connection, stage: str, key: str, result: dict | None = None) -> None:
+    conn.execute("INSERT OR REPLACE INTO processed (stage, key, result, done_at) VALUES (?,?,?,?)",
+                 (stage, key, json.dumps(result, ensure_ascii=False) if result else None, now_iso()))
     conn.commit()
