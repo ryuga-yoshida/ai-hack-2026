@@ -62,6 +62,7 @@ class ExcelAdapter:
                             "file": new.name, "base": base, "url": info.get("url"), "sheet": rec.sheet,
                             "row_key": rec.row_key, "column_label": rec.column_label,
                             "old": rec.old, "new": rec.new, "diff_kind": rec.kind,
+                            "formula_cell": rec.formula_cell,
                         },
                     ))
         return events

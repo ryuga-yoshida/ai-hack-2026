@@ -25,6 +25,9 @@ JUDGE_PROMPT = """以下の「決定事項」と「成果物の変更」が矛�
 判定の指針:
 - 決定を正しく反映した変更は矛盾ではない
 - 会話で変更理由が説明され合意されていれば、矛盾ではないか severity を下げる
+- 「その後の関連する決定」で上書き・許可されている変更は矛盾ではない
+- 決定の対象（ファイル・表・指標）と変更の対象が別物なら矛盾ではない。推測で結び付けない
+- 決定で定めた値・状態に戻す変更（誤った変更の取り消し）は矛盾ではない
 - 判断がつかない場合は confidence を低くする。無理に断定しない
 
 出力はJSONのみ:
@@ -57,16 +60,19 @@ def task_for_artifact(conn: sqlite3.Connection, ref: str | None) -> Task | None:
     return None
 
 
-def decision_for_task(conn: sqlite3.Connection, task: Task) -> Event | None:
-    """タスクの生成元を辿って決定 Event を返す。created_from が task_hint なら同じ会議の decision も探す"""
-    if not task.created_from:
-        return None
-    src = db.get_event(conn, task.created_from)
-    if src is None:
-        return None
-    if src.kind == "decision":
-        return src
-    return src   # task_hint も「決定された作業」として扱い、判定の左辺に置く
+def decisions_for_task(conn: sqlite3.Connection, task: Task) -> list[Event]:
+    """タスクに紐付く決定 Event（created_from が decision の場合と、follows で紐付いた決定）"""
+    out: list[Event] = []
+    if task.created_from:
+        src = db.get_event(conn, task.created_from)
+        if src and src.kind == "decision":
+            out.append(src)
+    rows = conn.execute(
+        "SELECT e.* FROM links l JOIN events e ON e.id = l.from_id "
+        "WHERE l.to_type='task' AND l.to_id=? AND l.from_type='event' AND e.kind='decision'",
+        (task.id,)).fetchall()
+    out += [db.row_to_event(r) for r in rows if all(r["id"] != e.id for e in out)]
+    return out
 
 
 def find_candidates(conn: sqlite3.Connection, change: Event) -> list[Event]:
@@ -80,24 +86,34 @@ def find_candidates(conn: sqlite3.Connection, change: Event) -> list[Event]:
 
     # タスク経由で直結する決定を優先
     if task := task_for_artifact(conn, change.ref):
-        if d := decision_for_task(conn, task):
-            out.append(d); seen.add(d.id)
-            rows = conn.execute(
-                "SELECT e.* FROM links l JOIN events e ON e.id = l.from_id "
-                "WHERE l.to_type='task' AND l.to_id=? AND l.from_type='event' AND e.kind='decision'",
-                (task.id,)).fetchall()
-            for r in rows:
-                if r["id"] not in seen:
-                    out.append(db.row_to_event(r)); seen.add(r["id"])
+        for d in decisions_for_task(conn, task):
+            if d.id not in seen:
+                out.append(d); seen.add(d.id)
 
-    # 埋め込みで絞る
+    # 埋め込みで絞る。埋め込みは無関係な文同士でも類似度が高く出るため、
+    # 変更の対象語（商品名・列名・シート名）が決定文に出てくるものだけを候補にする（LLM 不使用）
     since = change.occurred_at - timedelta(days=config.DETECT_LOOKBACK_DAYS)
-    hits = vec.search(conn, change.text, kind="decision", top_k=config.DETECT_CANDIDATE_TOP_K,
+    hits = vec.search(conn, change.text, kind="decision", top_k=config.DETECT_CANDIDATE_TOP_K * 2,
                       since=since, until=change.occurred_at, exclude_ids=seen)
     if hits is None:
         raise RuntimeError("埋め込みが取得できないため候補を絞れません")
-    out += [e for e, s in hits if s >= config.DETECT_CANDIDATE_THRESHOLD]
+    keys = _subject_keywords(change)
+    for e, s in hits:
+        if s < config.DETECT_CANDIDATE_THRESHOLD:
+            continue
+        if keys and not any(k in e.text for k in keys):
+            continue
+        out.append(e)
+        if len(out) >= config.DETECT_CANDIDATE_TOP_K:
+            break
     return out
+
+
+def _subject_keywords(change: Event) -> set[str]:
+    """変更が何についてのものかを表す語。Excel なら行ラベル・列ラベル・シート名"""
+    m = change.meta
+    words = {str(m.get(k) or "") for k in ("row_key", "column_label", "sheet", "base")}
+    return {w for w in words if len(w) >= 2 and not w.startswith("__")}
 
 
 # ---------- 機械的ガード ----------
@@ -131,18 +147,37 @@ def passes_guards(conn: sqlite3.Connection, decision: Event, change: Event) -> b
 # ---------- 会話文脈 ----------
 
 def related_utterances(conn: sqlite3.Connection, task_id: str | None,
-                       until: datetime | None = None, limit: int = 8) -> list[Event]:
-    """タスクに discusses で紐付く発言を時刻順に返す（紐付けエンジンが集めたもの）"""
-    if not task_id:
-        return []
-    sql = ("SELECT e.* FROM links l JOIN events e ON e.id = l.from_id "
-           "WHERE l.to_type='task' AND l.to_id=? AND l.relation='discusses' AND e.kind='utterance'")
-    params: list = [task_id]
-    if until:
-        sql += " AND e.occurred_at <= ?"; params.append(db.to_iso(until))
-    sql += " ORDER BY e.occurred_at DESC LIMIT ?"; params.append(limit)
-    rows = conn.execute(sql, params).fetchall()
-    return [db.row_to_event(r) for r in reversed(rows)]
+                       until: datetime | None = None, limit: int = 8,
+                       change: Event | None = None) -> list[Event]:
+    """判定に添える会話。タスクに discusses で紐付く発言（紐付けエンジンが集めたもの）に、
+    変更内容と意味的に近い発言（埋め込み・LLM 不使用）を加えて時刻順に返す。"""
+    found: dict[str, Event] = {}
+    if task_id:
+        sql = ("SELECT e.* FROM links l JOIN events e ON e.id = l.from_id "
+               "WHERE l.to_type='task' AND l.to_id=? AND l.relation='discusses' AND e.kind='utterance'")
+        params: list = [task_id]
+        if until:
+            sql += " AND e.occurred_at <= ?"; params.append(db.to_iso(until))
+        sql += " ORDER BY e.occurred_at DESC LIMIT ?"; params.append(limit)
+        for r in conn.execute(sql, params).fetchall():
+            found[r["id"]] = db.row_to_event(r)
+    if change is not None:
+        since = change.occurred_at - timedelta(days=config.DETECT_LOOKBACK_DAYS)
+        hits = vec.search(conn, change.text, kind="utterance", top_k=5, since=since,
+                          until=until or change.occurred_at) or []
+        for e, sim in hits:
+            if sim >= config.LINK_EMBED_THRESHOLD and e.source == "chat":
+                found.setdefault(e.id, e)
+                # 直後の返答（同じチャンネル・5分以内）も添える。「お願いします」のような合意が拾える
+                r = conn.execute(
+                    "SELECT * FROM events WHERE source='chat' AND kind='utterance' "
+                    "AND json_extract(meta,'$.channel') = ? AND occurred_at > ? AND occurred_at <= ? "
+                    "ORDER BY occurred_at LIMIT 1",
+                    (e.meta.get("channel"), db.to_iso(e.occurred_at),
+                     db.to_iso(min(e.occurred_at + timedelta(minutes=5), until or change.occurred_at)))).fetchone()
+                if r:
+                    found.setdefault(r["id"], db.row_to_event(r))
+    return sorted(found.values(), key=lambda e: e.occurred_at)[-10:]
 
 
 def _task_for_pair(conn: sqlite3.Connection, decision: Event, change: Event) -> Task | None:
@@ -156,9 +191,21 @@ def _task_for_pair(conn: sqlite3.Connection, decision: Event, change: Event) -> 
 
 # ---------- 第2段: 上位モデルによる判定 ----------
 
+def later_decisions(conn: sqlite3.Connection, decision: Event, change: Event,
+                    candidates: list[Event]) -> list[Event]:
+    """decision より後・change より前の関連する決定（候補リストとタスクに紐付く決定から）"""
+    out = {d.id: d for d in candidates if decision.occurred_at < d.occurred_at <= change.occurred_at}
+    if task := task_for_artifact(conn, change.ref):
+        for d in decisions_for_task(conn, task):
+            if decision.occurred_at < d.occurred_at <= change.occurred_at:
+                out[d.id] = d
+    return sorted(out.values(), key=lambda d: d.occurred_at)
+
+
 def judge(conn: sqlite3.Connection, decision: Event, change: Event,
-          utterances: list[Event]) -> dict | None:
+          utterances: list[Event], later: list[Event] | None = None) -> dict | None:
     conv = "\n".join(f"- {u.occurred_at:%m/%d %H:%M} {u.actor}: {u.text}" for u in utterances) or "（なし）"
+    after = "\n".join(f"- {d.occurred_at:%m/%d %H:%M} {d.actor}: {d.text}" for d in (later or [])) or "（なし）"
     user = (
         f"決定事項: {decision.text}\n"
         f"  発言者: {decision.actor}　日時: {decision.occurred_at:%Y-%m-%d %H:%M}\n"
@@ -166,7 +213,8 @@ def judge(conn: sqlite3.Connection, decision: Event, change: Event,
         f"成果物の変更: {change.text}\n"
         f"  更新者: {change.actor or '不明'}　日時: {change.occurred_at:%Y-%m-%d %H:%M}\n"
         f"  出典: {change.ref}\n\n"
-        f"関連する会話:\n{conv}"
+        f"関連する会話:\n{conv}\n\n"
+        f"その後の関連する決定（決定事項より後・変更より前）:\n{after}"
     )
     masked, table = mask(user)
     res = router.complete(JUDGE_PROMPT, masked, tier="high", task="judge")
@@ -221,16 +269,23 @@ def build_finding(conn: sqlite3.Connection, decision: Event, change: Event,
 # ---------- エントリポイント ----------
 
 def detect_for_change(conn: sqlite3.Connection, change: Event) -> Finding | None:
+    # 数式セルの値の変化は計算結果であって入力の変更ではない（数式自体の差分は別レコードで判定する）
+    if change.meta.get("diff_kind") == "value" and change.meta.get("formula_cell"):
+        log.info("計算結果の変化のためスキップ: %s", change.text)
+        return None
+
     candidates = find_candidates(conn, change)       # 第1段：LLM 不使用
     if not candidates:
         return orphan_change_finding(conn, change)   # どの決定にも紐付かない
 
-    for decision in candidates:
+    for decision in sorted(candidates, key=lambda d: d.occurred_at, reverse=True):   # 新しい決定から
         if not passes_guards(conn, decision, change):  # 機械的ガード
             continue
         task = _task_for_pair(conn, decision, change)
-        utterances = related_utterances(conn, task.id if task else None, until=change.occurred_at)
-        result = judge(conn, decision, change, utterances)  # 第2段：LLM 判定
+        utterances = related_utterances(conn, task.id if task else None, until=change.occurred_at,
+                                        change=change)
+        later = later_decisions(conn, decision, change, candidates)
+        result = judge(conn, decision, change, utterances, later)  # 第2段：LLM 判定
         if result is None:
             continue
         log.info("judge: %s ⇔ %s → contradicts=%s conf=%.2f",

@@ -22,6 +22,7 @@ from app.llm import cost
 log = logging.getLogger("router")
 
 Tier = Literal["high", "mid"]
+EMBED_BATCH = 100   # OrcaRouter の embeddings は1リクエスト最大100件
 
 # replay 時に True。キャッシュにない呼び出しは None を返す
 CACHE_ONLY = False
@@ -29,6 +30,9 @@ CACHE_ONLY = False
 _conn: sqlite3.Connection | None = None
 _lock = threading.Lock()
 _cache: dict | None = None
+_emb: dict[str, np.ndarray] | None = None       # 埋め込みキャッシュ（fixtures/llm_embeddings.npz）
+_emb_usage: dict[str, dict] = {}
+_replayed: set[str] = set()     # replay で既にコスト記録したキー（同じ文の再計算を二重計上しない）
 
 
 class LLMError(Exception):
@@ -62,8 +66,32 @@ def _save_cache() -> None:
     config.LLM_CACHE_PATH.write_text(json.dumps(_load_cache(), ensure_ascii=False, indent=1))
 
 
+def _load_emb() -> dict[str, np.ndarray]:
+    global _emb, _emb_usage
+    if _emb is None:
+        _emb = {}
+        try:
+            with np.load(config.LLM_EMBED_CACHE_PATH, allow_pickle=False) as z:
+                for k in z.files:
+                    if k == "__usage__":
+                        _emb_usage = json.loads(str(z[k]))
+                    else:
+                        _emb[k] = z[k].astype(np.float32)
+        except FileNotFoundError:
+            pass
+    return _emb
+
+
+def _save_emb() -> None:
+    config.LLM_EMBED_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    arrays = {k: v.astype(np.float16) for k, v in _load_emb().items()}   # float16 で十分（サイズ半減）
+    arrays["__usage__"] = np.array(json.dumps(_emb_usage))
+    np.savez_compressed(config.LLM_EMBED_CACHE_PATH, **arrays)
+
+
 def _key(kind: str, tier: str, payload: str) -> str:
-    return hashlib.sha256(f"{kind}|{tier}|{payload}".encode()).hexdigest()[:24]
+    # モデルを変えたらキャッシュが無効になるよう、モデル名もキーに含める
+    return hashlib.sha256(f"{kind}|{tier}|{model_for(tier)}|{payload}".encode()).hexdigest()[:24]
 
 
 # ---------- JSON ----------
@@ -168,37 +196,42 @@ def _finish(content: str, used: str, fallback: bool) -> dict | list | None:
 
 def embed(texts: list[str], task: str = "embed") -> list[np.ndarray]:
     """埋め込みを生成（バッチ）。キャッシュ済みのものは API を呼ばない。"""
-    cache = _load_cache()
+    emb = _load_emb()
     out: list[np.ndarray | None] = [None] * len(texts)
     missing: list[int] = []
     for i, t in enumerate(texts):
         k = _key("embed", "embed", t)
-        if k in cache:
-            out[i] = np.asarray(cache[k]["vector"], dtype=np.float32)
-            if CACHE_ONLY:
-                _record(task, "embed", cache[k].get("usage", {}))
+        if k in emb:
+            out[i] = emb[k]
+            if CACHE_ONLY and k not in _replayed:
+                _replayed.add(k)
+                _record(task, "embed", _emb_usage.get(k, {}))
         else:
             missing.append(i)
     if missing and not CACHE_ONLY:
-        try:
-            r = httpx.post(f"{config.ORCA_BASE_URL.rstrip('/')}/embeddings", headers=_headers(),
-                           json={"model": model_for("embed"), "input": [texts[i] for i in missing]},
-                           timeout=config.LLM_TIMEOUT_SEC)
-            r.raise_for_status()
-            data = r.json()
-        except (httpx.HTTPError, LLMError) as e:   # 埋め込みが取れなくてもシステムは止めない
-            log.warning("embed failed: %s", e)
-            return [v if v is not None else np.zeros(1, dtype=np.float32) for v in out]
-        usage = data.get("usage", {})
-        _record(task, "embed", usage)
-        for j, item in enumerate(sorted(data["data"], key=lambda d: d["index"])):
-            i = missing[j]
-            vec = np.asarray(item["embedding"], dtype=np.float32)
-            out[i] = vec
-            # usage はバッチ全体分なので件数で按分して保存する
-            share = {k: v // len(missing) for k, v in usage.items() if isinstance(v, int)}
-            cache[_key("embed", "embed", texts[i])] = {"vector": vec.tolist(), "usage": share}
-        _save_cache()
+        missing = [i for i in missing if texts[i].strip()]     # 空文字は API が受け付けない
+        for start in range(0, len(missing), EMBED_BATCH):
+            idx = missing[start:start + EMBED_BATCH]
+            try:
+                r = httpx.post(f"{config.ORCA_BASE_URL.rstrip('/')}/embeddings", headers=_headers(),
+                               json={"model": model_for("embed"), "input": [texts[i] for i in idx]},
+                               timeout=config.LLM_TIMEOUT_SEC)
+                r.raise_for_status()
+                data = r.json()
+            except (httpx.HTTPError, LLMError) as e:   # 埋め込みが取れなくてもシステムは止めない
+                log.warning("embed failed: %s", e)
+                continue
+            usage = data.get("usage", {})
+            _record(task, "embed", usage)
+            share = {k: v // len(idx) for k, v in usage.items() if isinstance(v, int)}
+            for j, item in enumerate(sorted(data["data"], key=lambda d: d["index"])):
+                i = idx[j]
+                vec = np.asarray(item["embedding"], dtype=np.float32)
+                out[i] = vec
+                k = _key("embed", "embed", texts[i])
+                emb[k] = vec
+                _emb_usage[k] = share   # usage はバッチ全体分なので件数で按分
+        _save_emb()
     elif missing:
         log.warning("embed cache miss in replay: %d texts", len(missing))
     return [v if v is not None else np.zeros(1, dtype=np.float32) for v in out]

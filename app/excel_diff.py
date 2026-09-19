@@ -19,6 +19,7 @@ class DiffRecord:
     cell: str            # 新版での座標。例: "D5"
     old: Any
     new: Any
+    formula_cell: bool = False   # value 差分で、そのセルが数式（計算結果の変化＝入力の変化ではない）
 
     def to_sentence(self) -> str:
         if self.kind == "row_added":
@@ -114,11 +115,11 @@ def diff_sheet(ws_old_v, ws_old_f, ws_new_v, ws_new_f,
 
             addr = ws_new_v.cell(row=r_new, column=c_new).coordinate
 
+            is_formula = str(f_old).startswith("=") or str(f_new).startswith("=")
             if v_old != v_new:
                 out.append(DiffRecord(sheet, "value", key[0], label,
-                                      addr, v_old, v_new))
+                                      addr, v_old, v_new, formula_cell=is_formula))
 
-            is_formula = str(f_old).startswith("=") or str(f_new).startswith("=")
             if is_formula and f_old != f_new:
                 out.append(DiffRecord(sheet, "formula", key[0], label,
                                       addr, f_old, f_new))

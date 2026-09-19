@@ -31,6 +31,8 @@ DETECT_NOTIFY_THRESHOLD = 0.8     # これ以上で自動通知
 DETECT_REVIEW_THRESHOLD = 0.5     # これ以上で確認キュー
 
 TASK_AUTOGEN_CONFIDENCE = 0.7
+DEDUPE_TASK_SIM = 0.82            # 既存タスクと同一とみなす埋め込み類似度
+DEDUPE_DECISION_SIM = 0.88        # 同一会議内で同じ決定とみなす類似度
 STALLED_DAYS = 7
 DISMISS_PENALTY = 0.7
 FALLBACK_PENALTY = 0.9
@@ -43,7 +45,8 @@ MODEL_PRICES = {
     "embed": {"input": 0.02, "output": 0.0},
 }
 LLM_TIMEOUT_SEC = 60
-LLM_CACHE_PATH = FIXTURES_DIR / "llm_cache.json"
+LLM_CACHE_PATH = FIXTURES_DIR / "llm_cache.json"            # chat の応答
+LLM_EMBED_CACHE_PATH = FIXTURES_DIR / "llm_embeddings.npz"   # 埋め込み（float16）
 
 # --- 抽出 ---
 CHUNK_SIZE_CHARS = 1500        # 800〜1200 トークン相当

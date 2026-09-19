@@ -1,13 +1,50 @@
 """LLM 呼び出しコストの記録と集計。全呼び出しで cost_logs に1行 INSERT する。"""
+import json
+import logging
 import sqlite3
 from datetime import datetime
+
+import httpx
 
 from app import config, db
 from app.models import CostLog, new_id
 
+log = logging.getLogger("cost")
 
-def price(tier: str, input_tokens: int, output_tokens: int) -> float:
-    p = config.MODEL_PRICES[tier]
+
+_pricing: dict[str, dict] | None = None
+
+
+def model_prices() -> dict[str, dict]:
+    """{model_id: {"input": USD/1M, "output": USD/1M}}。OrcaRouter の /v1/models から取得し
+    fixtures/llm_pricing.json に保存する（replay ではファイルだけを使う）。"""
+    global _pricing
+    if _pricing is not None:
+        return _pricing
+    path = config.FIXTURES_DIR / "llm_pricing.json"
+    try:
+        _pricing = json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        _pricing = {}
+    if not _pricing and config.ORCA_API_KEY and config.ORCA_BASE_URL:
+        try:
+            r = httpx.get(f"{config.ORCA_BASE_URL.rstrip('/')}/models",
+                          headers={"Authorization": f"Bearer {config.ORCA_API_KEY}"}, timeout=30)
+            r.raise_for_status()
+            for m in r.json().get("data", []):
+                p = m.get("pricing") or {}
+                if p.get("prompt") is not None:
+                    _pricing[m["id"]] = {"input": float(p["prompt"]) * 1_000_000,
+                                         "output": float(p.get("completion") or 0) * 1_000_000}
+            path.write_text(json.dumps(_pricing, ensure_ascii=False, indent=1))
+        except Exception as e:   # 料金が取れなくても処理は止めない
+            log.warning("pricing fetch failed: %s", e)
+    return _pricing
+
+
+def price(tier: str, input_tokens: int, output_tokens: int, model: str | None = None) -> float:
+    from app.llm.router import model_for   # 循環 import 回避
+    p = model_prices().get(model or model_for(tier)) or config.MODEL_PRICES[tier]
     return (input_tokens * p["input"] + output_tokens * p["output"]) / 1_000_000
 
 
@@ -16,7 +53,7 @@ def record(conn: sqlite3.Connection, task: str, model: str, tier: str,
     log = CostLog(
         id=new_id(), task=task, model=model, tier=tier,
         input_tokens=input_tokens, output_tokens=output_tokens,
-        cost_usd=price(tier, input_tokens, output_tokens),
+        cost_usd=price(tier, input_tokens, output_tokens, model=model),
         occurred_at=datetime.now().replace(microsecond=0),
     )
     db.save_cost_log(conn, log)

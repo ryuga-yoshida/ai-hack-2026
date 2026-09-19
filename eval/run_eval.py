@@ -25,8 +25,13 @@ def _findings_for(conn, match: dict) -> list[dict]:
     out = []
     for r in conn.execute("SELECT * FROM findings WHERE status != 'dismissed'").fetchall():
         ev = json.loads(r["evidence"])
-        if any(i["id"] in ev for i in ids):
-            out.append(dict(r))
+        if not any(i["id"] in ev for i in ids):
+            continue
+        if "decision_contains" in match:
+            d = conn.execute("SELECT text FROM events WHERE id=?", (ev[0],)).fetchone()
+            if not d or match["decision_contains"] not in d["text"]:
+                continue
+        out.append(dict(r))
     return out
 
 

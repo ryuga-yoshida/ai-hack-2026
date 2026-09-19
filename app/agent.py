@@ -230,10 +230,11 @@ def watch(conn: sqlite3.Connection, interval_sec: int = 300) -> None:
         time.sleep(interval_sec)
 
 
-def replay(conn: sqlite3.Connection, speed: float = 1.0) -> list[TickResult]:
+def replay(conn: sqlite3.Connection, speed: float = 1.0, record: bool = False) -> list[TickResult]:
     """fixtures の Event を occurred_at 順（日単位）に投入し、検知までを時系列に沿って再現する。
-    LLM 呼び出しは記録済みレスポンス（fixtures/llm_cache.json）だけを使う。"""
-    router.CACHE_ONLY = True
+    LLM 呼び出しは記録済みレスポンス（fixtures/llm_cache.json）だけを使う。
+    record=True のときは API を呼んでキャッシュを作る（提出前に1回実行しておく）。"""
+    router.CACHE_ONLY = not record
     router.bind(conn)
     all_events: list[Event] = []
     for adapter in adapters(conn):
@@ -251,9 +252,9 @@ def replay(conn: sqlite3.Connection, speed: float = 1.0) -> list[TickResult]:
         results.append(tick(conn, now=now, events_override=batch))
         if speed > 0:
             time.sleep(min(1.0 / speed, 3.0))
-    # 最終日から STALLED_DAYS 経過した時点の定期検知も再現する
+    # 最終日の翌日の定期巡回（stalled 検知）も再現する
     from datetime import timedelta
-    final = max(e.occurred_at for e in all_events) + timedelta(days=config.STALLED_DAYS + 1)
+    final = max(e.occurred_at for e in all_events) + timedelta(days=1)
     say(f"=== {final:%Y-%m-%d}: 定期巡回 ===")
     results.append(tick(conn, now=final, events_override=[]))
     return results

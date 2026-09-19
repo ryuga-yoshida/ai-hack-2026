@@ -11,8 +11,8 @@
   match: { ref: "売上見込_v2.xlsx:売上見込!B3" }
   expect: null
 - id: 3
-  desc: 決定より前に行われた変更（9/18 に商品Cの行を削除。終了決定は 9/19）
-  match: { ref: "売上見込_v2.xlsx:売上見込!A3" }
+  desc: 決定より前に行われた変更（9/18 の商品C行削除を、9/19 の「商品C終了」決定と結び付けて判定しない＝時系列ガード）
+  match: { ref: "売上見込_v2.xlsx:売上見込!A3", decision_contains: "取り扱いを終了" }
   expect: null
 - id: 4
   desc: 後の会議で決定が覆されている（9/8「商品D 第3四半期 300」→ 9/17 チャットで 350 に変更決定 → 9/19 に 300→350）
@@ -23,8 +23,8 @@
   match: { ref: "在庫表_v2.xlsx:在庫!B5" }
   expect: { kind: orphan_change }
 - id: 6
-  desc: 決定されたが7日間動きなし（9/15 定例で高橋に振られた予算会議資料の作成）
-  match: { task_title_contains: "予算会議" }
+  desc: 決定されたが7日間動きなし（9/8 定例で高橋に振られたカレンダー修正。その後どこにも言及なし）
+  match: { task_title_contains: "カレンダー" }
   expect: { kind: stalled }
 - id: 7
   desc: チャットで変更理由が説明済み（商品D 第4四半期 400→450。9/19 チャットで鈴木が了承）

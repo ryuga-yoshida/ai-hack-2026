@@ -51,7 +51,7 @@ def cmd_replay(args) -> int:
     conn = db.connect(); db.init_db(conn)
     from fixtures import seed
     seed.run(conn)
-    results = agent.replay(conn, speed=args.speed)
+    results = agent.replay(conn, speed=args.speed, record=args.record)
     n = sum(len(r.findings) for r in results)
     print(f"replay: Finding {n}件")
     return 0
@@ -86,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("watch"); p.add_argument("--interval", type=int, default=300)
     p = sub.add_parser("replay"); p.add_argument("--speed", type=float, default=1.0)
     p.add_argument("--reset", action="store_true", default=True)
+    p.add_argument("--record", action="store_true", help="API を呼んで LLM キャッシュを作る（通常はキャッシュのみ）")
     sub.add_parser("evaluate")
     sub.add_parser("cost")
     args = parser.parse_args(argv)

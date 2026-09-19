@@ -75,7 +75,7 @@ def split_chunks(text: str, size: int = config.CHUNK_SIZE_CHARS,
 # ---------- 検証（LLM 不使用） ----------
 
 def normalize(s: str) -> str:
-    return re.sub(r"\s+", "", s).replace("、", "").replace("。", "")
+    return re.sub(r"[\s<>、。「」]", "", s)
 
 
 def verify_quote(item: dict, chunk: str) -> bool:
@@ -190,24 +190,69 @@ def extract_from_chat(messages: list[Event]) -> list[Event]:
 
 # ---------- 保存とタスク自動生成 ----------
 
+def _similar_existing(conn: sqlite3.Connection, text: str, candidates: list[tuple[str, str]],
+                      threshold: float) -> str | None:
+    """candidates=[(id, text)] のうち text と埋め込み類似度が threshold 以上で最大のものの id"""
+    if not candidates:
+        return None
+    from app import vec   # 循環 import 回避
+    vecs = router.embed([text] + [c[1] for c in candidates], task="embed")
+    if vecs[0].shape[0] <= 1:
+        return None
+    q = vec._unit(vecs[0])
+    best, best_sim = None, threshold
+    for (cid, _), v in zip(candidates, vecs[1:]):
+        if v.shape[0] <= 1:
+            continue
+        sim = float(vec._unit(v) @ q)
+        if sim >= best_sim:
+            best, best_sim = cid, sim
+    return best
+
+
 def save_extracted(conn: sqlite3.Connection, events: list[Event]) -> tuple[int, int]:
     """抽出 Event を保存し、confidence が閾値以上の task_hint から Task を自動生成する。
+
+    - 同じ会議で既に同内容の決定があれば（会議末尾の「決定事項の確認」など）保存しない
+    - 既存の未完了タスクと同内容の task_hint は新規タスクにせず、既存タスクへ紐付ける
     戻り値: (保存した Event 数, 生成した Task 数)"""
-    db.save_events(conn, events)
+    saved: list[Event] = []
     created = 0
     new_tasks: list[tuple[Task, Event]] = []
     for ev in events:
-        if ev.kind == "task_hint" and ev.confidence >= config.TASK_AUTOGEN_CONFIDENCE:
+        if ev.kind == "decision":
+            same_meeting = [(r["id"], r["text"]) for r in conn.execute(
+                "SELECT id, text FROM events WHERE kind='decision' AND json_extract(meta,'$.meeting_id') = ?",
+                (ev.meta.get("meeting_id"),)).fetchall()] if ev.meta.get("meeting_id") else []
+            same_meeting += [(e.id, e.text) for e in saved if e.kind == "decision"]
+            if _similar_existing(conn, ev.text, same_meeting, config.DEDUPE_DECISION_SIM):
+                log.info("重複する決定として統合: %s", ev.text)
+                continue
+        db.save_event(conn, ev)
+        saved.append(ev)
+        # チャット発言からはタスクを自動生成しない（決定は拾う）。細切れの言及がタスクとして積み上がるため
+        if ev.kind == "task_hint" and ev.confidence >= config.TASK_AUTOGEN_CONFIDENCE and ev.source != "chat":
+            open_tasks = [t for t in db.list_tasks(conn) if t.status != "done"]
+            existing = _similar_existing(conn, ev.text, [(t.id, t.title) for t in open_tasks],
+                                         config.DEDUPE_TASK_SIM)
+            if existing:
+                # 既存タスクへの言及として紐付ける（stalled 検知の「動き」にもなる）
+                db.save_link(conn, Link(id=new_id(), from_type="event", from_id=ev.id, to_type="task",
+                                        to_id=existing, relation="discusses", confidence=0.9,
+                                        method="embedding"))
+                log.info("既存タスクに統合: %s → %s", ev.text, existing)
+                continue
             task = Task(id=new_id(), title=ev.text, assignee=ev.actor,
                         created_from=ev.id, status="todo")
             db.save_task(conn, task, at=ev.occurred_at)
-            db.save_link(conn, Link(id=new_id(), from_type="event", from_id=ev.id,
-                                    to_type="task", to_id=task.id, relation="implements",
-                                    confidence=ev.confidence, method="explicit"))
+            db.save_link(conn, Link(id=new_id(), from_type="event", from_id=ev.id, to_type="task",
+                                    to_id=task.id, relation="implements", confidence=ev.confidence,
+                                    method="explicit"))
             created += 1
             new_tasks.append((task, ev))
-    _link_tasks_to_decisions(conn, new_tasks, [e for e in events if e.kind == "decision"])
-    return len(events), created
+    conn.commit()
+    _link_tasks_to_decisions(conn, new_tasks, [e for e in saved if e.kind == "decision"])
+    return len(saved), created
 
 
 def _link_tasks_to_decisions(conn: sqlite3.Connection, tasks: list[tuple[Task, Event]],

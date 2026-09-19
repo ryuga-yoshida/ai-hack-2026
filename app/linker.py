@@ -26,7 +26,7 @@ LINK_PROMPT = """以下のチャット発言が、どのタスクについての
 - 指示語（あれ、例の、さっきの）は直前の会話から解決する
 - どれにも該当しない場合は null。推測で選ばない
 
-出力: {"task_id": "..." | null, "confidence": 0.0-1.0, "reason": "..."}"""
+出力: {"task_id": "T1" のような候補の番号 | null, "confidence": 0.0-1.0, "reason": "..."}"""
 
 # method 別の集計（デモで内訳を見せる）
 stats: dict[str, int] = {"explicit": 0, "context": 0, "assignee": 0, "embedding": 0, "llm": 0, "none": 0}
@@ -46,21 +46,29 @@ def _content_words(title: str) -> list[str]:
 
 
 def by_explicit(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | None:
+    """タスク ID・タイトル・成果物名・タイトルの内容語が発言に含まれていれば確定。
+    複数タスクに当たる場合は一致した語数が最大のものを選び、同点なら確定しない（次段へ）。"""
     text = msg.text
+    scored: list[tuple[int, Task]] = []
     for t in _open_tasks(conn):
-        if t.id in text:
+        if t.id in text or (len(t.title) >= 3 and t.title in text):
             return (t.id, 1.0)
-        if len(t.title) >= 3 and t.title in text:
-            return (t.id, 1.0)
-        # タイトルの内容語（4文字以上）が含まれる、または内容語が2語以上一致
-        words = _content_words(t.title)
-        hits = [w for w in words if w in text]
-        if any(len(w) >= 4 for w in hits) or len(hits) >= 2:
-            return (t.id, 1.0)
+        score = 0
         for a in t.artifacts:
             stem = a.rsplit(".", 1)[0]
             if len(stem) >= 3 and stem in text:
-                return (t.id, 1.0)
+                score += 2
+        words = _content_words(t.title)
+        hits = [w for w in words if w in text]
+        if any(len(w) >= 4 for w in hits) or len(hits) >= 2:
+            score += len(hits) + sum(1 for w in hits if len(w) >= 4)
+        if score:
+            scored.append((score, t))
+    if not scored:
+        return None
+    scored.sort(key=lambda x: -x[0])
+    if len(scored) == 1 or scored[0][0] > scored[1][0]:
+        return (scored[0][1].id, 1.0)
     return None
 
 
@@ -130,8 +138,9 @@ def recent_messages(conn: sqlite3.Connection, msg: Event, n: int = 5) -> list[Ev
 
 def by_llm(conn: sqlite3.Connection, msg: Event, candidates: list[Task]) -> tuple[str, float] | None:
     recent = "\n".join(f"- {m.actor}: {m.text}" for m in recent_messages(conn, msg)) or "（なし）"
+    # タスク id は実行ごとに変わるため、プロンプトでは T1.. の番号で参照する（キャッシュが安定する）
     cands = "\n".join(
-        f"{i}. [{t.id}] {t.title}（担当: {t.assignee or '未割当'}, 状態: {t.status}）"
+        f"{i}. [T{i}] {t.title}（担当: {t.assignee or '未割当'}, 状態: {t.status}）"
         for i, t in enumerate(candidates, 1))
     user = (f"直前の会話:\n{recent}\n\n判定対象: {msg.text}\n発言者: {msg.actor}\n\n候補タスク:\n{cands}")
     masked, table = mask(user)
@@ -139,12 +148,14 @@ def by_llm(conn: sqlite3.Connection, msg: Event, candidates: list[Task]) -> tupl
     if not isinstance(res, dict):
         return None
     res = unmask(res, table)
-    tid = res.get("task_id")
-    if tid and any(t.id == tid for t in candidates):
+    tid = str(res.get("task_id") or "")
+    m = re.fullmatch(r"T?(\d+)", tid.strip())
+    if m and 1 <= int(m[1]) <= len(candidates):
+        chosen = candidates[int(m[1]) - 1].id
         try:
-            return (tid, float(res.get("confidence", 0.5)))
+            return (chosen, float(res.get("confidence", 0.5)))
         except (TypeError, ValueError):
-            return (tid, 0.5)
+            return (chosen, 0.5)
     return None
 
 

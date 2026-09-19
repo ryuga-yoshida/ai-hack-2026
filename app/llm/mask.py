@@ -37,8 +37,10 @@ def mask(text: str, persons: list[str] | None = None) -> tuple[str, dict[str, st
 
 
 def unmask_text(s: str, table: dict[str, str]) -> str:
-    for key, orig in table.items():
-        s = s.replace(key, orig)
+    # LLM は "<PERSON_1>" の山括弧を落として "PERSON_1" と返すことがあるため両方を戻す。
+    # "<PERSON_10>" を "<PERSON_1>" より先に処理するため、長いキーから順に置換する
+    for key, orig in sorted(table.items(), key=lambda kv: -len(kv[0])):
+        s = s.replace(key, orig).replace(key.strip("<>"), orig)
     return s
 
 
