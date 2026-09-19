@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from pydantic import BaseModel
 
-from app import config, db
+from app import config, db, tags as tagmod
 from app.connectors import chat, meet
 from app.models import Event, Link, Task, new_id
 
@@ -86,7 +86,7 @@ def nav_context(conn: sqlite3.Connection) -> dict:
 def render(name: str, request: Request, conn: sqlite3.Connection | None = None, **ctx) -> HTMLResponse:
     if conn is not None:
         ctx.update(nav_context(conn))
-    ctx.setdefault("active", name.split(".")[0])
+    ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet"))
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -188,22 +188,25 @@ def task_meta(conn: sqlite3.Connection, t: Task) -> dict:
     n_findings = conn.execute(
         "SELECT COUNT(*) FROM findings WHERE task_id=? AND status IN ('notified','pending')", (t.id,)).fetchone()[0]
     origin = db.get_event(conn, t.created_from) if t.created_from else None
-    return {"task": t, "n_msgs": n_msgs, "n_findings": n_findings,
+    return {"task": t, "n_msgs": n_msgs, "n_findings": n_findings, "tags": tagmod.tags_for(conn, "task", t.id),
             "origin": origin, "overdue": bool(t.due_date and t.due_date < date.today() and t.status != "done")}
 
 
 @app.get("/tasks", response_class=HTMLResponse)
-def tasks_page(request: Request, assignee: str = "", q: str = ""):
+def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = ""):
     conn = get_conn()
     tasks = db.list_tasks(conn)
     if assignee:
         tasks = [t for t in tasks if (t.assignee or "") == assignee]
+    if tag:
+        ids = set(tagmod.targets_for(conn, tag)["task"])
+        tasks = [t for t in tasks if t.id in ids]
     if q:
         tasks = [t for t in tasks if q in t.title or q in (t.description or "")]
     by_status = {s: [task_meta(conn, t) for t in tasks if t.status == s] for s, _ in STATUSES}
     assignees = sorted({t.assignee for t in db.list_tasks(conn) if t.assignee})
     return render("tasks.html", request, conn, by_status=by_status, assignees=assignees,
-                  assignee=assignee, q=q)
+                  assignee=assignee, q=q, tag=tag, all_tags=tagmod.all_tags(conn))
 
 
 @app.post("/tasks")
@@ -217,6 +220,7 @@ def create_task(title: str = Form(...), assignee: str = Form(""), due_date: str 
         artifacts=[a.strip() for a in artifacts.split(",") if a.strip()],
     )
     db.save_task(conn, task)
+    tagmod.apply_hashtags(conn, f"{title} {description}", "task", task.id)
     return RedirectResponse(f"/tasks/{task.id}", status_code=303)
 
 
@@ -263,7 +267,7 @@ def task_detail(request: Request, task_id: str):
     if not task:
         raise HTTPException(404)
     return render("task_detail.html", request, conn, task=task, meta=task_meta(conn, task),
-                  timeline=task_timeline(conn, task), me=get_me(request))
+                  timeline=task_timeline(conn, task), me=get_me(request), all_tags=tagmod.all_tags(conn))
 
 
 class TaskPatch(BaseModel):
@@ -299,6 +303,8 @@ def task_comment(task_id: str, request: Request, actor: str = Form(...), text: s
     if not task:
         raise HTTPException(404)
     mid = chat.post_message(conn, "tasks", actor.strip(), text.strip())
+    for tname in tagmod.apply_hashtags(conn, text, "message", mid):
+        tagmod.link(conn, tname, "task", task_id)
     _ingest_chat(conn)
     db.save_link(conn, Link(id=new_id(), from_type="event", from_id=mid, to_type="task", to_id=task_id,
                             relation="discusses", confidence=1.0, method="explicit"))
@@ -311,12 +317,24 @@ def task_comment(task_id: str, request: Request, actor: str = Form(...), text: s
 
 # ---------- チャット ----------
 
-_MENTION = re.compile(r"@(" + "|".join(re.escape(p) for p in PEOPLE) + r"|all|channel)")
+_MENTION = re.compile(r"@([^\s@,、。<]+)")
+_HASH = re.compile(r"(?<![\w/])#([^\s#@,、。！？!?()（）「」<]{1,24})")
 
 
-def render_message(text: str) -> str:
+def render_message(text: str, conn: sqlite3.Connection | None = None) -> str:
     html = str(linkify(text))
-    return _MENTION.sub(r'<span class="bg-indigo-100 text-indigo-800 rounded px-1 font-medium">@\1</span>', html)
+    team_names = {t["name"] for t in tagmod.teams(conn)} if conn is not None else set()
+
+    def mention(m):
+        name = m.group(1)
+        if name in PEOPLE or name in ("all", "channel", "全員"):
+            return f'<span class="bg-indigo-100 text-indigo-800 rounded px-1 font-medium">@{name}</span>'
+        if name in team_names:
+            return f'<a href="/tags/{escape(name)}" class="bg-violet-100 text-violet-800 rounded px-1 font-medium">@{name}</a>'
+        return m.group(0)
+    html = _MENTION.sub(mention, html)
+    html = _HASH.sub(lambda m: f'<a href="/tags/{escape(m.group(1))}" class="text-indigo-600 hover:underline">#{m.group(1)}</a>', html)
+    return html
 
 
 def _message_dict(conn: sqlite3.Connection, r: sqlite3.Row) -> dict:
@@ -333,7 +351,9 @@ def _message_dict(conn: sqlite3.Connection, r: sqlite3.Row) -> dict:
     replies = conn.execute("SELECT COUNT(*) FROM chat_messages WHERE reply_to=? AND deleted=0", (r["id"],)).fetchone()[0]
     last_reply = conn.execute("SELECT posted_at FROM chat_messages WHERE reply_to=? AND deleted=0 ORDER BY posted_at DESC LIMIT 1", (r["id"],)).fetchone()
     return {"id": r["id"], "channel": r["channel"], "actor": r["actor"], "text": r["text"], "posted_at": r["posted_at"],
-            "html": render_message(r["text"]), "reply_to": r["reply_to"], "edited": bool(r["edited_at"]),
+            "html": render_message(r["text"], conn), "reply_to": r["reply_to"], "edited": bool(r["edited_at"]),
+            "tags": tagmod.tags_for(conn, "message", r["id"]),
+            "mentions": sorted(tagmod.expand_mentions(conn, r["text"], PEOPLE)),
             "attachments": json.loads(r["attachments"]) if r["attachments"] else [],
             "reactions": reactions, "replies": replies, "last_reply": last_reply["posted_at"] if last_reply else None,
             "task": {"id": link["to_id"], "title": link["title"], "method": link["method"],
@@ -376,18 +396,45 @@ def _ingest_chat(conn: sqlite3.Connection) -> None:
             linker.register_artifacts(conn, r[0], ev)
 
 
-@app.get("/chat", response_class=HTMLResponse)
-def chat_page(request: Request, channel: str = "general", thread: str = "", q: str = ""):
-    conn = get_conn()
-    channels = chat.list_channels(conn)
-    if channel not in channels:
-        channels.append(channel)
+def _sidebar(conn: sqlite3.Connection, me: str) -> dict:
     counts = {r["channel"]: r["n"] for r in conn.execute("SELECT channel, COUNT(*) n FROM chat_messages WHERE deleted=0 GROUP BY channel")}
-    descs = {r["name"]: r["description"] for r in conn.execute("SELECT name, description FROM chat_channels")}
+    return {"channels": chat.list_channels(conn), "conversations": chat.conversations(conn, me or None),
+            "counts": counts, "teams": tagmod.teams(conn)}
+
+
+def _active_meeting(conn: sqlite3.Connection, channel: str) -> dict | None:
+    r = conn.execute("SELECT id, title, status, started_at FROM meetings WHERE channel=? AND status IN ('recording','processing') "
+                     "ORDER BY started_at DESC LIMIT 1", (channel,)).fetchone()
+    return dict(r) if r else None
+
+
+@app.get("/chat", response_class=HTMLResponse)
+def chat_page(request: Request, channel: str = "general", thread: str = "", q: str = "", view: str = ""):
+    conn = get_conn()
+    me = get_me(request)
+    ch = chat.get_channel(conn, channel)
     results = [_message_dict(conn, r) for r in chat.search_messages(conn, q)] if q else []
-    return render("chat.html", request, conn, channel=channel, channels=channels, counts=counts, descs=descs,
+    mentions = []
+    if view == "mentions" and me:
+        for r in conn.execute("SELECT * FROM chat_messages WHERE deleted=0 AND text LIKE '%@%' ORDER BY posted_at DESC LIMIT 100"):
+            if me in tagmod.expand_mentions(conn, r["text"], PEOPLE):
+                mentions.append(_message_dict(conn, r))
+    return render("chat.html", request, conn, channel=channel, ch=ch, **_sidebar(conn, me),
                   messages=message_rows(conn, channel), thread=thread_rows(conn, thread) if thread else None,
-                  q=q, results=results, me=get_me(request))
+                  q=q, results=results, me=me, view=view, mentions=mentions,
+                  meeting=_active_meeting(conn, channel), channel_tags=tagmod.tags_for(conn, "channel", channel))
+
+
+@app.post("/chat/conversations")
+def create_conversation(request: Request, members: list[str] = Form(...), title: str = Form(""), me: str = Form("")):
+    conn = get_conn()
+    people = list(members) + ([me] if me.strip() else [])
+    try:
+        name = chat.ensure_conversation(conn, people, title.strip() or None)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    resp = RedirectResponse(f"/chat?channel={name}", status_code=303)
+    return set_me(resp, me) if me.strip() else resp
 
 
 @app.get("/api/chat/messages")
@@ -416,9 +463,16 @@ def post_chat(request: Request, channel: str = Form("general"), actor: str = For
         attachments = [{"url": url, "name": name}]
         if url not in text:
             text = f"{text.strip()} {url}".strip()   # URL を本文にも入れる（成果物の自動登録が効く）
-    chat.post_message(conn, channel.strip() or "general", actor.strip(), text.strip(),
-                      reply_to=reply_to.strip() or None, attachments=attachments)
+    mid = chat.post_message(conn, channel.strip() or "general", actor.strip(), text.strip(),
+                            reply_to=reply_to.strip() or None, attachments=attachments)
+    for tname in tagmod.apply_hashtags(conn, text, "message", mid):
+        for a in (attachments or []):
+            tagmod.link(conn, tname, "artifact", a["name"])
     _ingest_chat(conn)
+    linked = conn.execute("SELECT to_id FROM links WHERE from_type='event' AND from_id=? AND to_type='task' LIMIT 1", (mid,)).fetchone()
+    if linked:
+        for tname in tagmod.hashtags(text):
+            tagmod.link(conn, tname, "task", linked["to_id"])
     url = f"/chat?channel={channel}" + (f"&thread={reply_to}" if reply_to else "")
     resp = RedirectResponse(url, status_code=303)
     set_me(resp, actor)
@@ -497,10 +551,14 @@ def meet_page(request: Request):
 
 
 @app.post("/meet")
-def create_meeting(title: str = Form("定例会議"), me: str = Form(...)):
+def create_meeting(title: str = Form("定例会議"), me: str = Form(...), channel: str = Form("")):
     conn = get_conn()
-    mid = meet.create_meeting(conn, title)
+    mid = meet.create_meeting(conn, title, channel=channel.strip() or None)
     meet.join(conn, mid, me.strip())
+    if channel.strip():
+        chat.post_message(conn, channel.strip(), me.strip(),
+                          f"📹 会議「{title}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
+        _ingest_chat(conn)
     resp = RedirectResponse(f"/meet/{mid}?me={me.strip()}", status_code=303)
     set_me(resp, me)
     return resp
@@ -571,9 +629,17 @@ async def meet_audio(meeting_id: str, speaker: str = Form(...), rec_started_at: 
 def _finalize_job(meeting_id: str) -> None:
     conn = get_conn()
     try:
-        meet.finalize(conn, meeting_id)
+        transcript = meet.finalize(conn, meeting_id)
     except Exception:
-        pass   # 失敗は meetings.status='failed' に記録済み
+        return   # 失敗は meetings.status='failed' に記録済み
+    m = conn.execute("SELECT title, channel FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+    if m and m["channel"]:
+        n = transcript.count("\n[")
+        chat.post_message(conn, m["channel"], "エージェント",
+                          f"📝 会議「{m['title']}」の議事録ができました（{n} 発言）。次の巡回で決定・タスクに分解します。 {config.APP_BASE_URL}/meet/{meeting_id}")
+        _ingest_chat(conn)
+        for t in tagmod.tags_for(conn, "channel", m["channel"]):
+            tagmod.link(conn, t["name"], "meeting", meeting_id)
 
 
 @app.post("/meet/{meeting_id}/finalize")
@@ -639,6 +705,63 @@ def manual_tick(request: Request, background: BackgroundTasks):
     if "application/json" in request.headers.get("accept", ""):
         return {"ok": True}
     return RedirectResponse(request.headers.get("referer") or "/agent", status_code=303)
+
+
+# ---------- タグ・チーム ----------
+
+@app.get("/tags", response_class=HTMLResponse)
+def tags_page(request: Request):
+    conn = get_conn()
+    return render("tags.html", request, conn, tags=tagmod.all_tags(conn))
+
+
+@app.post("/tags")
+def create_tag(request: Request, name: str = Form(...), kind: str = Form("topic"), members: list[str] = Form([]),
+               description: str = Form("")):
+    conn = get_conn()
+    tagmod.ensure_tag(conn, name, kind="team" if kind == "team" else "topic",
+                      members=list(members) if kind == "team" else None, description=description.strip() or None)
+    return RedirectResponse(f"/tags/{name.strip().lstrip('#@')}", status_code=303)
+
+
+@app.get("/tags/{name}", response_class=HTMLResponse)
+def tag_page(request: Request, name: str):
+    conn = get_conn()
+    t = tagmod.get_tag(conn, name)
+    if not t:
+        t = tagmod.ensure_tag(conn, name)
+    targets = tagmod.targets_for(conn, name)
+    msgs = [_message_dict(conn, r) for r in (conn.execute("SELECT * FROM chat_messages WHERE id=? AND deleted=0", (i,)).fetchone() for i in targets["message"]) if r]
+    tasks = [task_meta(conn, t2) for t2 in (db.get_task(conn, i) for i in targets["task"]) if t2]
+    meetings = [dict(r) for r in (conn.execute("SELECT id, title, started_at, status FROM meetings WHERE id=?", (i,)).fetchone() for i in targets["meeting"]) if r]
+    artifacts = []
+    for name_ in targets["artifact"]:
+        changes = conn.execute("SELECT COUNT(*) FROM events WHERE kind='artifact_change' AND (json_extract(meta,'$.base') || '.xlsx' = ? OR json_extract(meta,'$.file') = ?)",
+                               (name_, name_)).fetchone()[0]
+        artifacts.append({"name": name_, "changes": changes})
+    return render("tag_detail.html", request, conn, tag=t, msgs=msgs, tasks=tasks, meetings=meetings,
+                  artifacts=artifacts, channels=targets["channel"], all_tasks=db.list_tasks(conn))
+
+
+@app.post("/tags/{name}/link")
+def tag_link(request: Request, name: str, target_type: str = Form(...), target_id: str = Form(...)):
+    conn = get_conn()
+    tagmod.link(conn, name, target_type, target_id.strip())
+    return RedirectResponse(request.headers.get("referer") or f"/tags/{name}", status_code=303)
+
+
+@app.post("/tags/{name}/unlink")
+def tag_unlink(request: Request, name: str, target_type: str = Form(...), target_id: str = Form(...)):
+    conn = get_conn()
+    tagmod.unlink(conn, name, target_type, target_id.strip())
+    return RedirectResponse(request.headers.get("referer") or f"/tags/{name}", status_code=303)
+
+
+@app.post("/tags/{name}/members")
+def tag_members(name: str, members: list[str] = Form([])):
+    conn = get_conn()
+    tagmod.ensure_tag(conn, name, kind="team", members=list(members))
+    return RedirectResponse(f"/tags/{name}", status_code=303)
 
 
 # ---------- コスト ----------

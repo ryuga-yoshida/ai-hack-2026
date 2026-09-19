@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ '@' if tag.kind == 'team' else '#' }}{{ tag.name }}{% endblock %}
+{% block heading %}<a href="/tags" class="text-gray-400 hover:text-gray-600 mr-2">タグ</a><span class="text-gray-300 mr-2">/</span>
+  <span class="px-2 py-0.5 rounded bg-{{ tag.color }}-100 text-{{ tag.color }}-800">{{ '@' if tag.kind == 'team' else '#' }}{{ tag.name }}</span>
+  {% if tag.description %}<span class="text-sm text-gray-400 font-normal ml-2">{{ tag.description }}</span>{% endif %}{% endblock %}
+{% block content %}
+<div class="grid grid-cols-3 gap-6">
+  <div class="col-span-2 space-y-6">
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold mb-3">タスク <span class="text-xs text-gray-400 font-normal">{{ tasks|length }}</span></h2>
+      <div class="space-y-2">
+        {% for m in tasks %}{% set t = m.task %}
+        <div class="flex items-center gap-3 text-sm border border-gray-100 rounded-lg px-3 py-2">
+          <span class="text-[10px] px-1.5 rounded bg-gray-100 text-gray-600">{{ STATUS_LABEL[t.status] }}</span>
+          <a href="/tasks/{{ t.id }}" class="flex-1 hover:underline">{{ t.title }}</a>
+          <span class="text-xs text-gray-500">{{ t.assignee or '未割当' }}</span>
+          <form method="post" action="/tags/{{ tag.name }}/unlink"><input type="hidden" name="target_type" value="task"><input type="hidden" name="target_id" value="{{ t.id }}"><button class="text-gray-300 hover:text-red-600">×</button></form>
+        </div>
+        {% else %}<p class="text-sm text-gray-400">なし</p>{% endfor %}
+      </div>
+      <form method="post" action="/tags/{{ tag.name }}/link" class="flex gap-2 mt-3">
+        <input type="hidden" name="target_type" value="task">
+        <select name="target_id" class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">{% for t in all_tasks %}<option value="{{ t.id }}">{{ t.title }}</option>{% endfor %}</select>
+        <button class="text-sm border border-gray-300 rounded-lg px-3">タスクを追加</button>
+      </form>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold mb-3">成果物 <span class="text-xs text-gray-400 font-normal">{{ artifacts|length }}</span></h2>
+      <div class="space-y-2">
+        {% for a in artifacts %}
+        <div class="flex items-center gap-3 text-sm border border-gray-100 rounded-lg px-3 py-2">
+          <span class="w-6 h-6 rounded bg-emerald-100 text-emerald-700 grid place-items-center text-[10px] font-bold">X</span>
+          <span class="flex-1">{{ a.name }}</span><span class="text-xs text-gray-500">変更 {{ a.changes }} 件</span>
+          <form method="post" action="/tags/{{ tag.name }}/unlink"><input type="hidden" name="target_type" value="artifact"><input type="hidden" name="target_id" value="{{ a.name }}"><button class="text-gray-300 hover:text-red-600">×</button></form>
+        </div>
+        {% else %}<p class="text-sm text-gray-400">なし</p>{% endfor %}
+      </div>
+      <form method="post" action="/tags/{{ tag.name }}/link" class="flex gap-2 mt-3">
+        <input type="hidden" name="target_type" value="artifact">
+        <input name="target_id" placeholder="ファイル名（例: 売上見込.xlsx）" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5">
+        <button class="text-sm border border-gray-300 rounded-lg px-3">成果物を追加</button>
+      </form>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold mb-3">会議 <span class="text-xs text-gray-400 font-normal">{{ meetings|length }}</span></h2>
+      {% for m in meetings %}<div class="text-sm py-1"><a href="/meet/{{ m.id }}" class="hover:underline">{{ m.title }}</a> <span class="text-xs text-gray-500">{{ m.started_at|dt }}</span></div>{% else %}<p class="text-sm text-gray-400">なし</p>{% endfor %}
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-2">
+      <h2 class="font-semibold px-3 pt-3 mb-1">発言 <span class="text-xs text-gray-400 font-normal">{{ msgs|length }}</span></h2>
+      {% for m in msgs %}<div class="text-xs text-gray-400 px-4 pt-1"># {{ m.channel }}</div>{% with compact=true %}{% include "_message.html" %}{% endwith %}{% else %}<p class="text-sm text-gray-400 px-3 pb-3">なし</p>{% endfor %}
+    </div>
+  </div>
+
+  <aside class="space-y-4">
+    {% if tag.kind == 'team' %}
+    <form method="post" action="/tags/{{ tag.name }}/members" class="bg-white border border-gray-200 rounded-xl p-4 text-sm space-y-2">
+      <h2 class="font-semibold">メンバー</h2>
+      <div class="grid grid-cols-2 gap-1">{% for p in PEOPLE %}<label class="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1.5"><input type="checkbox" name="members" value="{{ p }}" {% if p in tag.members %}checked{% endif %}>{{ p }}</label>{% endfor %}</div>
+      <button class="w-full border border-gray-300 rounded-lg py-1.5 bg-white hover:bg-gray-50">更新</button>
+      <p class="text-xs text-gray-500">チャットで <b>@{{ tag.name }}</b> と書くとメンバー全員にメンションされます。</p>
+    </form>
+    {% endif %}
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm space-y-2">
+      <h2 class="font-semibold">チャンネルに付ける</h2>
+      <form method="post" action="/tags/{{ tag.name }}/link" class="flex gap-2">
+        <input type="hidden" name="target_type" value="channel">
+        <input name="target_id" placeholder="general" required class="flex-1 border border-gray-300 rounded-lg px-2 py-1.5"><button class="border border-gray-300 rounded-lg px-3">追加</button>
+      </form>
+      {% for c in channels %}<div class="flex items-center justify-between"><a href="/chat?channel={{ c }}" class="hover:underline"># {{ c }}</a>
+        <form method="post" action="/tags/{{ tag.name }}/unlink"><input type="hidden" name="target_type" value="channel"><input type="hidden" name="target_id" value="{{ c }}"><button class="text-gray-300 hover:text-red-600">×</button></form></div>{% endfor %}
+      <p class="text-xs text-gray-500">チャンネルに付けると、そのチャンネルから始めた会議にも自動で付きます。</p>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -1,11 +1,20 @@
 {% extends "base.html" %}
 {% block title %}チャット{% endblock %}
-{% block heading %}チャット <span class="text-gray-400 font-normal">#{{ channel }}</span>{% if descs.get(channel) %}<span class="text-sm text-gray-400 font-normal ml-2">{{ descs.get(channel) }}</span>{% endif %}{% endblock %}
+{% block heading %}チャット <span class="text-gray-400 font-normal">{% if ch.kind == 'channel' %}#{{ channel }}{% else %}{{ ch.title }}{% endif %}</span>
+  {% if ch.description %}<span class="text-sm text-gray-400 font-normal ml-2">{{ ch.description }}</span>{% endif %}
+  {% for t in channel_tags %}<a href="/tags/{{ t.name }}" class="ml-2 text-xs px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800 font-normal">#{{ t.name }}</a>{% endfor %}{% endblock %}
 {% block actions %}
 <form method="get" action="/chat" class="flex items-center gap-2">
   <input type="hidden" name="channel" value="{{ channel }}">
-  <input name="q" value="{{ q }}" placeholder="メッセージを検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-48">
+  <input name="q" value="{{ q }}" placeholder="メッセージを検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-44">
 </form>
+<a href="/chat?channel={{ channel }}&view=mentions" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 {% if view == 'mentions' %}bg-indigo-50 border-indigo-300{% endif %}">@ メンション</a>
+{% if not meeting %}
+<form method="post" action="/meet" class="flex">
+  <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="title" value="{{ ch.title if ch.kind != 'channel' else '#' + channel }} の会議"><input type="hidden" name="me" value="{{ me or '鈴木' }}">
+  <button class="text-sm bg-emerald-600 text-white rounded-lg px-3 py-1.5 hover:bg-emerald-700">📹 会議を始める</button>
+</form>
+{% endif %}
 {% endblock %}
 {% block main_class %}p-0 flex min-h-0{% endblock %}
 {% block content %}
@@ -19,21 +28,49 @@
       <input name="description" placeholder="説明（任意）" class="w-full text-xs border border-gray-300 rounded px-2 py-1">
       <button class="w-full text-xs bg-indigo-600 text-white rounded py-1">作成</button>
     </form>
-    <nav class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm">
-      {% for ch in channels %}
-      <a href="/chat?channel={{ ch }}" class="flex items-center justify-between px-2 py-1.5 rounded-lg {% if ch == channel %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
-        <span># {{ ch }}</span><span class="text-xs text-gray-400">{{ counts.get(ch, 0) }}</span></a>
+    <nav class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-thin">
+      {% for c in channels %}
+      <a href="/chat?channel={{ c }}" class="flex items-center justify-between px-2 py-1.5 rounded-lg {% if c == channel %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
+        <span># {{ c }}</span><span class="text-xs text-gray-400">{{ counts.get(c, 0) }}</span></a>
       {% endfor %}
+      <div class="px-2 pt-4 pb-1 text-xs font-semibold text-gray-500 flex items-center justify-between">ダイレクトメッセージ
+        <button @click="$dispatch('open-new-dm')" class="text-gray-400 hover:text-gray-700 text-base leading-none" title="新しいメッセージ">＋</button></div>
+      {% for c in conversations %}
+      <a href="/chat?channel={{ c.name }}" class="flex items-center gap-2 px-2 py-1.5 rounded-lg {% if c.name == channel %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
+        {% if c.kind == 'dm' %}<span class="w-2 h-2 rounded-full bg-emerald-400"></span>{% else %}<span class="text-[10px] px-1 rounded bg-gray-300 text-gray-700">{{ c.members|length }}</span>{% endif %}
+        <span class="truncate">{{ c.title }}</span><span class="ml-auto text-xs text-gray-400">{{ counts.get(c.name, 0) }}</span></a>
+      {% else %}<div class="px-2 text-xs text-gray-400">{% if me %}まだありません{% else %}名前を入力するとDMが表示されます{% endif %}</div>{% endfor %}
+      <div class="px-2 pt-4 pb-1 text-xs font-semibold text-gray-500 flex items-center justify-between">チーム
+        <a href="/tags" class="text-gray-400 hover:text-gray-700" title="タグ・チームを管理">⚙</a></div>
+      {% for t in teams %}
+      <a href="/tags/{{ t.name }}" class="flex items-center gap-2 px-2 py-1 rounded-lg text-gray-600 hover:bg-gray-200">
+        <span class="w-2 h-2 rounded-full bg-{{ t.color }}-500"></span><span class="truncate">@{{ t.name }}</span><span class="ml-auto text-xs text-gray-400">{{ t.members|length }}人</span></a>
+      {% else %}<div class="px-2 text-xs text-gray-400">未作成（<a href="/tags" class="underline">作る</a>）</div>{% endfor %}
     </nav>
     <div class="px-4 py-3 text-xs text-gray-500 border-t border-gray-200">
-      <div class="font-semibold mb-1">メンバー</div>
-      {% for p in PEOPLE %}<div class="flex items-center gap-1.5 py-0.5"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>{{ p }}</div>{% endfor %}
+      <div class="font-semibold mb-1">メンバー{% if me %} <span class="font-normal text-gray-400">（あなた: {{ me }}）</span>{% endif %}</div>
+      {% for p in PEOPLE %}<a href="#" @click.prevent="$dispatch('open-new-dm', { with: '{{ p }}' })" class="flex items-center gap-1.5 py-0.5 hover:text-gray-900"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>{{ p }}</a>{% endfor %}
     </div>
   </aside>
 
   <!-- メッセージ -->
   <section class="flex-1 min-w-0 flex flex-col bg-white">
-    {% if q %}
+    {% if meeting %}
+    <div class="bg-emerald-50 border-b border-emerald-200 px-4 py-2 text-sm flex items-center gap-3">
+      <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span>会議「{{ meeting.title }}」が{{ '文字起こし中' if meeting.status == 'processing' else '進行中' }}です（{{ meeting.started_at|dt }} 開始）</span>
+      <a href="/meet/{{ meeting.id }}{% if me %}?me={{ me }}{% endif %}" class="ml-auto bg-emerald-600 text-white rounded-lg px-3 py-1 text-xs hover:bg-emerald-700">参加する</a>
+    </div>
+    {% endif %}
+    {% if ch.kind != 'channel' %}
+    <div class="px-4 py-2 border-b border-gray-100 text-xs text-gray-500">{{ 'ダイレクトメッセージ' if ch.kind == 'dm' else 'グループチャット' }} · メンバー: {{ ch.members|join('・') }}</div>
+    {% endif %}
+    {% if view == 'mentions' %}
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="text-sm text-gray-500 mb-2">{% if me %}<b>{{ me }}</b> へのメンション {{ mentions|length }} 件（個人・チーム・@all を含む）{% else %}名前を入力すると自分宛のメンションが見られます{% endif %} <a href="/chat?channel={{ channel }}" class="text-indigo-600 ml-2">閉じる</a></div>
+      {% for m in mentions %}<div class="text-xs text-gray-400 px-4 pt-2"># {{ m.channel }}</div>{% with compact=true %}{% include "_message.html" %}{% endwith %}{% endfor %}
+    </div>
+    {% elif q %}
     <div class="flex-1 overflow-y-auto p-4">
       <div class="text-sm text-gray-500 mb-2">「{{ q }}」の検索結果 {{ results|length }} 件 <a href="/chat?channel={{ channel }}" class="text-indigo-600 ml-2">閉じる</a></div>
       {% for m in results %}<div class="text-xs text-gray-400 px-4 pt-2"># {{ m.channel }}</div>{% with compact=true %}{% include "_message.html" %}{% endwith %}{% endfor %}
@@ -56,7 +93,7 @@
       <div class="flex gap-2">
         <input name="actor" value="{{ me }}" placeholder="名前" required list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-24">
         <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
-        <input name="text" placeholder="#{{ channel }} にメッセージを送信（@名前 でメンション）" required autocomplete="off" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+        <input name="text" placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（@名前 / @チーム でメンション、#タグ でタグ付け）" required autocomplete="off" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
         <button type="button" @click="attach = !attach" class="text-sm border border-gray-300 rounded-lg px-3 bg-white hover:bg-gray-50" title="ファイルのリンクを添付">📎</button>
         <button class="text-sm bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700">送信</button>
       </div>
@@ -86,6 +123,23 @@
     </form>
   </aside>
   {% endif %}
+</div>
+
+<!-- 新しいメッセージ（DM / グループ） -->
+<div x-data="{ open: false, with_: '' }" @open-new-dm.window="open = true; with_ = ($event.detail && $event.detail.with) || ''" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/chat/conversations" class="bg-white rounded-xl shadow-xl p-6 w-[440px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">新しいメッセージ</h3>
+      <div><label class="text-xs text-gray-500">あなた</label><input name="me" value="{{ me }}" required list="people" placeholder="名前" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="text-xs text-gray-500">相手（複数選ぶとグループチャット）</label>
+        <div class="mt-1 grid grid-cols-3 gap-1">
+          {% for p in PEOPLE %}<label class="flex items-center gap-1.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5"><input type="checkbox" name="members" value="{{ p }}" :checked="with_ === '{{ p }}'">{{ p }}</label>{% endfor %}
+        </div></div>
+      <input name="title" placeholder="グループ名（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">開始</button></div>
+    </form>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}

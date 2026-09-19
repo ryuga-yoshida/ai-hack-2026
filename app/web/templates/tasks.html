@@ -3,6 +3,10 @@
 {% block actions %}
 <form method="get" class="flex items-center gap-2">
   <input name="q" value="{{ q }}" placeholder="検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-40">
+  <select name="tag" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+    <option value="">全タグ</option>
+    {% for t in all_tags %}<option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>#{{ t.name }}</option>{% endfor %}
+  </select>
   <select name="assignee" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
     <option value="">全員</option>
     {% for a in assignees %}<option value="{{ a }}" {% if a == assignee %}selected{% endif %}>{{ a }}</option>{% endfor %}
@@ -29,6 +33,7 @@
          class="block bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md hover:border-indigo-300 transition cursor-grab {% if t.status == 'done' %}opacity-70{% endif %}"
          id="task-{{ t.id }}">
         <div class="text-sm font-medium leading-snug">{{ t.title }}</div>
+        {% if m.tags %}<div class="flex flex-wrap gap-1 mt-1">{% for tg in m.tags %}<span class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</span>{% endfor %}</div>{% endif %}
         <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
           <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>
           <span>{{ t.assignee or "未割当" }}</span>

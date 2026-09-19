@@ -9,7 +9,10 @@ DDL = """
 CREATE TABLE IF NOT EXISTS chat_channels (
     name        TEXT PRIMARY KEY,
     description TEXT,
-    created_at  TEXT NOT NULL
+    created_at  TEXT NOT NULL,
+    kind        TEXT NOT NULL DEFAULT 'channel',   -- channel | dm | group
+    members     TEXT,                              -- JSON 配列（dm / group）
+    title       TEXT                               -- 表示名（group）
 );
 CREATE TABLE IF NOT EXISTS chat_messages (
     id          TEXT PRIMARY KEY,
@@ -31,6 +34,7 @@ CREATE TABLE IF NOT EXISTS chat_reactions (
 """
 
 _COLUMNS = {"reply_to": "TEXT", "edited_at": "TEXT", "deleted": "INTEGER NOT NULL DEFAULT 0", "attachments": "TEXT"}
+_CH_COLUMNS = {"kind": "TEXT NOT NULL DEFAULT 'channel'", "members": "TEXT", "title": "TEXT"}
 
 
 def init(conn: sqlite3.Connection) -> None:
@@ -40,6 +44,10 @@ def init(conn: sqlite3.Connection) -> None:
     for col, typ in _COLUMNS.items():
         if col not in have:
             conn.execute(f"ALTER TABLE chat_messages ADD COLUMN {col} {typ}")
+    have = {r[1] for r in conn.execute("PRAGMA table_info(chat_channels)")}
+    for col, typ in _CH_COLUMNS.items():
+        if col not in have:
+            conn.execute(f"ALTER TABLE chat_channels ADD COLUMN {col} {typ}")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_channel_time ON chat_messages(channel, posted_at)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_reply ON chat_messages(reply_to)")
     conn.commit()
@@ -108,10 +116,59 @@ def ensure_channel(conn: sqlite3.Connection, name: str, description: str | None 
 
 
 def list_channels(conn: sqlite3.Connection) -> list[str]:
-    names = {r[0] for r in conn.execute("SELECT name FROM chat_channels")}
-    names |= {r[0] for r in conn.execute("SELECT DISTINCT channel FROM chat_messages")}
+    """公開チャンネル名の一覧（dm / group は含まない）"""
+    import json
+    dm = {r[0] for r in conn.execute("SELECT name FROM chat_channels WHERE kind != 'channel'")}
+    names = {r[0] for r in conn.execute("SELECT name FROM chat_channels WHERE kind = 'channel'")}
+    names |= {r[0] for r in conn.execute("SELECT DISTINCT channel FROM chat_messages")} - dm
     order = {"general": 0, "sales": 1, "random": 2}
     return sorted(names, key=lambda n: (order.get(n, 9), n))
+
+
+def conversations(conn: sqlite3.Connection, me: str | None = None) -> list[dict]:
+    """dm / group の一覧。me を渡すとその人が参加しているものだけ"""
+    import json
+    out = []
+    for r in conn.execute("SELECT * FROM chat_channels WHERE kind != 'channel' ORDER BY created_at DESC"):
+        members = json.loads(r["members"]) if r["members"] else []
+        if me and me not in members:
+            continue
+        last = conn.execute("SELECT posted_at FROM chat_messages WHERE channel=? AND deleted=0 ORDER BY posted_at DESC LIMIT 1",
+                            (r["name"],)).fetchone()
+        out.append({"name": r["name"], "kind": r["kind"], "members": members,
+                    "title": r["title"] or "・".join(m for m in members if m != me) or "・".join(members),
+                    "last": last["posted_at"] if last else r["created_at"]})
+    return sorted(out, key=lambda c: c["last"], reverse=True)
+
+
+def get_channel(conn: sqlite3.Connection, name: str) -> dict:
+    import json
+    r = conn.execute("SELECT * FROM chat_channels WHERE name=?", (name,)).fetchone()
+    if not r:
+        return {"name": name, "kind": "channel", "members": [], "title": name, "description": None}
+    d = dict(r)
+    d["members"] = json.loads(d["members"]) if d["members"] else []
+    d["title"] = d["title"] or ("・".join(d["members"]) if d["kind"] != "channel" else d["name"])
+    return d
+
+
+def ensure_conversation(conn: sqlite3.Connection, members: list[str], title: str | None = None) -> str:
+    """メンバーの集合で dm（2人）/ group（3人以上）を作る。同じメンバーの dm は使い回す"""
+    import hashlib, json
+    members = sorted({m.strip() for m in members if m.strip()})
+    if len(members) < 2:
+        raise ValueError("2人以上のメンバーが必要")
+    kind = "dm" if len(members) == 2 else "group"
+    if kind == "dm":
+        name = "dm-" + hashlib.sha1("|".join(members).encode()).hexdigest()[:8]
+    else:
+        name = "grp-" + new_id()[:8]
+    if not conn.execute("SELECT 1 FROM chat_channels WHERE name=?", (name,)).fetchone():
+        conn.execute("INSERT INTO chat_channels (name, description, created_at, kind, members, title) VALUES (?,?,?,?,?,?)",
+                     (name, None, datetime.now().replace(microsecond=0).isoformat(), kind,
+                      json.dumps(members, ensure_ascii=False), title))
+        conn.commit()
+    return name
 
 
 class ChatAdapter:

@@ -16,6 +16,7 @@ ORCA_MODEL_HIGH = os.getenv("ORCA_MODEL_HIGH", "")
 ORCA_MODEL_MID = os.getenv("ORCA_MODEL_MID", "")
 ORCA_MODEL_EMBED = os.getenv("ORCA_MODEL_EMBED", "")
 GOOGLE_CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "")
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:8000")   # チャットに貼る会議 URL の基点
 
 FIXTURES_DIR = ROOT / "fixtures"
 

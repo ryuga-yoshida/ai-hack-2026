@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}タグ・チーム{% endblock %}
+{% block content %}
+<div class="grid grid-cols-3 gap-6">
+  <div class="col-span-2">
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-xs text-gray-500 text-left"><tr><th class="px-4 py-2">名前</th><th class="px-4 py-2">種類</th><th class="px-4 py-2">メンバー / 説明</th><th class="px-4 py-2 text-right">紐付け数</th></tr></thead>
+        <tbody>
+        {% for t in tags %}
+        <tr class="border-t border-gray-100 hover:bg-gray-50">
+          <td class="px-4 py-2.5"><a href="/tags/{{ t.name }}" class="px-2 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800 font-medium">{{ '@' if t.kind == 'team' else '#' }}{{ t.name }}</a></td>
+          <td class="px-4 py-2.5 text-gray-600">{{ 'チーム' if t.kind == 'team' else 'タグ' }}</td>
+          <td class="px-4 py-2.5 text-gray-600">{{ t.members|join('・') if t.kind == 'team' else (t.description or '') }}</td>
+          <td class="px-4 py-2.5 text-right">{{ t.count }}</td>
+        </tr>
+        {% else %}<tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">まだタグはありません。チャットで <code>#商品D</code> のように書くと自動で作られます。</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <aside class="space-y-4">
+    <form method="post" action="/tags" class="bg-white border border-gray-200 rounded-xl p-4 space-y-3 text-sm">
+      <h2 class="font-semibold">チームを作る</h2>
+      <input type="hidden" name="kind" value="team">
+      <input name="name" required placeholder="営業チーム" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <div class="grid grid-cols-3 gap-1">{% for p in PEOPLE %}<label class="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1.5"><input type="checkbox" name="members" value="{{ p }}">{{ p }}</label>{% endfor %}</div>
+      <input name="description" placeholder="説明（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <button class="w-full bg-indigo-600 text-white rounded-lg py-2">作成（チャットで @名前 でメンションできます）</button>
+    </form>
+    <form method="post" action="/tags" class="bg-white border border-gray-200 rounded-xl p-4 space-y-3 text-sm">
+      <h2 class="font-semibold">タグを作る</h2>
+      <input type="hidden" name="kind" value="topic">
+      <input name="name" required placeholder="商品D" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <input name="description" placeholder="説明（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <button class="w-full border border-gray-300 rounded-lg py-2 bg-white hover:bg-gray-50">作成</button>
+      <p class="text-xs text-gray-500">タグは発言・タスク・成果物・会議に付けられ、タグページから横断で辿れます。同じタグを持つ発言とタスクは自動で紐付きます。</p>
+    </form>
+  </aside>
+</div>
+{% endblock %}

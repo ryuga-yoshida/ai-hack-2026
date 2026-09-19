@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS meetings (
     ended_at      TEXT,
     status        TEXT NOT NULL DEFAULT 'recording',  -- recording|processing|done|failed
     transcript    TEXT,
-    error         TEXT
+    error         TEXT,
+    channel       TEXT             -- チャットから開始した場合の会話名
 );
 CREATE TABLE IF NOT EXISTS meeting_tracks (
     id            TEXT PRIMARY KEY,
@@ -55,13 +56,16 @@ CREATE TABLE IF NOT EXISTS meeting_participants (
 
 def init(conn: sqlite3.Connection) -> None:
     conn.executescript(DDL)
+    if "channel" not in {r[1] for r in conn.execute("PRAGMA table_info(meetings)")}:
+        conn.execute("ALTER TABLE meetings ADD COLUMN channel TEXT")
     conn.commit()
 
 
-def create_meeting(conn: sqlite3.Connection, title: str, started_at: datetime | None = None) -> str:
+def create_meeting(conn: sqlite3.Connection, title: str, started_at: datetime | None = None,
+                   channel: str | None = None) -> str:
     mid = new_id()
-    conn.execute("INSERT INTO meetings (id, title, started_at) VALUES (?,?,?)",
-                 (mid, title.strip() or "会議", (started_at or datetime.now()).replace(microsecond=0).isoformat()))
+    conn.execute("INSERT INTO meetings (id, title, started_at, channel) VALUES (?,?,?,?)",
+                 (mid, title.strip() or "会議", (started_at or datetime.now()).replace(microsecond=0).isoformat(), channel))
     conn.commit()
     return mid
 

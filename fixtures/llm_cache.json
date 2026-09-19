@@ -15003,5 +15003,57 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "judge"
+ },
+ "53739a25031aef749a297344": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"対象の据え置き\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"これ据え置きって決めたはずですが？\",\n      \"confidence\": 0.8\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 334,
+   "completion_tokens": 1112,
+   "total_tokens": 1446,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 334,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 74,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1038
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "7f7cf1debdbee3cbf1e56d91": {
+  "tier": "mid",
+  "content": "{\"items\": []}",
+  "usage": {
+   "prompt_tokens": 272,
+   "completion_tokens": 139,
+   "total_tokens": 411,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 272,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 5,
+    "audio_tokens": 0,
+    "reasoning_tokens": 134
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
  }
 }

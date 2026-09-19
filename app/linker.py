@@ -46,14 +46,19 @@ def _content_words(title: str) -> list[str]:
 
 
 def by_explicit(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | None:
-    """タスク ID・タイトル・成果物名・タイトルの内容語が発言に含まれていれば確定。
+    """タスク ID・タイトル・成果物名・タイトルの内容語・共通のタグが発言に含まれていれば確定。
     複数タスクに当たる場合は一致した語数が最大のものを選び、同点なら確定しない（次段へ）。"""
+    from app import tags as tagmod
     text = msg.text
+    msg_tags = set(tagmod.hashtags(text))
     scored: list[tuple[int, Task]] = []
     for t in _open_tasks(conn):
         if t.id in text or (len(t.title) >= 3 and t.title in text):
             return (t.id, 1.0)
         score = 0
+        if msg_tags:
+            shared = msg_tags & {x["name"] for x in tagmod.tags_for(conn, "task", t.id)}
+            score += 3 * len(shared)
         for a in t.artifacts:
             stem = a.rsplit(".", 1)[0]
             if len(stem) >= 3 and stem in text:

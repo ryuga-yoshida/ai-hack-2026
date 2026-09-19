@@ -140,8 +140,10 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(DDL)
     conn.commit()
     from app.connectors import chat, meet  # 自作チャット/Meet のテーブル（循環importを避けて遅延）
+    from app import tags
     chat.init(conn)
     meet.init(conn)
+    tags.init(conn)
 
 
 def table_names(conn: sqlite3.Connection) -> list[str]:
