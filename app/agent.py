@@ -97,8 +97,13 @@ def _poll_watch_dir() -> list[str]:
 
 
 def _loop():
-    global _file_sig
+    global _file_sig, _watch_sig
     _file_sig = _excel_signature()
+    # 起動時は監視フォルダの現状を「既知」として記録するだけ（古いコピーを新版として取り込まない）
+    if config.ARTIFACT_WATCH_DIR:
+        from pathlib import Path
+        from app.connectors.excel import watch_signature
+        _watch_sig = watch_signature(Path(config.ARTIFACT_WATCH_DIR).expanduser())
     while not _stop.is_set():
         if state["enabled"]:
             reasons = []
@@ -413,3 +418,20 @@ def replay(conn: sqlite3.Connection, speed: float = 1.0, record: bool = False) -
     say(f"=== {final:%Y-%m-%d}: 定期巡回 ===")
     results.append(tick(conn, now=final, events_override=[]))
     return results
+
+
+def mirror_to_watch_dir(version_path) -> None:
+    """ブラウザ編集・アップロードで作った新版を監視フォルダ（OneDrive 代替）の <base>.xlsx にも書き戻す。
+    書き戻した分は「既知」にして再取り込みしない"""
+    import re as _re
+    import shutil
+    from pathlib import Path
+    if not config.ARTIFACT_WATCH_DIR:
+        return
+    d = Path(config.ARTIFACT_WATCH_DIR).expanduser()
+    if not d.exists():
+        return
+    base = _re.sub(r"_v\d+(?=\.xlsx$)", "", Path(version_path).name)
+    dest = d / base
+    shutil.copyfile(version_path, dest)
+    _watch_sig[dest.name] = dest.stat().st_mtime

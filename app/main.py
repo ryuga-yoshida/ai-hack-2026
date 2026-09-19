@@ -772,34 +772,63 @@ def artifact_edit(request: Request, base: str):
                   version=series[-1][0], me=get_me(request))
 
 
-@app.post("/artifacts/upload")
-async def upload_artifact(request: Request, file: UploadFile = File(...), actor: str = Form(...), note: str = Form(""),
-                          channel: str = Form("")):
-    """新しい版をアップロードする（SharePoint にファイルを上げる操作の代わり）。
-    <base>_vN.xlsx として保存し versions.json に更新者・日時を記録 → 自動巡回が数秒で拾う"""
+def _register_version(conn: sqlite3.Connection, base: str, data: bytes | None, actor: str, note: str,
+                      channel: str, sheets: list[dict] | None = None) -> Path:
+    """新しい版を <base>_vN.xlsx として保存し versions.json に記録 → チャット共有 → 即時巡回"""
     from app.connectors.excel import version_series
+    from app import sheet_export
     d = config.FIXTURES_DIR / "excel"
-    name = Path(file.filename or "upload.xlsx").name
-    if not name.lower().endswith(".xlsx"):
-        raise HTTPException(422, ".xlsx のみ")
-    base = re.sub(r"_v\d+(?=\.xlsx$)", "", name)[:-5]
     series = version_series(d).get(base, [])
     n = (series[-1][0] + 1) if series else 1
     dest = d / f"{base}_v{n}.xlsx"
-    dest.write_bytes(await file.read())
+    if sheets is not None:
+        sheet_export.save_xlsx(sheets, dest)
+    else:
+        dest.write_bytes(data or b"")
     vp = d / "versions.json"
     versions = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else {}
     prev = next((versions[s[1].name] for s in reversed(series) if s[1].name in versions), {})
     versions[dest.name] = {"actor": actor.strip(), "at": datetime.now().replace(microsecond=0).isoformat(),
                            "url": prev.get("url") or f"https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/{base}.xlsx"}
     vp.write_text(json.dumps(versions, ensure_ascii=False, indent=2), encoding="utf-8")
-    conn = get_conn()
     if channel.strip():
         chat.post_message(conn, channel.strip(), actor.strip(),
                           f"{note.strip() or base + ' を更新しました'} {versions[dest.name]['url']}")
         _ingest_chat(conn)
     from app import agent
-    agent.request_tick(f"成果物アップロード（{dest.name}）")
+    agent.mirror_to_watch_dir(dest)
+    agent.request_tick(f"成果物の保存（{dest.name}）")
+    return dest
+
+
+class SheetSave(BaseModel):
+    sheets: list[dict]
+    actor: str
+    channel: str = ""
+    note: str = ""
+
+
+@app.post("/artifacts/{base}/save")
+def artifact_save(base: str, body: SheetSave):
+    """ブラウザ編集（Luckysheet）の保存。JSON → xlsx → 新しい版"""
+    conn = get_conn()
+    if not body.actor.strip():
+        raise HTTPException(422, "更新者が必要")
+    dest = _register_version(conn, base, None, body.actor, body.note, body.channel, sheets=body.sheets)
+    return {"ok": True, "file": dest.name}
+
+
+@app.post("/artifacts/upload")
+async def upload_artifact(request: Request, file: UploadFile = File(...), actor: str = Form(...), note: str = Form(""),
+                          channel: str = Form("")):
+    """新しい版をアップロードする（SharePoint にファイルを上げる操作の代わり）。
+    <base>_vN.xlsx として保存し versions.json に更新者・日時を記録 → 自動巡回が数秒で拾う"""
+    name = Path(file.filename or "upload.xlsx").name
+    if not name.lower().endswith(".xlsx"):
+        raise HTTPException(422, ".xlsx のみ")
+    base = re.sub(r"_v\d+(?=\.xlsx$)", "", name)[:-5]
+    conn = get_conn()
+    _register_version(conn, base, await file.read(), actor, note, channel)
     resp = RedirectResponse("/artifacts", status_code=303)
     return set_me(resp, actor)
 
