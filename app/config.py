@@ -34,3 +34,21 @@ TASK_AUTOGEN_CONFIDENCE = 0.7
 STALLED_DAYS = 7
 DISMISS_PENALTY = 0.7
 FALLBACK_PENALTY = 0.9
+
+# --- LLM ---
+# 単価（USD / 1M tokens）。OrcaRouter の実際の料金に合わせて書き換える
+MODEL_PRICES = {
+    "high":  {"input": 3.00, "output": 15.00},
+    "mid":   {"input": 0.30, "output": 1.20},
+    "embed": {"input": 0.02, "output": 0.0},
+}
+LLM_TIMEOUT_SEC = 60
+LLM_CACHE_PATH = FIXTURES_DIR / "llm_cache.json"
+
+# --- 抽出 ---
+CHUNK_SIZE_CHARS = 1500        # 800〜1200 トークン相当
+CHUNK_OVERLAP_CHARS = 300      # 前後 200 トークン相当
+CHAT_CHUNK_MESSAGES = 20       # チャットは同一チャンネルの連続 20 発言
+
+# --- マスキング用の登場人物（fixtures の5名） ---
+PERSONS = ["鈴木", "山田", "田中", "佐藤", "高橋"]
