@@ -1,5 +1,8 @@
 {
-  "売上見込_v2.xlsx": {"actor": "山田", "at": "2026-09-18T14:05:00"},
-  "売上見込_v3.xlsx": {"actor": "山田", "at": "2026-09-19T15:30:00"},
-  "在庫表_v2.xlsx":   {"actor": "田中", "at": "2026-09-19T15:00:00"}
+  "売上見込_v2.xlsx": {"actor": "山田", "at": "2026-09-18T14:05:00",
+    "url": "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/売上見込.xlsx"},
+  "売上見込_v3.xlsx": {"actor": "山田", "at": "2026-09-19T15:30:00",
+    "url": "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/売上見込.xlsx"},
+  "在庫表_v2.xlsx":   {"actor": "田中", "at": "2026-09-19T15:00:00",
+    "url": "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/在庫表.xlsx"}
 }

@@ -171,15 +171,74 @@ def link_message(conn: sqlite3.Connection, msg: Event) -> tuple[str | None, floa
     return (None, 0.0, "llm")   # 紐付かないことは正しい答え
 
 
+_URL = re.compile(r"https?://[^\s<>\"']+")
+
+
+def file_links(text: str) -> list[tuple[str, str]]:
+    """発言中のファイル URL を [(url, ファイル名)] で返す（SPO / Drive などのリンク共有）"""
+    from urllib.parse import unquote
+    out = []
+    for url in _URL.findall(text):
+        name = unquote(url.rstrip("/").rsplit("/", 1)[-1].split("?")[0])
+        if "." in name:
+            out.append((url, name))
+    return out
+
+
+def register_artifacts(conn: sqlite3.Connection, task_id: str, msg: Event) -> list[str]:
+    """発言に含まれるファイル URL を、そのタスクの成果物として登録する"""
+    links = file_links(msg.text)
+    if not links:
+        return []
+    task = db.get_task(conn, task_id)
+    if not task:
+        return []
+    added = []
+    for url, name in links:
+        if name not in task.artifacts:
+            task.artifacts.append(name)
+            added.append(name)
+        arts = task.artifacts
+    if added:
+        db.save_task(conn, task, at=msg.occurred_at)
+        log.info("成果物を登録: task=%s %s", task.title, added)
+    return added
+
+
 def link_and_save(conn: sqlite3.Connection, msg: Event) -> tuple[str | None, float, LinkMethod]:
     task_id, conf, method = link_message(conn, msg)
     if task_id:
         db.save_link(conn, Link(id=new_id(), from_type="event", from_id=msg.id, to_type="task",
                                 to_id=task_id, relation="discusses", confidence=conf, method=method))
         stats[method] += 1
+        register_artifacts(conn, task_id, msg)
     else:
         stats["none"] += 1
     return task_id, conf, method
+
+
+# ---------- 成果物の変更 → タスク ----------
+
+def link_change(conn: sqlite3.Connection, change: Event) -> tuple[str | None, float, LinkMethod]:
+    """artifact_change をタスクに紐付ける。ファイル名一致 → 変更者の担当タスク → 埋め込み の順"""
+    from app.detector import task_for_artifact   # 循環 import 回避
+    if t := task_for_artifact(conn, change.ref):
+        return (t.id, 1.0, "explicit")
+    mine = [t for t in _open_tasks(conn) if t.assignee == change.actor and t.status in ("todo", "in_progress")]
+    if len(mine) == 1:
+        return (mine[0].id, 0.6, "assignee")
+    r = by_embedding(conn, change, mine or None)
+    if isinstance(r, tuple):
+        return (*r, "embedding")
+    return (None, 0.0, "embedding")
+
+
+def link_change_and_save(conn: sqlite3.Connection, change: Event) -> str | None:
+    task_id, conf, method = link_change(conn, change)
+    if task_id:
+        db.save_link(conn, Link(id=new_id(), from_type="event", from_id=change.id, to_type="task",
+                                to_id=task_id, relation="implements", confidence=conf, method=method))
+    return task_id
 
 
 def unlinked_chat_messages(conn: sqlite3.Connection) -> list[Event]:
@@ -198,5 +257,7 @@ def method_breakdown(conn: sqlite3.Connection) -> dict[str, int]:
     out = {"explicit": 0, "context": 0, "assignee": 0, "embedding": 0, "llm": 0, "none": 0}
     for r in conn.execute("SELECT result FROM processed WHERE stage='link'"):
         res = json.loads(r["result"]) if r["result"] else {}
+        if res.get("kind") == "artifact_change":
+            continue
         out["none" if not res.get("task_id") else res.get("method", "llm")] += 1
     return out

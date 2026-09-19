@@ -29,9 +29,9 @@ python -m app.cli cost      # コスト集計（全て high で回した場合�
 ## アーキテクチャ
 
 ```
-[Meet 文字起こし] ──┐
-[自作チャット]     ──┼→ ① コネクタ層 → ② 正規化（全ソースを Event に） → ③ 統合グラフ（SQLite）
-[Excel 差分]       ──┘        SourceAdapter.fetch(since)                  events / tasks / links
+[Meet 文字起こし]   ──┐
+[自作チャット]       ──┼→ ① コネクタ層 → ② 正規化（全ソースを Event に） → ③ 統合グラフ（SQLite）
+[Excel 差分(SPO想定)] ──┘        SourceAdapter.fetch(since)                  events / tasks / links
                                                                                     │
                      ┌──────────────────────────────────────────────────────────────┘
                      ↓
@@ -46,13 +46,21 @@ python -m app.cli cost      # コスト集計（全て high で回した場合�
 
 | モジュール | 役割 |
 | --- | --- |
-| `app/connectors/` | Meet（Drive API・未設定時は fixtures）/ 自作チャット / Excel 差分。Confluence・Slack は同じ IF の空実装 |
+| `app/connectors/` | Meet（Drive API・未設定時は fixtures）/ 自作チャット / Excel 差分。Confluence・Slack・SharePoint は同じ IF の空実装 |
 | `app/excel_diff.py` | 行キーで対応付けるセル差分エンジン。行挿入で座標がズレても偽差分を出さない |
 | `app/extract.py` | チャンク分割 → マスク → 抽出（mid）→ 引用検証 → 重複除去 → Task 自動生成 |
 | `app/linker.py` | 明示参照 → 会話文脈 → 担当者 → 埋め込み → LLM の順で紐付け。紐付かないのも正解 |
 | `app/detector.py` | タスク直結＋埋め込みで候補を絞り、時系列ガードを通ったものだけ high で判定 |
 | `app/agent.py` | 5分ごとの自律ループ。取込 → 抽出 → 埋め込み → 紐付け → 検知 → アクション決定 |
 | `app/llm/` | OrcaRouter クライアント（high→mid フォールバック・キャッシュ）/ マスキング / コスト記録 |
+
+### 業務の流れとの対応
+
+1. 会議をする → 文字起こしが取り込まれる（Meet）
+2. 議事録から決定とタスクが自動で切り出され、タスクボードに積まれる（人力での作成・編集も可）
+3. チャットの発言は、どのタスクの話かを自動判定して紐付く（「例の数字」も直前の文脈から解決）
+4. 成果物は SharePoint に置き、更新した人がチャットにリンクを貼る → そのファイルがタスクの成果物として登録される
+5. 成果物の版差分がタスクに直結し、元の決定と突き合わせて矛盾を検知する
 
 ### 設計上の要点
 

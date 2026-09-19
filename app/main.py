@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from pydantic import BaseModel
 
 from app import db
@@ -14,6 +15,22 @@ from app.models import Task, new_id
 
 app = FastAPI(title="進行管理エージェント")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
+
+
+def linkify(text: str) -> Markup:
+    """発言中の URL（SPO のリンク共有など）をアンカーにする"""
+    import re
+    from html import escape
+    out, pos = [], 0
+    for m in re.finditer(r"https?://[^\s<>\"']+", text):
+        out.append(escape(text[pos:m.start()]))
+        out.append(f'<a href="{escape(m.group(0))}" class="text-blue-600 underline" target="_blank">{escape(m.group(0))}</a>')
+        pos = m.end()
+    out.append(escape(text[pos:]))
+    return Markup("".join(out))
+
+
+templates.env.filters["linkify"] = linkify
 
 STATUSES = [("todo", "未着手"), ("in_progress", "進行中"), ("blocked", "ブロック"), ("done", "完了")]
 

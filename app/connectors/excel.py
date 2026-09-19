@@ -59,7 +59,7 @@ class ExcelAdapter:
                         text=rec.to_sentence(), actor=actor, occurred_at=at,
                         ref=f"{new.name}:{rec.sheet}!{rec.cell}" if rec.cell else f"{new.name}:{rec.sheet}",
                         meta={
-                            "file": new.name, "base": base, "sheet": rec.sheet,
+                            "file": new.name, "base": base, "url": info.get("url"), "sheet": rec.sheet,
                             "row_key": rec.row_key, "column_label": rec.column_label,
                             "old": rec.old, "new": rec.new, "diff_kind": rec.kind,
                         },

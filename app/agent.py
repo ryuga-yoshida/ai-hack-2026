@@ -186,6 +186,12 @@ def stage_detect(conn, stats: TickResult, now: datetime | None = None) -> None:
         "WHERE e.kind='artifact_change' AND p.key IS NULL ORDER BY e.occurred_at").fetchall()
     for r in rows:
         ch = db.row_to_event(r)
+        if not db.is_processed(conn, "link", ch.id):
+            tid = linker.link_change_and_save(conn, ch)
+            db.mark_processed(conn, "link", ch.id, {"task_id": tid, "kind": "artifact_change"})
+            if tid:
+                t = db.get_task(conn, tid)
+                say(f"link: 変更 {ch.ref} → タスク「{t.title if t else tid}」")
         say(f"detect: {ch.ref} の変更を判定中...")
         try:
             f = detector.detect_for_change(conn, ch)

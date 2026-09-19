@@ -11,7 +11,7 @@
 <div class="bg-white border rounded p-4 mb-4 text-sm space-y-2 max-h-[28rem] overflow-y-auto">
   {% for m in messages %}
   <div><span class="text-gray-400">{{ m.posted_at[5:16].replace("T", " ") }}</span>
-    <span class="font-semibold">{{ m.actor }}</span>: {{ m.text }}</div>
+    <span class="font-semibold">{{ m.actor }}</span>: {{ m.text|linkify }}</div>
   {% else %}
   <div class="text-gray-500">まだ発言はありません。</div>
   {% endfor %}
