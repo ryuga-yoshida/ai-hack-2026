@@ -15055,5 +15055,86 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "extract"
+ },
+ "a8dbcd48b1c0ca8bf8a0c52f": {
+  "tier": "mid",
+  "content": "{\"items\": []}",
+  "usage": {
+   "prompt_tokens": 284,
+   "completion_tokens": 198,
+   "total_tokens": 482,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 284,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 5,
+    "audio_tokens": 0,
+    "reasoning_tokens": 193
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "ce3fe546971db93ed16b890c": {
+  "tier": "mid",
+  "content": "{\"items\": []}",
+  "usage": {
+   "prompt_tokens": 312,
+   "completion_tokens": 216,
+   "total_tokens": 528,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 312,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 5,
+    "audio_tokens": 0,
+    "reasoning_tokens": 211
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "a17891b926d64d0a6685eb0b": {
+  "tier": "high",
+  "content": "{\n  \"contradicts\": true,\n  \"confidence\": 0.9,\n  \"reason\": \"決定では商品Dの追加と商品Bの修正以外の数字は変更しないとされており、商品Eの第3四半期の上方修正はその範囲外。後続の決定（商品D第3四半期350、商品D第4四半期450）も商品Eを許可しておらず、会話でも<PERSON_1>が据え置きを指摘し<PERSON_2>が書面未了と認めている。\",\n  \"severity\": \"high\"\n}",
+  "usage": {
+   "prompt_tokens": 1351,
+   "completion_tokens": 173,
+   "total_tokens": 1524,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1349,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1351,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1349,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
  }
 }

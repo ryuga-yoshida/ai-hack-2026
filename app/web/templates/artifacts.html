@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}成果物{% endblock %}
+{% block actions %}<button @click="$dispatch('open-upload')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">↑ 新しい版をアップロード</button>{% endblock %}
+{% block content %}
+<div class="max-w-5xl space-y-4">
+  <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
+    ここは SharePoint の共有フォルダの代わりです。新しい版を置くとエージェントが<b>自動で差分を取り</b>（行の挿入・削除があってもセル単位で追跡）、決定と突き合わせます。自動巡回が ON なら数秒で検知結果に反映されます。
+  </div>
+  {% for a in artifacts %}
+  <div class="bg-white border border-gray-200 rounded-xl p-5">
+    <div class="flex items-center gap-3">
+      <span class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 grid place-items-center font-bold">X</span>
+      <div class="min-w-0">
+        <div class="font-semibold">{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · {{ a.latest.actor or '—' }} · {{ a.latest.at|dt }}</span></div>
+        <div class="text-xs text-gray-500 truncate">{{ a.latest.url }}</div>
+      </div>
+      <div class="ml-auto flex items-center gap-2 text-xs">
+        {% for t in a.tags %}<a href="/tags/{{ t.name }}" class="px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
+        {% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[220px]">⇢ {{ t.title }}</a>{% endfor %}
+      </div>
+    </div>
+    <table class="w-full text-sm mt-3">
+      <thead class="text-xs text-gray-500 text-left"><tr><th class="py-1">版</th><th>更新者</th><th>日時</th><th class="text-right">サイズ</th><th class="text-right">差分</th><th class="text-right">検知</th></tr></thead>
+      <tbody>{% for v in a.versions|reverse %}
+        <tr class="border-t border-gray-100"><td class="py-1.5">v{{ v.n }} <span class="text-gray-400">{{ v.file }}</span></td><td>{{ v.actor or '—' }}</td><td>{{ v.at|dt }}</td>
+          <td class="text-right text-gray-500">{{ (v.size / 1024)|round(1) }} KB</td>
+          <td class="text-right">{% if v.changes %}{{ v.changes }} 件{% else %}<span class="text-gray-400">{{ '初版' if v.n == 1 else '未処理' }}</span>{% endif %}</td>
+          <td class="text-right">{% if v.findings %}<a href="/findings?status=all" class="text-red-600 font-semibold">⚠ {{ v.findings }}</a>{% else %}<span class="text-gray-400">—</span>{% endif %}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  {% endfor %}
+</div>
+
+<div x-data="{ open: false }" @open-upload.window="open = true" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/artifacts/upload" enctype="multipart/form-data" class="bg-white rounded-xl shadow-xl p-6 w-[460px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">新しい版をアップロード</h3>
+      <input type="file" name="file" accept=".xlsx" required class="w-full text-sm">
+      <p class="text-xs text-gray-500">ファイル名が同じなら次の版（v{{ '{N}' }}）として扱います（例: 売上見込.xlsx → 売上見込_v4.xlsx）。</p>
+      <input name="actor" value="{{ me }}" required list="people" placeholder="更新者" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
+      <select name="channel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">チャットに共有しない</option><option value="general">#general にリンクを共有</option><option value="sales">#sales にリンクを共有</option></select>
+      <input name="note" placeholder="共有メッセージ（任意）例: 見込み表を更新しました" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">アップロード</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

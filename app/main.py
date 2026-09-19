@@ -469,6 +469,8 @@ def post_chat(request: Request, channel: str = Form("general"), actor: str = For
         for a in (attachments or []):
             tagmod.link(conn, tname, "artifact", a["name"])
     _ingest_chat(conn)
+    from app import agent
+    agent.request_tick(f"チャット投稿（#{channel.strip() or 'general'} {actor.strip()}）")
     linked = conn.execute("SELECT to_id FROM links WHERE from_type='event' AND from_id=? AND to_type='task' LIMIT 1", (mid,)).fetchone()
     if linked:
         for tname in tagmod.hashtags(text):
@@ -640,6 +642,8 @@ def _finalize_job(meeting_id: str) -> None:
         _ingest_chat(conn)
         for t in tagmod.tags_for(conn, "channel", m["channel"]):
             tagmod.link(conn, t["name"], "meeting", meeting_id)
+    from app import agent
+    agent.request_tick(f"会議終了（{m['title'] if m else meeting_id}）")
 
 
 @app.post("/meet/{meeting_id}/finalize")
@@ -671,6 +675,17 @@ def agent_status():
     from app import agent
     conn = get_conn()
     return {"state": dict(agent.state), "open_findings": nav_context(conn)["nav_open_findings"]}
+
+
+class TriggerBody(BaseModel):
+    reason: str = "手動トリガー"
+
+
+@app.post("/api/agent/trigger")
+def agent_trigger(body: TriggerBody):
+    from app import agent
+    ok = agent.request_tick(body.reason)
+    return {"queued": ok, "note": None if ok else "自動巡回が OFF のためトリガーは無効です"}
 
 
 class AgentToggle(BaseModel):
@@ -705,6 +720,68 @@ def manual_tick(request: Request, background: BackgroundTasks):
     if "application/json" in request.headers.get("accept", ""):
         return {"ok": True}
     return RedirectResponse(request.headers.get("referer") or "/agent", status_code=303)
+
+
+# ---------- 成果物（SharePoint 代替のフォルダ） ----------
+
+def artifact_rows(conn: sqlite3.Connection) -> list[dict]:
+    from app.connectors.excel import version_series
+    d = config.FIXTURES_DIR / "excel"
+    versions = json.loads((d / "versions.json").read_text(encoding="utf-8")) if (d / "versions.json").exists() else {}
+    out = []
+    for base, series in version_series(d).items():
+        vs = []
+        for n, path in series:
+            info = versions.get(path.name, {})
+            changes = conn.execute("SELECT COUNT(*) FROM events WHERE kind='artifact_change' AND json_extract(meta,'$.file')=?", (path.name,)).fetchone()[0]
+            findings = conn.execute(
+                "SELECT COUNT(*) FROM findings f WHERE f.status != 'dismissed' AND EXISTS ("
+                "SELECT 1 FROM events e WHERE e.kind='artifact_change' AND json_extract(e.meta,'$.file')=? AND f.evidence LIKE '%' || e.id || '%')",
+                (path.name,)).fetchone()[0]
+            vs.append({"n": n, "file": path.name, "actor": info.get("actor"), "at": info.get("at") or datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
+                       "url": info.get("url"), "size": path.stat().st_size, "changes": changes, "findings": findings})
+        tasks = [t for t in db.list_tasks(conn) if any(a.rsplit(".", 1)[0] == base or a == f"{base}.xlsx" for a in t.artifacts)]
+        out.append({"base": base, "name": f"{base}.xlsx", "versions": vs, "latest": vs[-1], "tasks": tasks,
+                    "tags": tagmod.tags_for(conn, "artifact", f"{base}.xlsx")})
+    return sorted(out, key=lambda a: a["latest"]["at"], reverse=True)
+
+
+@app.get("/artifacts", response_class=HTMLResponse)
+def artifacts_page(request: Request):
+    conn = get_conn()
+    return render("artifacts.html", request, conn, artifacts=artifact_rows(conn), me=get_me(request))
+
+
+@app.post("/artifacts/upload")
+async def upload_artifact(request: Request, file: UploadFile = File(...), actor: str = Form(...), note: str = Form(""),
+                          channel: str = Form("")):
+    """新しい版をアップロードする（SharePoint にファイルを上げる操作の代わり）。
+    <base>_vN.xlsx として保存し versions.json に更新者・日時を記録 → 自動巡回が数秒で拾う"""
+    from app.connectors.excel import version_series
+    d = config.FIXTURES_DIR / "excel"
+    name = Path(file.filename or "upload.xlsx").name
+    if not name.lower().endswith(".xlsx"):
+        raise HTTPException(422, ".xlsx のみ")
+    base = re.sub(r"_v\d+(?=\.xlsx$)", "", name)[:-5]
+    series = version_series(d).get(base, [])
+    n = (series[-1][0] + 1) if series else 1
+    dest = d / f"{base}_v{n}.xlsx"
+    dest.write_bytes(await file.read())
+    vp = d / "versions.json"
+    versions = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else {}
+    prev = next((versions[s[1].name] for s in reversed(series) if s[1].name in versions), {})
+    versions[dest.name] = {"actor": actor.strip(), "at": datetime.now().replace(microsecond=0).isoformat(),
+                           "url": prev.get("url") or f"https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/{base}.xlsx"}
+    vp.write_text(json.dumps(versions, ensure_ascii=False, indent=2), encoding="utf-8")
+    conn = get_conn()
+    if channel.strip():
+        chat.post_message(conn, channel.strip(), actor.strip(),
+                          f"{note.strip() or base + ' を更新しました'} {versions[dest.name]['url']}")
+        _ingest_chat(conn)
+    from app import agent
+    agent.request_tick(f"成果物アップロード（{dest.name}）")
+    resp = RedirectResponse("/artifacts", status_code=303)
+    return set_me(resp, actor)
 
 
 # ---------- タグ・チーム ----------

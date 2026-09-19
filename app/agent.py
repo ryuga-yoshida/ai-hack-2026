@@ -37,18 +37,54 @@ def say(msg: str, at: datetime | None = None) -> None:
 
 import threading
 
-state = {"enabled": False, "interval": 60, "running": False, "last_tick": None, "ticks": 0, "last_result": None}
+state = {"enabled": False, "interval": 60, "running": False, "last_tick": None, "ticks": 0, "last_result": None,
+         "last_trigger": None}
 _thread: threading.Thread | None = None
 _stop = threading.Event()
+_wake = threading.Event()        # イベント駆動の起床要求
+_pending_reasons: list[str] = []
+_file_sig: dict[str, float] = {}
+
+
+def request_tick(reason: str) -> bool:
+    """感度の高いイベント（会議終了・チャット投稿・成果物の新版）から即時巡回を要求する。
+    自動巡回が OFF のときは何もしない（ポーリングもトリガーも止まっている状態）"""
+    if not state["enabled"]:
+        return False
+    _pending_reasons.append(reason)
+    _wake.set()
+    return True
+
+
+def _excel_signature() -> dict[str, float]:
+    d = config.FIXTURES_DIR / "excel"
+    return {p.name: p.stat().st_mtime for p in d.glob("*.xlsx")} if d.exists() else {}
 
 
 def _loop():
+    global _file_sig
+    _file_sig = _excel_signature()
     while not _stop.is_set():
         if state["enabled"]:
+            reasons = []
+            # 成果物の新版（SharePoint 代替のフォルダ）をファイル監視で検出
+            sig = _excel_signature()
+            if sig != _file_sig:
+                added = sorted(set(sig) - set(_file_sig)) or sorted(k for k in sig if sig[k] != _file_sig.get(k))
+                _file_sig = sig
+                reasons.append("成果物の新版: " + "・".join(added[:3]))
+            if _pending_reasons:
+                reasons += _pending_reasons[:]
+                _pending_reasons.clear()
+            _wake.clear()
             conn = db.connect()
             db.init_db(conn)
             try:
                 state["running"] = True
+                if reasons:
+                    state["last_trigger"] = reasons[-1]
+                    _log_conn_set(conn)
+                    say("trigger: " + " / ".join(dict.fromkeys(reasons)) + " → 即時巡回")
                 r = tick(conn)
                 state["ticks"] += 1
                 state["last_tick"] = datetime.now().replace(microsecond=0).isoformat()
@@ -60,7 +96,20 @@ def _loop():
             finally:
                 state["running"] = False
                 conn.close()
-        _stop.wait(state["interval"])
+        # 次の定期巡回まで待つ。ただしイベントが来たら即起きる。ファイル監視のため 3 秒刻みで見る
+        waited = 0
+        while waited < state["interval"] and not _stop.is_set():
+            if _wake.wait(3):
+                time.sleep(1.5)     # 連続イベントをまとめる（デバウンス）
+                break
+            waited += 3
+            if state["enabled"] and _excel_signature() != _file_sig:
+                break
+
+
+def _log_conn_set(conn):
+    global _log_conn
+    _log_conn = conn
 
 
 def set_enabled(enabled: bool, interval: int | None = None) -> dict:

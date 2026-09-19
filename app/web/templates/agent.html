@@ -26,6 +26,11 @@
       <div class="flex items-center gap-2 text-xs"><span class="text-gray-500">間隔</span>
         <select x-model.number="interval" @change="if (agent.enabled) toggle(true)" class="border border-gray-300 rounded px-2 py-1 bg-white"><option value="30">30秒</option><option value="60">1分</option><option value="300">5分</option></select></div>
       <div class="text-xs text-gray-500">巡回回数 <b class="text-gray-800" x-text="agent.ticks"></b> · 最終 <span x-text="agent.last_tick ? agent.last_tick.slice(5,16).replace('T',' ') : '—'"></span></div>
+      <div class="text-xs text-gray-500 bg-gray-50 rounded-lg p-2 leading-relaxed">
+        <b class="text-gray-700">ハイブリッド起動</b>: 定期巡回（保険）に加えて、感度の高いイベントは即時に巡回します —
+        <span class="text-gray-700">会議終了 / チャット投稿 / 成果物の新版（フォルダ監視）</span>
+        <template x-if="agent.last_trigger"><div class="mt-1">最終トリガー: <span x-text="agent.last_trigger" class="text-gray-700"></span></div></template>
+      </div>
       <template x-if="agent.last_result">
         <div class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2">前回: 取込 <b x-text="agent.last_result.fetched"></b> · 抽出 <b x-text="agent.last_result.extracted"></b> · 紐付け <b x-text="agent.last_result.linked"></b> · Finding <b x-text="agent.last_result.findings"></b></div>
       </template>
