@@ -528,6 +528,46 @@ def react_chat(msg_id: str, body: ReactBody):
     return {"added": added, "reactions": reactions}
 
 
+class LinkBody(BaseModel):
+    task_id: str | None = None   # None なら紐付けを外す
+
+
+@app.post("/api/chat/{msg_id}/link")
+def link_chat_message(msg_id: str, body: LinkBody):
+    """発言をタスクに人力で紐付ける／外す。エージェントの判定より人の指定を優先し、以後は再判定しない"""
+    from app import linker
+    conn = get_conn()
+    m = conn.execute("SELECT * FROM chat_messages WHERE id=?", (msg_id,)).fetchone()
+    if not m:
+        raise HTTPException(404)
+    if not db.get_event(conn, msg_id):
+        _ingest_chat(conn)
+    conn.execute("DELETE FROM links WHERE from_type='event' AND from_id=? AND to_type='task' AND relation='discusses'", (msg_id,))
+    conn.commit()
+    if body.task_id:
+        task = db.get_task(conn, body.task_id)
+        if not task:
+            raise HTTPException(404, "task not found")
+        db.save_link(conn, Link(id=new_id(), from_type="event", from_id=msg_id, to_type="task", to_id=task.id,
+                                relation="discusses", confidence=1.0, method="manual"))
+        ev = db.get_event(conn, msg_id)
+        if ev:
+            linker.register_artifacts(conn, task.id, ev)
+            for tname in tagmod.hashtags(ev.text):
+                tagmod.link(conn, tname, "task", task.id)
+        db.save_task(conn, task)   # 動きがあったので updated_at を更新
+    db.mark_processed(conn, "link", msg_id, {"method": "manual", "task_id": body.task_id})
+    return {"ok": True, "task_id": body.task_id}
+
+
+@app.get("/api/tasks/open")
+def open_tasks_api(q: str = ""):
+    conn = get_conn()
+    out = [{"id": t.id, "title": t.title, "assignee": t.assignee, "status": t.status}
+           for t in db.list_tasks(conn) if t.status != "done" and (not q or q in t.title)]
+    return {"tasks": out[:50]}
+
+
 @app.post("/chat/channels")
 def create_channel(name: str = Form(...), description: str = Form("")):
     conn = get_conn()

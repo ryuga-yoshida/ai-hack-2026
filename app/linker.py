@@ -277,10 +277,10 @@ def mark_linked(conn: sqlite3.Connection, msg: Event, method: str, task_id: str 
 
 
 def method_breakdown(conn: sqlite3.Connection) -> dict[str, int]:
-    out = {"explicit": 0, "context": 0, "assignee": 0, "embedding": 0, "llm": 0, "none": 0}
+    out = {"explicit": 0, "context": 0, "assignee": 0, "embedding": 0, "llm": 0, "manual": 0, "none": 0}
     for r in conn.execute("SELECT result FROM processed WHERE stage='link'"):
         res = json.loads(r["result"]) if r["result"] else {}
         if res.get("kind") == "artifact_change":
             continue
-        out["none" if not res.get("task_id") else res.get("method", "llm")] += 1
+        out["none" if not res.get("task_id") else (res.get("method") if res.get("method") in out else "llm")] += 1
     return out

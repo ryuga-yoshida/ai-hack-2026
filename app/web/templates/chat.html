@@ -128,6 +128,30 @@
   {% endif %}
 </div>
 
+<!-- 発言 → タスクの人力紐付け -->
+<div x-data="linker()" @open-linker.window="open($event.detail.msg, $event.detail.task)" x-cloak>
+  <div x-show="show" class="fixed inset-0 bg-black/30 z-40" @click="show = false"></div>
+  <div x-show="show" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <div class="bg-white rounded-xl shadow-xl p-5 w-[520px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="show = false">
+      <div class="flex items-center justify-between"><h3 class="font-semibold">発言をタスクに紐付ける</h3><button @click="show = false" class="text-gray-400 hover:text-gray-700">×</button></div>
+      <input x-model="q" @input="load()" x-ref="q" placeholder="タスク名で検索" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <div class="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
+        <template x-for="t in tasks" :key="t.id">
+          <button type="button" @click="pick(t.id)" class="w-full text-left px-3 py-2 hover:bg-indigo-50 flex items-center gap-2" :class="t.id === current && 'bg-indigo-50'">
+            <span class="text-[10px] px-1.5 rounded bg-gray-100 text-gray-600" x-text="({todo:'未着手',in_progress:'進行中',blocked:'ブロック',done:'完了'})[t.status]"></span>
+            <span class="flex-1" x-text="t.title"></span><span class="text-xs text-gray-400" x-text="t.assignee || '未割当'"></span>
+            <span x-show="t.id === current" class="text-indigo-600 text-xs">現在</span></button>
+        </template>
+        <div x-show="!tasks.length" class="px-3 py-4 text-gray-400 text-xs">該当するタスクがありません</div>
+      </div>
+      <div class="flex items-center justify-between text-xs">
+        <span class="text-gray-500">人が指定した紐付けはエージェントの判定より優先され、以後は再判定されません。</span>
+        <button x-show="current" @click="pick(null)" class="text-red-600 hover:underline">紐付けを外す</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 新しいメッセージ（DM / グループ） -->
 <div x-data="{ open: false, with_: '' }" @open-new-dm.window="open = true; with_ = ($event.detail && $event.detail.with) || ''" x-cloak>
   <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
@@ -159,6 +183,18 @@ function chatPage() {
       const r = await fetch(`/api/chat/messages?channel={{ channel }}&after=${encodeURIComponent(this.last)}`);
       const j = await r.json();
       if (j.messages.length) { location.reload(); }   // 新着があれば描画し直す（サーバー描画を正とする）
+    },
+  };
+}
+function openLinker(msg, task) { window.dispatchEvent(new CustomEvent('open-linker', { detail: { msg, task } })); }
+function linker() {
+  return {
+    show: false, msg: null, current: null, q: '', tasks: [],
+    async open(msg, task) { this.msg = msg; this.current = task; this.q = ''; this.show = true; await this.load(); this.$nextTick(() => this.$refs.q.focus()); },
+    async load() { const r = await fetch('/api/tasks/open?q=' + encodeURIComponent(this.q)); this.tasks = (await r.json()).tasks; },
+    async pick(taskId) {
+      const r = await fetch(`/api/chat/${this.msg}/link`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task_id: taskId }) });
+      if (r.ok) { Alpine.$data(document.body).toast(taskId ? 'タスクに紐付けました' : '紐付けを外しました'); location.reload(); } else { alert('失敗しました'); }
     },
   };
 }

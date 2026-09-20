@@ -7,10 +7,15 @@
       <span class="font-semibold text-sm">{{ m.actor }}</span>
       <span class="text-xs text-gray-400">{{ m.posted_at|dt }}</span>
       {% if m.edited %}<span class="text-[10px] text-gray-400">（編集済み）</span>{% endif %}
+      <span class="inline-flex items-center gap-0.5">
       {% if m.task %}
-      <a href="/tasks/{{ m.task.id }}" class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 truncate max-w-[260px]" title="紐付け: {{ m.task.method }} ({{ '%.2f' % m.task.confidence }})">
+      <a href="/tasks/{{ m.task.id }}" class="text-[11px] px-1.5 py-0.5 rounded-l-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 truncate max-w-[260px]" title="紐付け: {{ m.task.method }} ({{ '%.2f' % m.task.confidence }})">
         ⇢ {{ m.task.title }} <span class="opacity-60">{{ m.task.method }}</span></a>
+      <button type="button" @click="openLinker('{{ m.id }}', '{{ m.task.id }}')" class="text-[11px] px-1 py-0.5 rounded-r-full bg-indigo-50 text-indigo-500 hover:bg-indigo-100" title="紐付け先を変更 / 外す">▾</button>
+      {% else %}
+      <button type="button" @click="openLinker('{{ m.id }}', null)" class="text-[11px] px-1.5 py-0.5 rounded-full border border-dashed border-gray-300 text-gray-400 hover:text-indigo-600 hover:border-indigo-300 opacity-0 group-hover:opacity-100" title="タスクに紐付ける">⇢ 紐付け</button>
       {% endif %}
+      </span>
       {% if m.decision %}<span class="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700" title="{{ m.decision }}">決定として抽出</span>{% endif %}
       {% for t in m.tags %}<a href="/tags/{{ t.name }}" class="text-[11px] px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
       {% if m.mentions %}<span class="text-[10px] text-gray-400" title="メンション先">→ {{ m.mentions|join('・') }}</span>{% endif %}
