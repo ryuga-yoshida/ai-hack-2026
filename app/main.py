@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from pydantic import BaseModel
 
-from app import config, db, tags as tagmod
+from app import auth, config, db, tags as tagmod
 from app.connectors import calendar as cal, chat, mail as mailmod, meet, wiki as wikimod
 from app.models import Event, Link, Task, new_id
 
@@ -97,7 +97,7 @@ async def require_signin(request: Request, call_next):
     """未サインイン（プロフィール未設定）なら /login へ。API・WebSocket・静的ファイルは対象外。
     本番では Microsoft Entra ID などの SSO に置き換える"""
     path = request.url.path
-    if request.method == "GET" and not request.cookies.get("me") and not (
+    if request.method == "GET" and not get_me(request) and not (
         path.startswith(("/login", "/api/", "/ws/", "/static", "/artifacts/file/", "/meet/")) or path == "/tick"
     ) and "application/json" not in request.headers.get("accept", ""):
         return RedirectResponse(f"/login?next={quote(str(request.url.path) + ('?' + request.url.query if request.url.query else ''))}", status_code=303)
@@ -122,12 +122,20 @@ from urllib.parse import quote, unquote
 
 
 def get_me(request: Request) -> str:
-    return unquote(request.cookies.get("me", ""))
+    """サインイン中のユーザーの表示名。セッション cookie（署名付き）から取る"""
+    s = auth.verify_session(request.cookies.get(auth.SESSION_COOKIE))
+    return s["name"] if s else ""
 
 
 def set_me(resp, name: str):
+    """名前でセッションを張る（ログイン・デモ用の即時サインイン）。users に居る人だけ"""
     if name and name.strip():
-        resp.set_cookie("me", quote(name.strip()), max_age=86400 * 365)
+        conn = db.connect()
+        u = auth.user_by_name(conn, name.strip())
+        conn.close()
+        if u:
+            resp.set_cookie(auth.SESSION_COOKIE, auth.make_session(u["id"], u["name"]), max_age=86400 * auth.SESSION_DAYS,
+                            httponly=True, samesite="lax", secure=config.APP_BASE_URL.startswith("https"))
     return resp
 
 
@@ -149,6 +157,7 @@ def get_conn() -> sqlite3.Connection:
     conn = db.connect()
     if not _db_initialized:
         db.init_db(conn)
+        auth.seed_demo_users(conn)
         _db_initialized = True
     if not _overrides_loaded:
         config.apply_overrides(db.get_settings(conn))
@@ -359,32 +368,85 @@ def notifications_count(request: Request):
 
 @app.get("/login/as/{name}")
 def login_as(name: str, next: str = "/"):
-    """デモ用の即時サインイン（展示で端末を切り替えるとき用）。SSO 導入時は削除する"""
+    """デモ用の即時サインイン（展示で端末を切り替えるとき用）。DEMO_MODE=0 の環境では無効"""
+    if not auth.DEMO_MODE:
+        raise HTTPException(404)
     conn = get_conn()
-    if name not in people_list(conn):
+    if not auth.user_by_name(conn, name):
         raise HTTPException(404)
     return set_me(RedirectResponse(next or "/", status_code=303), name)
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, next: str = "/"):
+def login_page(request: Request, next: str = "/", error: str = ""):
     conn = get_conn()
-    accounts = [{"name": p, **config.PERSON_INFO.get(p, {"role": "", "dept": ""}), "email": f"{p}@aoba-beverage.example"}
-                for p in people_list(conn)]
-    return templates.TemplateResponse(request, "login.html", {"accounts": accounts, "next": next or "/"})
+    auth.seed_demo_users(conn)
+    accounts = [{"name": u["name"], "email": u["email"], **config.PERSON_INFO.get(u["name"], {"role": "", "dept": ""})} for u in auth.list_users(conn) if u["active"]]
+    return templates.TemplateResponse(request, "login.html", {"accounts": accounts, "next": next or "/", "error": error,
+                                                              "demo_mode": auth.DEMO_MODE, "demo_password": auth.DEMO_PASSWORD if auth.DEMO_MODE else ""})
 
 
 @app.post("/login")
-def login_post(name: str = Form(...), next: str = Form("/")):
+def login_post(request: Request, email: str = Form(""), password: str = Form(""), next: str = Form("/")):
+    conn = get_conn()
+    auth.seed_demo_users(conn)
+    u = auth.authenticate(conn, email, password)
+    if not u:
+        conn.execute("INSERT INTO audit_logs (at, actor, role, method, path, status, detail, ip) VALUES (?,?,?,?,?,?,?,?)",
+                     (db.now_iso(), email.strip().lower(), None, "POST", "/login", 401, "サインイン失敗", request.client.host if request.client else None))
+        conn.commit()
+        return RedirectResponse(f"/login?error=1&next={quote(next)}", status_code=303)
     resp = RedirectResponse(next if next.startswith("/") else "/", status_code=303)
-    return set_me(resp, name)
+    return set_me(resp, u["name"])
 
 
 @app.post("/logout")
 def logout():
     resp = RedirectResponse("/login", status_code=303)
+    resp.delete_cookie(auth.SESSION_COOKIE)
     resp.delete_cookie("me")
     return resp
+
+
+@app.post("/profile/password")
+def change_password(request: Request, current: str = Form(...), new: str = Form(...)):
+    conn = get_conn()
+    s = auth.verify_session(request.cookies.get(auth.SESSION_COOKIE))
+    if not s:
+        raise HTTPException(401)
+    u = conn.execute("SELECT * FROM users WHERE id=?", (s["user_id"],)).fetchone()
+    if not u or not auth.check_password(current, u["password_hash"]):
+        return HTMLResponse("<script>alert('現在のパスワードが違います'); history.back();</script>", status_code=400)
+    if len(new) < 8:
+        return HTMLResponse("<script>alert('新しいパスワードは8文字以上にしてください'); history.back();</script>", status_code=400)
+    auth.set_password(conn, u["id"], new)
+    return RedirectResponse("/profile", status_code=303)
+
+
+@app.post("/settings/users")
+def settings_users(request: Request, email: str = Form(...), name: str = Form(...), password: str = Form(...), role: str = Form("member")):
+    """管理者がユーザーを追加（招待の代わり）"""
+    conn = get_conn()
+    if role_of(conn, get_me(request)) != "admin":
+        raise HTTPException(403)
+    if len(password) < 8:
+        return HTMLResponse("<script>alert('パスワードは8文字以上にしてください'); history.back();</script>", status_code=400)
+    try:
+        auth.create_user(conn, email, name, password)
+    except sqlite3.IntegrityError:
+        return HTMLResponse("<script>alert('そのメールアドレスは登録済みです'); history.back();</script>", status_code=409)
+    if role in ROLE_LABEL:
+        db.set_setting(conn, f"role:{name.strip()}", role)
+    return RedirectResponse("/settings#users", status_code=303)
+
+
+@app.post("/settings/users/{user_id}/toggle")
+def settings_user_toggle(request: Request, user_id: str):
+    conn = get_conn()
+    if role_of(conn, get_me(request)) != "admin":
+        raise HTTPException(403)
+    conn.execute("UPDATE users SET active = 1 - active WHERE id=?", (user_id,)); conn.commit()
+    return RedirectResponse("/settings#users", status_code=303)
 
 
 @app.get("/profile", response_class=HTMLResponse)
@@ -3166,7 +3228,7 @@ def settings_page(request: Request):
               ("Wiki の書き換え", "実装しない"), ("ファイルの更新（外部ストレージ）", "実装しない"), ("Slack・メールへの外部送信", "実装しない")]
     return render("settings.html", request, conn, items=items, models=models, scopes=scopes, writes=writes,
                   agent_state=dict(agent.state), watch_dir=config.ARTIFACT_WATCH_DIR, gemini=bool(config.GEMINI_API_KEY),
-                  orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL, ROLES=ROLES, roles={p_: role_of(conn, p_) for p_ in people_list(conn)})
+                  orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL, ROLES=ROLES, roles={p_: role_of(conn, p_) for p_ in people_list(conn)}, users=auth.list_users(conn), demo_mode=auth.DEMO_MODE)
 
 
 @app.post("/settings")

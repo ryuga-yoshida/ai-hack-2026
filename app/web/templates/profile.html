@@ -30,6 +30,11 @@
       <button @click="enableDesktopNotify()" class="ml-auto text-xs border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">オンにする</button>
       <button @click="try { localStorage.setItem('desktop-notify', '0') } catch (e) {}; toast('デスクトップ通知をオフにしました')" class="text-xs text-gray-500 hover:text-gray-800">オフ</button>
     </div>
+    <form method="post" action="/profile/password" class="border-t pt-4 space-y-2 text-sm">
+      <div class="font-semibold text-gray-800 text-xs">パスワードの変更</div>
+      <div class="grid grid-cols-2 gap-2"><input name="current" type="password" required autocomplete="current-password" placeholder="現在のパスワード" class="border border-gray-300 rounded-lg px-3 py-1.5"><input name="new" type="password" required minlength="8" autocomplete="new-password" placeholder="新しいパスワード（8文字以上）" class="border border-gray-300 rounded-lg px-3 py-1.5"></div>
+      <button class="border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">変更する</button>
+    </form>
     <div class="border-t pt-4 text-xs text-gray-500">別のアカウントで使うには「サインアウト」してからサインインし直してください。</div>
   </div>
   <aside class="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-600 space-y-2">

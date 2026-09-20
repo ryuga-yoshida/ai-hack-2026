@@ -203,7 +203,8 @@ def init_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE tasks ADD COLUMN start_date TEXT")
     conn.commit()
     from app.connectors import calendar, chat, mail, meet, wiki  # 自作ツールのテーブル（循環importを避けて遅延）
-    from app import minutes, tags
+    from app import auth, minutes, tags
+    auth.init(conn)
     chat.init(conn)
     meet.init(conn)
     mail.init(conn)

@@ -585,6 +585,8 @@ def reset_demo() -> dict:
         conn.commit()
         conn.execute("PRAGMA foreign_keys = ON")
         seed.run(conn)
+        from app import auth
+        auth.seed_demo_users(conn)
         results = replay(conn, speed=0, record=False)
         router.CACHE_ONLY = False
         n = sum(len(r.findings) for r in results)

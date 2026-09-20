@@ -20,8 +20,10 @@ def cmd_seed(args) -> int:
     conn = db.connect()
     db.init_db(conn)
     from fixtures import seed
+    from app import auth
     seed.run(conn)
-    print(f"seed: {config.DB_PATH} に {len(db.table_names(conn))} テーブル")
+    auth.seed_demo_users(conn)
+    print(f"seed: {config.DB_PATH} に {len(db.table_names(conn))} テーブル・デモ用アカウント5件（パスワード: DEMO_PASSWORD）")
     return 0
 
 

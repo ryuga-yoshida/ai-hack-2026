@@ -3,6 +3,25 @@
 {% block content %}
 <div class="grid grid-cols-3 gap-6">
   <div class="col-span-2 space-y-4">
+  <div class="bg-white border border-gray-200 rounded-xl p-5" id="users">
+    <h2 class="font-semibold mb-1">ユーザー</h2>
+    <p class="text-xs text-gray-500 mb-3">メール＋パスワードでサインインする人の一覧。追加は管理者のみ（招待メールの代わりにパスワードを直接渡す）。{% if demo_mode %}<span class="text-amber-700">DEMO_MODE: <code>/login/as/名前</code> で即時サインインできる状態です。公開環境では環境変数 DEMO_MODE=0 に。</span>{% endif %}</p>
+    <table class="w-full text-sm mb-3">
+      <thead class="text-xs text-gray-500 text-left"><tr><th class="py-1">表示名</th><th>メール</th><th>最終サインイン</th><th></th></tr></thead>
+      <tbody>{% for u in users %}
+      <tr class="border-t border-gray-100 {% if not u.active %}opacity-50{% endif %}"><td class="py-1.5" data-person="{{ u.name }}">{{ u.name }}</td><td class="text-xs text-gray-600">{{ u.email }}</td><td class="text-xs text-gray-500">{{ u.last_login|rel if u.last_login else '—' }}</td>
+        <td class="text-right">{% if my_role == 'admin' and u.name != me %}<form method="post" action="/settings/users/{{ u.id }}/toggle"><button class="text-xs text-gray-500 hover:text-gray-800">{{ '無効化' if u.active else '有効化' }}</button></form>{% endif %}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+    {% if my_role == 'admin' %}
+    <form method="post" action="/settings/users" class="grid grid-cols-4 gap-2 text-sm">
+      <input name="name" required placeholder="表示名" class="border border-gray-300 rounded-lg px-2 py-1.5">
+      <input name="email" type="email" required placeholder="メール" class="border border-gray-300 rounded-lg px-2 py-1.5">
+      <input name="password" type="text" required minlength="8" placeholder="初期パスワード（8文字以上）" class="border border-gray-300 rounded-lg px-2 py-1.5">
+      <div class="flex gap-1"><select name="role" class="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 bg-white">{% for k, l, d in ROLES %}<option value="{{ k }}" {% if k == 'member' %}selected{% endif %}>{{ l }}</option>{% endfor %}</select><button class="bg-indigo-600 text-white rounded-lg px-3">追加</button></div>
+    </form>
+    {% endif %}
+  </div>
   <div class="bg-white border border-gray-200 rounded-xl p-5" id="roles">
     <h2 class="font-semibold mb-1">ロール（権限）</h2>
     <p class="text-xs text-gray-500 mb-3">{% for k, l, d in ROLES %}<b>{{ l }}</b>＝{{ d }}{% if not loop.last %} ／ {% endif %}{% endfor %}。変更操作は全て<a href="/audit" class="text-indigo-600 hover:underline">監査ログ</a>に残ります。本番では Entra ID のグループから同期します。</p>
