@@ -115,7 +115,7 @@
   marked.setOptions({ gfm: true, breaks: false });
   let i = 0;
   const renderer = new marked.Renderer();
-  renderer.heading = function ({ text, depth }) { i += 1; return `<h${depth} id="h-${i}">${text}</h${depth}>`; };
+  renderer.heading = function (a, b) { const text = typeof a === 'object' ? this.parser.parseInline(a.tokens) : a; const depth = typeof a === 'object' ? a.depth : b; i += 1; return `<h${depth} id="h-${i}">${text}</h${depth}>`; };
   let html = marked.parse(el.dataset.md, { renderer });
   html = html.replace(/@([^\s<@,、。]+)/g, '<span class="bg-indigo-100 text-indigo-800 rounded px-1">@$1</span>');
   el.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
