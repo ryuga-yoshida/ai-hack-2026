@@ -302,7 +302,13 @@ def task_timeline(conn: sqlite3.Connection, task: Task) -> list[dict]:
         "SELECT e.*, l.relation FROM links l JOIN events e ON e.id = l.from_id "
         "WHERE l.to_type='task' AND l.to_id=? AND l.from_type='event'", (task.id,)).fetchall()
     for r in rows:
-        add(db.row_to_event(r))
+        ev = db.row_to_event(r)
+        if str(ev.meta.get("channel", "")).startswith("task:"):
+            add(ev, label="コメント", color="bg-teal-500")
+        elif ev.source == "mail":
+            add(ev, label="メール", color="bg-sky-600")
+        else:
+            add(ev)
     created = conn.execute("SELECT created_at FROM tasks WHERE id=?", (task.id,)).fetchone()["created_at"]
     items.append({"when": db.from_iso(created), "label": "タスク生成", "color": "bg-emerald-500",
                   "text": task.title, "actor": task.assignee, "ref": None, "quote": None, "meta": {}, "kind": "task"})
@@ -326,7 +332,7 @@ def task_detail(request: Request, task_id: str):
         raise HTTPException(404)
     all_tags = tagmod.all_tags(conn)
     return render("task_detail.html", request, conn, task=task, meta=task_meta(conn, task),
-                  timeline=task_timeline(conn, task), me=get_me(request),
+                  timeline=task_timeline(conn, task), me=get_me(request), comments=task_comments(conn, task_id),
                   all_tags=[t for t in all_tags if t["kind"] != "team"], teams=[t for t in all_tags if t["kind"] == "team"])
 
 
@@ -355,14 +361,21 @@ def patch_task(task_id: str, patch: TaskPatch):
     return {"ok": True, "task": task}
 
 
+def task_comments(conn: sqlite3.Connection, task_id: str) -> list[dict]:
+    """タスク上のコメント（チャンネルには流さない。task:<id> という非表示の会話に置く）"""
+    rows = conn.execute("SELECT * FROM chat_messages WHERE channel=? AND deleted=0 ORDER BY posted_at, rowid",
+                        (f"task:{task_id}",)).fetchall()
+    return [_message_dict(conn, r) for r in rows]
+
+
 @app.post("/tasks/{task_id}/comment")
 def task_comment(task_id: str, request: Request, actor: str = Form(...), text: str = Form(...)):
-    """タスクへのコメント。チャットの #tasks チャンネルに投稿し、明示的にこのタスクへ紐付ける"""
+    """タスクへのコメント。タスク上に残り、Event としてこのタスクに紐付く（チャットには流さない）"""
     conn = get_conn()
     task = db.get_task(conn, task_id)
     if not task:
         raise HTTPException(404)
-    mid = chat.post_message(conn, "tasks", actor.strip(), text.strip())
+    mid = chat.post_message(conn, f"task:{task_id}", actor.strip(), text.strip())
     for tname in tagmod.apply_hashtags(conn, text, "message", mid):
         tagmod.link(conn, tname, "task", task_id)
     _ingest_chat(conn)

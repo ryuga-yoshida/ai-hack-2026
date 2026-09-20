@@ -36,10 +36,26 @@
     </div>
 
     <div class="bg-white border border-gray-200 rounded-xl p-5">
-      <h2 class="font-semibold mb-3">コメント</h2>
+      <h2 class="font-semibold mb-3">コメント <span class="text-xs text-gray-400 font-normal">{{ comments|length }} · このタスクにだけ残ります（チャットには流れません）</span></h2>
+      <div class="space-y-3 mb-4">
+        {% for m in comments %}
+        <div class="flex gap-3">
+          <span class="w-8 h-8 rounded-full bg-teal-500 text-white grid place-items-center text-xs font-semibold shrink-0">{{ m.actor|initials }}</span>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs"><span class="font-semibold text-sm">{{ m.actor }}</span> <span class="text-gray-400">{{ m.posted_at|dt }}</span>
+              {% if m.mentions %}<span class="text-gray-400 ml-1">→ {{ m.mentions|join('・') }}</span>{% endif %}
+              {% for t in m.tags %}<a href="/tags/{{ t.name }}" class="ml-1 px-1.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}</div>
+            <div class="text-sm mt-0.5">{{ m.html|safe }}</div>
+            {% for a in m.attachments %}<a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-1 mt-1 text-xs border border-gray-200 rounded px-2 py-0.5 hover:bg-gray-50">📎 {{ a.name }}</a>{% endfor %}
+          </div>
+          <form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="text-gray-300 hover:text-red-600 text-xs">🗑</button></form>
+        </div>
+        {% else %}<div class="text-sm text-gray-400">まだコメントはありません。</div>{% endfor %}
+      </div>
       <form method="post" action="/tasks/{{ task.id }}/comment" class="flex gap-2">
-        <input name="actor" value="{{ me }}" placeholder="名前" required class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-28">
-        <input name="text" placeholder="コメントを書く（#tasks チャンネルに投稿され、このタスクに紐付きます）" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+        <input name="actor" value="{{ me }}" placeholder="名前" required list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-28">
+        <datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist>
+        <input name="text" placeholder="コメントを書く（@名前 でメンション、#タグ、SPO リンクも可）" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
         <button class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-2">送信</button>
       </form>
     </div>
