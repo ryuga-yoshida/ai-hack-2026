@@ -9,6 +9,7 @@
 {% block heading %}<a href="/wiki/{{ page.id }}" class="text-gray-400 hover:text-gray-600 mr-2">{{ page.title|truncate(30) }}</a><span class="text-gray-300 mr-2">/</span>編集{% endblock %}
 {% block actions %}
 <span id="saveState" class="text-xs text-gray-400"></span>
+<button id="collabBtn" onclick="toggleCollab()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="複数人で同時に編集（Yjs の CRDT で競合なく統合）">👥 同時編集</button>
 <input id="noteInput" placeholder="変更メモ（任意）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-44">
 <select id="channelInput" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
 <a href="/wiki/{{ page.id }}" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white">キャンセル</a>
@@ -21,10 +22,18 @@
   <div class="flex-1 min-w-0 flex flex-col bg-white">
     <div class="px-6 pt-4 pb-2"><input id="titleInput" value="{{ page.title }}" class="w-full text-2xl font-bold border-0 focus:ring-0 px-0" placeholder="ページ名"></div>
     <div id="editor" class="flex-1 min-h-0"></div>
+    <div id="collab" class="hidden flex-1 min-h-0 flex flex-col">
+      <div class="px-6 py-1.5 border-y border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-3">
+        <span class="font-semibold">👥 同時編集モード</span><span id="peers" class="text-emerald-700">接続中…</span>
+        <span id="cursors" class="text-gray-500"></span>
+        <span class="ml-auto text-gray-500">Markdown で編集。他の人の変更はその場で反映（CRDT）。「保存」で改訂として記録</span>
+      </div>
+      <textarea id="collabArea" class="flex-1 w-full px-6 py-3 font-mono text-[13px] leading-relaxed outline-none resize-none" spellcheck="false"></textarea>
+    </div>
     <div class="px-4 py-2 border-t border-gray-100 text-[11px] text-gray-400">WYSIWYG と Markdown を切り替えられます。画像は貼り付け可。保存すると改訂として記録され、変わった段落をエージェントが決定事項と突き合わせます。⌘/Ctrl+S で保存。</div>
   </div>
 </div>
-<form id="saveForm" method="post" action="/wiki/{{ page.id }}/edit" class="hidden"><input type="hidden" name="title"><input type="hidden" name="body"><input type="hidden" name="note"><input type="hidden" name="channel"></form>
+<form id="saveForm" method="post" action="/wiki/{{ page.id }}/edit" class="hidden"><input type="hidden" name="title"><input type="hidden" name="body"><input type="hidden" name="note"><input type="hidden" name="channel"><input type="hidden" name="collab"></form>
 {% endblock %}
 {% block scripts %}
 <script>
@@ -37,11 +46,76 @@ const editor = new toastui.Editor({
 let dirty = false; editor.on('change', () => { dirty = true; document.getElementById('saveState').textContent = '未保存の変更'; });
 function save() {
   const f = document.getElementById('saveForm');
-  f.title.value = document.getElementById('titleInput').value; f.body.value = editor.getMarkdown();
+  f.title.value = document.getElementById('titleInput').value; f.body.value = collabOn ? ytext.toString() : editor.getMarkdown(); f.collab.value = collabOn ? '1' : '';
+  if (collabOn && cws && cws.readyState === 1) cws.send(JSON.stringify({ type: 'saved' }));
   f.note.value = document.getElementById('noteInput').value; f.channel.value = document.getElementById('channelInput').value;
   dirty = false; f.submit();
 }
 document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); save(); } });
 window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+</script>
+<script type="module">
+// ---------- 同時編集: Yjs (CRDT) を自前 WebSocket で中継 ----------
+import * as Y from 'https://cdn.jsdelivr.net/npm/yjs@13.6.27/+esm';
+const ME = {{ me|tojson }};
+let ydoc = null; window.ytext = null; window.cws = null; window.collabOn = false;
+const ta = document.getElementById('collabArea');
+const b64 = { enc: u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }, dec: s => Uint8Array.from(atob(s), c => c.charCodeAt(0)) };
+let lastVal = '';
+function applyLocalDiff() {
+  const nv = ta.value, ov = lastVal; if (nv === ov) return;
+  let s = 0; while (s < ov.length && s < nv.length && ov[s] === nv[s]) s++;
+  let eo = ov.length, en = nv.length; while (eo > s && en > s && ov[eo - 1] === nv[en - 1]) { eo--; en--; }
+  ydoc.transact(() => { if (eo > s) ytext.delete(s, eo - s); if (en > s) ytext.insert(s, nv.slice(s, en)); }, 'local');
+  lastVal = nv;
+}
+function connectCollab() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  cws = new WebSocket(`${proto}://${location.host}/ws/wiki/{{ page.id }}?name=${encodeURIComponent(ME || '編集者')}`); window.cws = cws;
+  cws.onmessage = ev => {
+    const m = JSON.parse(ev.data);
+    if (m.type === 'welcome') {
+      if (m.state) { Y.applyUpdate(ydoc, b64.dec(m.state), 'remote'); }
+      if (!ytext.toString().length) ydoc.transact(() => ytext.insert(0, editor.getMarkdown()), 'local');   // 最初の人が本文を持ち込む
+      renderPeers(m.peers);
+    } else if (m.type === 'update') { Y.applyUpdate(ydoc, b64.dec(m.data), 'remote'); }
+    else if (m.type === 'peer-joined') { peers.add(m.name); renderPeers([...peers]); Alpine.$data(document.body).toast(m.name + ' が編集に参加しました'); }
+    else if (m.type === 'peer-left') { peers.delete(m.name); delete cursors[m.name]; renderPeers([...peers]); }
+    else if (m.type === 'cursor') { cursors[m.name] = m.line; renderCursors(); }
+    else if (m.type === 'saved') { document.getElementById('saveState').textContent = m.name + ' が改訂として保存しました'; dirty = false; }
+  };
+  cws.onclose = () => { if (collabOn) setTimeout(connectCollab, 2000); };
+}
+const peers = new Set(); const cursors = {};
+function renderPeers(list) { peers.clear(); list.forEach(p => peers.add(p)); document.getElementById('peers').textContent = list.length ? '一緒に編集中: ' + list.join('、') : '今はあなただけ（他の人がこのページを「同時編集」で開くと合流します）'; }
+function renderCursors() { document.getElementById('cursors').textContent = Object.entries(cursors).map(([n, l]) => `${n}: ${l}行目`).join(' · '); }
+let stateTimer = null;
+window.toggleCollab = function () {
+  if (collabOn) { location.reload(); return; }   // 解除は再読み込みで通常エディタに戻す
+  collabOn = true; window.collabOn = true;
+  document.getElementById('collabBtn').classList.add('bg-emerald-600', 'text-white', 'border-emerald-600');
+  document.getElementById('editor').classList.add('hidden'); document.getElementById('collab').classList.remove('hidden');
+  ydoc = new Y.Doc(); ytext = ydoc.getText('body'); window.ytext = ytext;
+  ytext.observe((ev, tr) => {
+    if (tr.origin === 'local') return;
+    const pos = ta.selectionStart; const before = ta.value;
+    ta.value = ytext.toString(); lastVal = ta.value;
+    // カーソル位置をざっくり保持（変更が手前なら差分ぶんずらす）
+    let delta = 0; ev.delta.reduce((idx, d) => { if (d.retain) { idx += d.retain; } else if (d.insert && idx <= pos) { delta += d.insert.length; } else if (d.delete && idx < pos) { delta -= Math.min(d.delete, pos - idx); } return idx; }, 0);
+    ta.selectionStart = ta.selectionEnd = Math.max(0, pos + delta);
+    dirty = true; document.getElementById('saveState').textContent = '他の人の変更を反映しました';
+  });
+  ydoc.on('update', (update, origin) => {
+    if (origin === 'local' && cws && cws.readyState === 1) cws.send(JSON.stringify({ type: 'update', data: b64.enc(update) }));
+    clearTimeout(stateTimer); stateTimer = setTimeout(() => { if (cws && cws.readyState === 1) cws.send(JSON.stringify({ type: 'state', data: b64.enc(Y.encodeStateAsUpdate(ydoc)) })); }, 1500);
+  });
+  ta.addEventListener('input', () => { applyLocalDiff(); dirty = true; document.getElementById('saveState').textContent = '未保存の変更（同時編集中）'; });
+  let cTimer = null;
+  ta.addEventListener('keyup', () => { clearTimeout(cTimer); cTimer = setTimeout(() => { const line = ta.value.slice(0, ta.selectionStart).split('\n').length; if (cws && cws.readyState === 1) cws.send(JSON.stringify({ type: 'cursor', line })); }, 300); });
+  ta.addEventListener('click', () => ta.dispatchEvent(new Event('keyup')));
+  connectCollab();
+  // 初期表示（welcome で state が来たら上書きされる）
+  ta.value = editor.getMarkdown(); lastVal = ta.value;
+};
 </script>
 {% endblock %}

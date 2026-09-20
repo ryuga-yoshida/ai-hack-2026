@@ -23,6 +23,12 @@ CREATE TABLE IF NOT EXISTS wiki_pages (
     space       TEXT NOT NULL DEFAULT 'general',
     created_at  TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS wiki_collab (
+    page_id     TEXT PRIMARY KEY,
+    state       TEXT NOT NULL,     -- Yjs のドキュメント状態（base64）
+    updated_by  TEXT,
+    updated_at  TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS wiki_revisions (
     id          TEXT PRIMARY KEY,
     page_id     TEXT NOT NULL,
@@ -76,6 +82,22 @@ def update(conn: sqlite3.Connection, page_id: str, title: str, body: str, actor:
                  (new_id(), page_id, body, title.strip(), actor, ts, note))
     conn.commit()
     return True
+
+
+def collab_state(conn: sqlite3.Connection, page_id: str) -> str | None:
+    r = conn.execute("SELECT state FROM wiki_collab WHERE page_id=?", (page_id,)).fetchone()
+    return r["state"] if r else None
+
+
+def save_collab_state(conn: sqlite3.Connection, page_id: str, state_b64: str, by: str) -> None:
+    conn.execute("INSERT INTO wiki_collab (page_id, state, updated_by, updated_at) VALUES (?,?,?,?) "
+                 "ON CONFLICT(page_id) DO UPDATE SET state=excluded.state, updated_by=excluded.updated_by, updated_at=excluded.updated_at",
+                 (page_id, state_b64, by, db.to_iso(datetime.now().replace(microsecond=0))))
+    conn.commit()
+
+
+def clear_collab_state(conn: sqlite3.Connection, page_id: str) -> None:
+    conn.execute("DELETE FROM wiki_collab WHERE page_id=?", (page_id,)); conn.commit()
 
 
 def get(conn: sqlite3.Connection, page_id: str) -> dict | None:

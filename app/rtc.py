@@ -148,3 +148,77 @@ _main_loop = None
 def bind_loop(loop) -> None:
     global _main_loop
     _main_loop = loop
+
+
+# ---------- Wiki 同時編集（Yjs の更新を中継し、全体状態を保存） ----------
+
+wiki_rooms: dict[str, dict[str, WebSocket]] = {}
+
+
+async def wiki_ws(ws: WebSocket, page_id: str, name: str) -> None:
+    """クライアント間で Yjs の update（base64）を中継する。サーバーは CRDT を解釈せず、
+    クライアントが定期的に送る全体状態（encodeStateAsUpdate）を保存して、後から来た人に渡す"""
+    from app import db
+    from app.connectors import wiki
+    await ws.accept()
+    room = wiki_rooms.setdefault(page_id, {})
+    key = name
+    n = 1
+    while key in room:   # 同じ人が2タブで開いたとき
+        n += 1; key = f"{name}#{n}"
+    room[key] = ws
+    conn = db.connect()
+    state = wiki.collab_state(conn, page_id)
+    conn.close()
+    await _send(ws, {"type": "welcome", "peers": [k for k in room if k != key], "state": state})
+    for other_key, other in list(room.items()):
+        if other is not ws:
+            await _send(other, {"type": "peer-joined", "name": key})
+    try:
+        while True:
+            raw = await ws.receive_text()
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            t = msg.get("type")
+            if t == "update":
+                for other_key, other in list(room.items()):
+                    if other is not ws:
+                        try:
+                            await other.send_text(json.dumps({"type": "update", "data": msg.get("data", ""), "from": key}))
+                        except Exception:
+                            room.pop(other_key, None)
+            elif t == "state":
+                try:
+                    conn = db.connect(); wiki.save_collab_state(conn, page_id, str(msg.get("data", "")), name); conn.close()
+                except Exception as e:
+                    log.warning("wiki state save failed: %s", e)
+            elif t == "cursor":
+                for other_key, other in list(room.items()):
+                    if other is not ws:
+                        try:
+                            await other.send_text(json.dumps({"type": "cursor", "name": key, "pos": msg.get("pos"), "line": msg.get("line")}))
+                        except Exception:
+                            room.pop(other_key, None)
+            elif t == "saved":   # 誰かが改訂として保存した → 他の人に知らせる
+                for other_key, other in list(room.items()):
+                    if other is not ws:
+                        try:
+                            await other.send_text(json.dumps({"type": "saved", "name": key}))
+                        except Exception:
+                            pass
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        log.warning("wiki ws error %s/%s: %s", page_id, key, e)
+    finally:
+        if room.get(key) is ws:
+            room.pop(key, None)
+        if not room:
+            wiki_rooms.pop(page_id, None)
+        for other_key, other in list(room.items()):
+            try:
+                await other.send_text(json.dumps({"type": "peer-left", "name": key}))
+            except Exception:
+                pass

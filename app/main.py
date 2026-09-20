@@ -2214,6 +2214,12 @@ async def chat_ws(websocket: WebSocket):
     await rtc.chat_ws(websocket)
 
 
+@app.websocket("/ws/wiki/{page_id}")
+async def wiki_ws(websocket: WebSocket, page_id: str, name: str = "編集者"):
+    from app import rtc
+    await rtc.wiki_ws(websocket, page_id, name.strip() or "編集者")
+
+
 @app.websocket("/ws/meet/{meeting_id}")
 async def meet_ws(websocket: WebSocket, meeting_id: str, name: str = "参加者"):
     from app import rtc
@@ -2931,9 +2937,11 @@ def wiki_edit(request: Request, page_id: str):
 
 @app.post("/wiki/{page_id}/edit")
 def wiki_save(request: Request, page_id: str, title: str = Form(...), body: str = Form(""), note: str = Form(""),
-              channel: str = Form("")):
+              channel: str = Form(""), collab: str = Form("")):
     conn = get_conn()
     changed = wikimod.update(conn, page_id, title, body.replace("\r\n", "\n"), who(request), note=note.strip() or None)
+    if not collab:
+        wikimod.clear_collab_state(conn, page_id)   # 通常エディタで保存 → 共同編集の途中状態は破棄
     if changed:
         if channel.strip():
             chat.post_message(conn, channel.strip(), who(request), f"📖 Wiki「{title.strip()}」を更新しました{('（' + note.strip() + '）') if note.strip() else ''} {config.APP_BASE_URL}/wiki/{page_id}")
