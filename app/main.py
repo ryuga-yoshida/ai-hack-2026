@@ -2274,11 +2274,16 @@ async def _bind_loop():
     persist.restore()            # GCS_BUCKET があれば起動時に復元
     persist.start_background()   # 定期バックアップ
     conn = get_conn()
-    if conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0:
-        import threading
-        threading.Thread(target=agent.reset_demo, daemon=True).start()   # 空の環境 → 架空データを投入してキャッシュ再生
-    if os.getenv("AGENT_AUTOSTART", "0") == "1":
-        agent.set_enabled(True, int(os.getenv("AGENT_INTERVAL", "60")))
+    empty = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
+    autostart = os.getenv("AGENT_AUTOSTART", "0") == "1"
+
+    def boot():
+        if empty:
+            agent.reset_demo()   # 空の環境 → 架空データを投入してキャッシュ再生（巡回と同時に走らせない）
+        if autostart:
+            agent.set_enabled(True, int(os.getenv("AGENT_INTERVAL", "60")))
+    import threading
+    threading.Thread(target=boot, daemon=True).start()
 
 
 @app.on_event("shutdown")
