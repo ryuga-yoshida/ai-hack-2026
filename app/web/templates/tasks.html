@@ -47,8 +47,8 @@
   <button type="submit" @click="if (act === 'delete' && !confirm(sel.length + ' 件を削除しますか？')) $event.preventDefault()" class="bg-indigo-500 hover:bg-indigo-400 rounded px-3 py-0.5 font-semibold">適用</button>
   <button type="button" @click="sel = []; all = false" class="ml-auto text-gray-400 hover:text-white">選択解除</button>
 </div>
-<div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-  <table class="w-full text-sm">
+<div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+  <table class="w-full min-w-[1100px] text-sm">
     <thead class="bg-gray-50 text-xs text-gray-500 text-left">
       <tr>
         <th class="pl-4 pr-1 py-2 w-6"><input type="checkbox" x-model="all" @change="sel = all ? {{ rows|map(attribute='task.id')|list|tojson|forceescape }} : []"></th>
@@ -62,7 +62,7 @@
     {% for m in rows %}{% set t = m.task %}
       <tr class="border-t border-gray-100 hover:bg-gray-50 {% if t.status == 'done' %}text-gray-400{% endif %}" :class="sel.includes('{{ t.id }}') && 'bg-indigo-50'">
         <td class="pl-4 pr-1 py-2"><input type="checkbox" name="ids" value="{{ t.id }}" x-model="sel"></td>
-        <td class="px-3 py-2"><a href="/tasks/{{ t.id }}" class="font-medium hover:underline">{{ t.title }}</a>{% if m.origin %}<div class="text-[11px] text-gray-400">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成</div>{% endif %}</td>
+        <td class="px-3 py-2 min-w-[260px]"><a href="/tasks/{{ t.id }}" class="font-medium hover:underline">{{ t.title }}</a>{% if m.origin %}<div class="text-[11px] text-gray-400">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成</div>{% endif %}</td>
         <td class="px-3 py-2"><select onchange="window.shellPatch('/tasks/{{ t.id }}', {priority: this.value}, '優先度を更新しました')" class="text-xs border-0 bg-transparent hover:bg-gray-100 rounded px-1 py-0.5 cursor-pointer">{% for k, l in PRIORITIES %}<option value="{{ k }}" {% if k == t.priority %}selected{% endif %}>{{ {'urgent':'🔴','high':'🟠','normal':'🟢','low':'⚪'}[k] }} {{ l }}</option>{% endfor %}</select></td>
         <td class="px-3 py-2">
           <select onchange="window.shellPatch('/tasks/{{ t.id }}', {status: this.value}, '状態を更新しました')" class="text-xs rounded-full border-0 py-0.5 pl-2 pr-6 cursor-pointer {% if t.status == 'todo' %}bg-gray-100 text-gray-700{% elif t.status == 'in_progress' %}bg-indigo-100 text-indigo-700{% elif t.status == 'blocked' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
