@@ -90,7 +90,19 @@ async def chat_ws(ws: WebSocket) -> None:
     chat_subscribers.add(ws)
     try:
         while True:
-            await ws.receive_text()   # クライアントからの ping を待つだけ
+            raw = await ws.receive_text()   # ping か typing 通知
+            if raw.startswith("{"):
+                try:
+                    msg = json.loads(raw)
+                except Exception:
+                    continue
+                if msg.get("type") == "typing":
+                    for other in list(chat_subscribers):
+                        if other is not ws:
+                            try:
+                                await other.send_text(raw)
+                            except Exception:
+                                chat_subscribers.discard(other)
     except Exception:
         pass
     finally:

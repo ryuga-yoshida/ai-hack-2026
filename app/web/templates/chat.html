@@ -8,7 +8,9 @@
   <input type="hidden" name="channel" value="{{ channel }}">
   <input name="q" value="{{ q }}" placeholder="メッセージを検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-44">
 </form>
-<a href="/chat?channel={{ channel }}&view=mentions" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 {% if view == 'mentions' %}bg-indigo-50 border-indigo-300{% endif %}">@ メンション</a>
+<a href="/chat?channel={{ channel }}{% if view != 'mentions' %}&view=mentions{% endif %}" class="text-sm border rounded-lg px-3 py-1.5 {% if view == 'mentions' %}bg-indigo-50 border-indigo-300 text-indigo-700{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}" title="自分宛のメンション">@</a>
+<a href="/chat?channel={{ channel }}{% if view != 'saved' %}&view=saved{% endif %}" class="text-sm border rounded-lg px-3 py-1.5 {% if view == 'saved' %}bg-indigo-50 border-indigo-300 text-indigo-700{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}" title="保存したメッセージ">🔖</a>
+<a href="/chat?channel={{ channel }}{% if not info %}&info=1{% endif %}" class="text-sm border rounded-lg px-3 py-1.5 {% if info %}bg-indigo-50 border-indigo-300 text-indigo-700{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}" title="チャンネル情報">ⓘ</a>
 {% if not meeting %}
 <form method="post" action="/meet" class="flex">
   <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="title" value="{{ ch.title if ch.kind != 'channel' else '#' + channel }} の会議">
@@ -31,7 +33,7 @@
     <nav class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-thin">
       {% for c in channels %}
       <a href="/chat?channel={{ c }}" class="flex items-center justify-between px-2 py-1.5 rounded-lg {% if c == channel %}bg-white font-medium shadow-sm{% elif unread.get(c) %}text-gray-900 font-semibold hover:bg-gray-200{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
-        <span># {{ c }}</span>{% if unread.get(c) and c != channel %}<span class="text-[10px] bg-indigo-600 text-white rounded-full px-1.5 py-0.5">{{ unread.get(c) }}</span>{% else %}<span class="text-xs text-gray-400">{{ counts.get(c, 0) }}</span>{% endif %}</a>
+        <span>{{ '🔕' if c in muted else '#' }} {{ c }}</span>{% if unread.get(c) and c != channel and c not in muted %}<span class="text-[10px] bg-indigo-600 text-white rounded-full px-1.5 py-0.5">{{ unread.get(c) }}</span>{% else %}<span class="text-xs text-gray-400">{{ counts.get(c, 0) }}</span>{% endif %}</a>
       {% endfor %}
       <div class="px-2 pt-4 pb-1 text-xs font-semibold text-gray-500 flex items-center justify-between">ダイレクトメッセージ
         <button @click="$dispatch('open-new-dm')" class="text-gray-400 hover:text-gray-700 text-base leading-none" title="新しいメッセージ">＋</button></div>
@@ -68,7 +70,18 @@
       {% if ch.kind == 'team' %}<a href="/tags/{{ ch.title|replace('@', '') }}" class="ml-auto text-indigo-600 hover:underline">チームの設定・タグ →</a>{% endif %}
     </div>
     {% endif %}
-    {% if view == 'mentions' %}
+    {% if pins and view != 'mentions' and not q %}
+    <div class="px-4 py-1.5 border-b border-amber-100 bg-amber-50 text-xs flex items-center gap-2 overflow-x-auto" x-data="{ i: 0 }">
+      <span class="text-amber-700 shrink-0">📌 ピン留め {{ pins|length }}</span>
+      {% for pm in pins %}<a href="#msg-{{ pm.id }}" class="shrink-0 max-w-[360px] truncate text-gray-700 hover:underline" title="{{ pm.text }}"><b>{{ pm.actor }}</b>: {{ pm.text|truncate(60) }}</a>{% if not loop.last %}<span class="text-amber-300">|</span>{% endif %}{% endfor %}
+    </div>
+    {% endif %}
+    {% if view == 'saved' %}
+    <div class="flex-1 overflow-y-auto p-4">
+      <div class="text-sm text-gray-500 mb-2">🔖 保存したメッセージ {{ saved_msgs|length }} 件 <a href="/chat?channel={{ channel }}" class="text-indigo-600 ml-2">閉じる</a></div>
+      {% for m in saved_msgs %}<div class="text-xs text-gray-400 px-4 pt-2"># {{ m.channel }}</div>{% with compact=true %}{% include "_message.html" %}{% endwith %}{% else %}<div class="text-sm text-gray-400 px-4">メッセージの 🔖 で保存すると、ここに集まります</div>{% endfor %}
+    </div>
+    {% elif view == 'mentions' %}
     <div class="flex-1 overflow-y-auto p-4">
       <div class="text-sm text-gray-500 mb-2">{% if me %}<b>{{ me }}</b> へのメンション {{ mentions|length }} 件（個人・チーム・@all を含む）{% else %}名前を入力すると自分宛のメンションが見られます{% endif %} <a href="/chat?channel={{ channel }}" class="text-indigo-600 ml-2">閉じる</a></div>
       {% for m in mentions %}<div class="text-xs text-gray-400 px-4 pt-2"># {{ m.channel }}</div>{% with compact=true %}{% include "_message.html" %}{% endwith %}{% endfor %}
@@ -85,30 +98,102 @@
         {% if m.posted_at[:10] != ns.day %}{% set ns.day = m.posted_at[:10] %}
         <div class="flex items-center gap-3 px-4 my-3"><div class="flex-1 h-px bg-gray-200"></div><span class="text-xs text-gray-400">{{ ns.day }}</span><div class="flex-1 h-px bg-gray-200"></div></div>
         {% endif %}
+        {% if m.id == first_unread %}<div class="flex items-center gap-3 px-4 my-2" id="unread"><div class="flex-1 h-px bg-red-300"></div><span class="text-[11px] text-red-500 font-semibold">ここから未読</span><div class="flex-1 h-px bg-red-300"></div></div>{% endif %}
         {% with compact=false %}{% include "_message.html" %}{% endwith %}
       {% else %}
       <div class="text-center text-sm text-gray-400 mt-20">まだ発言はありません。最初のメッセージを投稿しましょう。</div>
       {% endfor %}
       <div id="live"></div>
     </div>
-    <form method="post" action="/chat" class="border-t border-gray-200 p-3" x-data="{ attach: false }">
-      <input type="hidden" name="channel" value="{{ channel }}">
-      <div class="flex gap-2">
-        <span class="w-9 h-9 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold shrink-0 self-center" title="{{ me }} として投稿">{{ me|initials }}</span>
-        <div class="flex-1 relative" x-data="mentionInput()">
-          <input name="text" placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（@ でメンション、#タグ）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" @input="onInput" @keydown="onKey" @blur="setTimeout(() => open = false, 150)">
-          {% include "_mention_menu.html" %}
+    <div class="border-t border-gray-200 px-3 pt-1 pb-3" x-data="composer('{{ channel }}')">
+      <div class="h-4 text-[11px] text-gray-400 px-1" x-text="typingText"></div>
+      <form method="post" action="/chat" @submit="stopTyping()">
+        <input type="hidden" name="channel" value="{{ channel }}">
+        <div class="border border-gray-300 rounded-xl focus-within:ring-2 focus-within:ring-indigo-200 bg-white">
+          <div class="relative" x-data="mentionInput()">
+            <textarea name="text" x-ref="ta" rows="1" placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（Enter で送信・Shift+Enter で改行・@ メンション・#タグ）" required autocomplete="off"
+              class="w-full text-sm border-0 focus:ring-0 rounded-t-xl px-3 py-2 resize-none max-h-40" @input="onInput; grow($event.target); typing()" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
+            {% include "_mention_menu.html" %}
+          </div>
+          <div class="flex items-center gap-0.5 px-2 pb-1.5 text-gray-500">
+            <button type="button" @click="wrap('**')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs font-bold" title="太字 (**text**)">B</button>
+            <button type="button" @click="wrap('~~')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs line-through" title="取り消し線">S</button>
+            <button type="button" @click="wrap('`')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs font-mono" title="コード">&lt;/&gt;</button>
+            <button type="button" @click="prefix('> ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs" title="引用">❝</button>
+            <button type="button" @click="prefix('- ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs" title="箇条書き">•</button>
+            <span class="w-px h-4 bg-gray-200 mx-1"></span>
+            <div class="relative"><button type="button" @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-sm" title="絵文字">😊</button>
+              <div x-show="emo" x-cloak @click.outside="emo = false" class="absolute left-0 bottom-8 bg-white border border-gray-200 rounded-lg shadow-lg p-2 grid grid-cols-8 gap-0.5 z-20 w-64">
+                <template x-for="e in emojis" :key="e"><button type="button" @click="insert(e); emo = false" class="text-lg hover:bg-gray-100 rounded" x-text="e"></button></template></div></div>
+            <button type="button" @click="$refs.file.click()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-sm" title="ファイルを添付（成果物ライブラリに保存され、版管理と検知の対象になります）">📎</button>
+            <button type="button" @click="attach = !attach" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-sm" :class="attach && 'bg-gray-100'" title="リンクを添付">🔗</button>
+            <span class="flex-1"></span>
+            <span class="text-[11px] text-gray-400 mr-2">{{ me }} として投稿</span>
+            <button class="text-sm bg-indigo-600 text-white rounded-lg px-4 py-1.5 hover:bg-indigo-700">送信 ↵</button>
+          </div>
         </div>
-        <button type="button" @click="attach = !attach" class="text-sm border border-gray-300 rounded-lg px-3 bg-white hover:bg-gray-50" title="ファイルのリンクを添付">📎</button>
-        <button class="text-sm bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700">送信</button>
-      </div>
-      <div x-show="attach" x-cloak class="flex gap-2 mt-2">
-        <input name="attachment_url" placeholder="SharePoint / Drive のファイル URL" class="flex-1 text-xs border border-gray-300 rounded-lg px-3 py-1.5">
-        <input name="attachment_name" placeholder="表示名（任意）" class="w-40 text-xs border border-gray-300 rounded-lg px-3 py-1.5">
-      </div>
-    </form>
+        <div x-show="attach" x-cloak class="flex gap-2 mt-2">
+          <input name="attachment_url" placeholder="成果物ライブラリ / SharePoint のファイル URL" class="flex-1 text-xs border border-gray-300 rounded-lg px-3 py-1.5">
+          <input name="attachment_name" placeholder="表示名（任意）" class="w-40 text-xs border border-gray-300 rounded-lg px-3 py-1.5">
+        </div>
+      </form>
+      <form method="post" action="/chat/upload" enctype="multipart/form-data" class="hidden" x-ref="upform">
+        <input type="hidden" name="channel" value="{{ channel }}"><input type="file" name="file" x-ref="file" @change="if ($refs.file.files.length) { $refs.uptext.value = $refs.ta.value; $refs.upform.submit(); Alpine.$data(document.body).toast('アップロード中…'); }">
+        <input type="hidden" name="text" x-ref="uptext">
+      </form>
+    </div>
     {% endif %}
   </section>
+
+  <!-- チャンネル情報 -->
+  {% if info %}
+  <aside class="w-80 shrink-0 border-l border-gray-200 bg-white flex flex-col text-sm overflow-y-auto scrollbar-thin">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between font-semibold">{{ ch.title if ch.kind != 'channel' else '#' + channel }}
+      <a href="/chat?channel={{ channel }}" class="text-gray-400 hover:text-gray-700">×</a></div>
+    <div class="p-4 space-y-5">
+      <form method="post" action="/chat/channels/{{ channel }}/update" class="space-y-1">
+        {% if ch.kind in ('group',) %}<div class="text-xs text-gray-500">グループ名</div><input name="title" value="{{ ch.title }}" class="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm">{% endif %}
+        <div class="text-xs text-gray-500">説明</div>
+        <textarea name="description" rows="2" placeholder="このチャンネルの目的…" class="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm">{{ ch.description or '' }}</textarea>
+        <button class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50">保存</button>
+      </form>
+      <div class="grid grid-cols-3 gap-2 text-center text-xs">
+        <div class="bg-gray-50 rounded-lg py-2"><div class="text-lg font-semibold">{{ stats.n }}</div>発言</div>
+        <div class="bg-gray-50 rounded-lg py-2"><div class="text-lg font-semibold">{{ stats.people }}</div>参加者</div>
+        <div class="bg-gray-50 rounded-lg py-2"><div class="text-lg font-semibold">{{ pins|length }}</div>ピン</div>
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-500 mb-1">メンバー {{ (ch.members if ch.kind != 'channel' else people)|length }}</div>
+        {% for p in (ch.members if ch.kind != 'channel' else people) %}
+        <div class="flex items-center gap-2 py-1"><span data-person="{{ p }}" class="w-6 h-6 rounded-full bg-indigo-500 text-white grid place-items-center text-[10px] font-semibold">{{ p|initials }}</span><span data-person="{{ p }}" class="flex-1">{{ p }}{% if p == me %} <span class="text-gray-400">(あなた)</span>{% endif %}</span>{% if p != me %}<a href="/chat/dm/{{ p }}" class="text-xs text-indigo-600 hover:underline">DM</a>{% endif %}</div>
+        {% endfor %}
+        {% if ch.kind in ('group',) %}
+        <form method="post" action="/chat/channels/{{ channel }}/update" class="mt-2">
+          <div class="text-xs text-gray-500 mb-1">メンバーを編集</div>
+          {% with pp_name='members', pp_selected=ch.members, pp_multi=true, pp_placeholder='追加する人を検索' %}{% include "_people_picker.html" %}{% endwith %}
+          <button class="mt-1 text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50">更新</button>
+        </form>
+        {% endif %}
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-500 mb-1">📌 ピン留め</div>
+        {% for pm in pins %}<a href="#msg-{{ pm.id }}" class="block text-xs py-1 border-b border-gray-100 hover:bg-gray-50"><b>{{ pm.actor }}</b> {{ pm.text|truncate(70) }}</a>{% else %}<div class="text-xs text-gray-400">なし</div>{% endfor %}
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-500 mb-1">📎 共有されたファイル {{ files|length }}</div>
+        {% for f in files %}<a href="{{ f.url }}" class="flex items-center gap-2 text-xs py-1 border-b border-gray-100 hover:bg-gray-50"><span class="w-5 h-5 rounded bg-emerald-100 text-emerald-700 grid place-items-center text-[10px] font-bold">{{ f.name.rsplit('.', 1)[-1][:4]|upper if '.' in f.name else '?' }}</span><span class="flex-1 truncate">{{ f.name }}</span><span class="text-gray-400 shrink-0">{{ f.actor }} · {{ f.at|rel }}</span></a>{% else %}<div class="text-xs text-gray-400">なし</div>{% endfor %}
+      </div>
+      <div>
+        <div class="text-xs font-semibold text-gray-500 mb-1">タグ</div>
+        <div class="flex flex-wrap gap-1 items-center">{% for t in channel_tags %}<a href="/tags/{{ t.name }}" class="text-xs px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}{% with tp_type='channel', tp_id=channel %}{% include "_tag_picker.html" %}{% endwith %}</div>
+      </div>
+      <div class="flex gap-2 pt-2 border-t">
+        <form method="post" action="/chat/channels/{{ channel }}/mute"><button class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50">{{ '🔔 通知をオン' if channel in muted else '🔕 ミュート' }}</button></form>
+        {% if ch.kind in ('group', 'dm') %}<form method="post" action="/chat/channels/{{ channel }}/leave" onsubmit="return confirm('この会話から退出しますか？')"><button class="text-xs border border-red-200 text-red-600 rounded-lg px-2 py-1 bg-white hover:bg-red-50">退出</button></form>{% endif %}
+      </div>
+    </div>
+  </aside>
+  {% endif %}
 
   <!-- スレッド -->
   {% if thread %}
@@ -123,7 +208,7 @@
     <form method="post" action="/chat" class="border-t border-gray-200 p-3 flex gap-2">
       <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="reply_to" value="{{ thread.root.id }}">
       <div class="flex-1 relative" x-data="mentionInput()">
-        <input name="text" placeholder="返信…（@ でメンション）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" @input="onInput" @keydown="onKey" @blur="setTimeout(() => open = false, 150)">
+        <textarea name="text" rows="1" placeholder="返信…（@ でメンション、Shift+Enter で改行）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-none" @input="onInput; $event.target.style.height = 'auto'; $event.target.style.height = Math.min($event.target.scrollHeight, 160) + 'px'" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
         {% include "_mention_menu.html" %}
       </div>
       <button class="text-sm bg-indigo-600 text-white rounded-lg px-3">送信</button>
@@ -180,13 +265,14 @@ function chatPage() {
     newCh: false, last: {{ (messages[-1].posted_at if messages else '')|tojson }},
     ws: null,
     init() {
-      const l = this.$refs.list; if (l && !sessionStorage.getItem('chat-keep')) l.scrollTop = l.scrollHeight; sessionStorage.removeItem('chat-keep');
+      const l = this.$refs.list; if (l && !sessionStorage.getItem('chat-keep')) { const u = document.getElementById('unread'); if (u) u.scrollIntoView({ block: 'center' }); else l.scrollTop = l.scrollHeight; } sessionStorage.removeItem('chat-keep');
+      window.chatWs = () => this.ws;
       {% if not q %}this.connect(); setInterval(() => this.poll(), 15000);{% endif %}
     },
     connect() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       this.ws = new WebSocket(`${proto}://${location.host}/ws/chat`);
-      this.ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.type === 'message' && m.channel === '{{ channel }}') this.poll(); else if (m.type === 'message') this.markUnread(m.channel); };
+      this.ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.type === 'message' && m.channel === '{{ channel }}') this.poll(); else if (m.type === 'message') this.markUnread(m.channel); else if (m.type === 'typing') window.dispatchEvent(new CustomEvent('chat-typing', { detail: m })); };
       this.ws.onclose = () => setTimeout(() => this.connect(), 3000);
       setInterval(() => { if (this.ws && this.ws.readyState === 1) this.ws.send('ping'); }, 25000);
     },
@@ -210,6 +296,23 @@ function chatPage() {
       const inp = document.querySelector('form[action="/chat"] input[name="text"]');
       if (!inp || !inp.value) setTimeout(() => { if (!inp || !inp.value) location.reload(); }, 6000);
     },
+  };
+}
+function composer(channel) {
+  return {
+    attach: false, emo: false, typers: {}, lastSent: 0,
+    emojis: ['👍','👎','✅','❌','👀','🙏','🎉','🔥','💯','😀','😂','😅','🤔','😢','😮','🙌','👏','💪','🚀','⭐','❗','❓','📌','📎','📅','⏰','💡','📝','☕','🍵','🍺','🎯'],
+    get typingText() { const n = Object.keys(this.typers); return n.length ? n.join('、') + ' が入力中…' : ''; },
+    init() {
+      window.addEventListener('chat-typing', e => { const m = e.detail; if (m.channel !== channel || m.actor === ME) return;
+        this.typers[m.actor] = Date.now(); setTimeout(() => { if (Date.now() - this.typers[m.actor] > 3500) delete this.typers[m.actor]; }, 4000); });
+    },
+    typing() { const ws = window.chatWs && window.chatWs(); if (ws && ws.readyState === 1 && Date.now() - this.lastSent > 2000) { this.lastSent = Date.now(); ws.send(JSON.stringify({ type: 'typing', channel, actor: ME })); } },
+    stopTyping() { this.lastSent = 0; },
+    grow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; },
+    insert(t) { const ta = this.$refs.ta; const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + t + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + t.length; ta.focus(); this.grow(ta); },
+    wrap(mark) { const ta = this.$refs.ta; const s = ta.selectionStart, e = ta.selectionEnd; const sel = ta.value.slice(s, e) || 'テキスト'; ta.value = ta.value.slice(0, s) + mark + sel + mark + ta.value.slice(e); ta.selectionStart = s + mark.length; ta.selectionEnd = s + mark.length + sel.length; ta.focus(); },
+    prefix(p) { const ta = this.$refs.ta; const s = ta.selectionStart; const ls = ta.value.lastIndexOf('\n', s - 1) + 1; ta.value = ta.value.slice(0, ls) + p + ta.value.slice(ls); ta.selectionStart = ta.selectionEnd = s + p.length; ta.focus(); this.grow(ta); },
   };
 }
 async function toTask(id) {

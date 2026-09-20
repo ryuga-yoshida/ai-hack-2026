@@ -845,7 +845,36 @@ def render_message(text: str, conn: sqlite3.Connection | None = None) -> str:
         return m.group(0)
     html = _MENTION.sub(mention, html)
     html = _HASH.sub(lambda m: f'<a href="/tags/{escape(m.group(1))}" class="text-indigo-600 hover:underline">#{m.group(1)}</a>', html)
-    return html
+    return _markdown_lite(html)
+
+
+def _markdown_lite(html: str) -> str:
+    """エスケープ済み HTML に軽量の書式を当てる: ```code```, `code`, **太字**, ~~取消~~, > 引用, - 箇条書き, 改行"""
+    html = re.sub(r"```\n?(.*?)```", lambda m: f'<pre class="bg-gray-900 text-gray-100 rounded-lg px-3 py-2 my-1 text-xs overflow-x-auto">{m.group(1).strip()}</pre>', html, flags=re.S)
+    html = re.sub(r"`([^`\n]+)`", r'<code class="bg-gray-100 rounded px-1 text-[13px]">\1</code>', html)
+    html = re.sub(r"\*\*([^*\n]+)\*\*", r"<b>\1</b>", html)
+    html = re.sub(r"~~([^~\n]+)~~", r"<s>\1</s>", html)
+    lines, out, in_list = html.split("\n"), [], False
+    for ln in lines:
+        if ln.startswith("<pre"):
+            out.append(ln); continue
+        if re.match(r"^[-・] ", ln):
+            if not in_list:
+                out.append('<ul class="list-disc pl-5 my-0.5">'); in_list = True
+            out.append(f"<li>{ln[2:]}</li>"); continue
+        if in_list:
+            out.append("</ul>"); in_list = False
+        if ln.startswith("&gt; "):
+            out.append(f'<blockquote class="border-l-2 border-gray-300 pl-2 text-gray-600 my-0.5">{ln[5:]}</blockquote>'); continue
+        out.append(ln)
+    if in_list:
+        out.append("</ul>")
+    res = []
+    for i, ln in enumerate(out):
+        res.append(ln)
+        if i < len(out) - 1 and not (ln.startswith(("<ul", "<li", "</ul", "<blockquote", "<pre")) or out[i + 1].startswith(("<ul", "</ul", "<li", "<blockquote"))):
+            res.append("<br>")
+    return "".join(res)
 
 
 def _message_dict(conn: sqlite3.Connection, r: sqlite3.Row) -> dict:
@@ -869,7 +898,8 @@ def _message_dict(conn: sqlite3.Connection, r: sqlite3.Row) -> dict:
             "reactions": reactions, "replies": replies, "last_reply": last_reply["posted_at"] if last_reply else None,
             "task": {"id": link["to_id"], "title": link["title"], "method": link["method"],
                      "confidence": link["confidence"]} if link else None,
-            "decision": decided["text"] if decided else None}
+            "decision": decided["text"] if decided else None,
+            "pinned": bool(conn.execute("SELECT 1 FROM chat_pins WHERE message_id=?", (r["id"],)).fetchone())}
 
 
 def message_rows(conn: sqlite3.Connection, channel: str, after: str | None = None) -> list[dict]:
@@ -933,11 +963,17 @@ def _unread_counts(conn: sqlite3.Connection, me: str) -> dict[str, int]:
 
 
 @app.get("/chat", response_class=HTMLResponse)
-def chat_page(request: Request, channel: str = "general", thread: str = "", q: str = "", view: str = ""):
+def chat_page(request: Request, channel: str = "general", thread: str = "", q: str = "", view: str = "", info: str = ""):
     conn = get_conn()
     me = get_me(request)
     ch = chat.get_channel(conn, channel)
     unread = _unread_counts(conn, me) if me else {}
+    seen_at = conn.execute("SELECT value FROM settings WHERE key=?", (f"chat_seen:{me}:{channel}",)).fetchone() if me else None
+    first_unread = None
+    if seen_at and unread.get(channel):
+        r = conn.execute("SELECT id FROM chat_messages WHERE channel=? AND deleted=0 AND reply_to IS NULL AND actor != ? AND posted_at > ? ORDER BY posted_at LIMIT 1",
+                         (channel, me, seen_at["value"])).fetchone()
+        first_unread = r["id"] if r else None
     if me:
         db.set_setting(conn, f"chat_seen:{me}:{channel}", db.now_iso())
     results = [_message_dict(conn, r) for r in chat.search_messages(conn, q)] if q else []
@@ -946,10 +982,87 @@ def chat_page(request: Request, channel: str = "general", thread: str = "", q: s
         for r in conn.execute("SELECT * FROM chat_messages WHERE deleted=0 AND text LIKE '%@%' ORDER BY posted_at DESC LIMIT 100"):
             if me in tagmod.expand_mentions(conn, r["text"], PEOPLE):
                 mentions.append(_message_dict(conn, r))
+    saved_msgs = [_message_dict(conn, r) for r in chat.saved(conn, me)] if view == "saved" and me else []
+    pins = [_message_dict(conn, r) for r in chat.pins(conn, channel)]
     return render("chat.html", request, conn, channel=channel, ch=ch, **_sidebar(conn, me), unread=unread,
                   messages=message_rows(conn, channel), thread=thread_rows(conn, thread) if thread else None,
-                  q=q, results=results, me=me, view=view, mentions=mentions,
+                  q=q, results=results, me=me, view=view, mentions=mentions, saved_msgs=saved_msgs, pins=pins,
+                  saved_ids=chat.saved_ids(conn, me) if me else set(), first_unread=first_unread, info=bool(info),
+                  muted=chat.muted(conn, me) if me else set(), files=chat.channel_files(conn, channel) if info or view == "files" else [],
+                  stats=chat.channel_stats(conn, channel),
                   meeting=_active_meeting(conn, channel), channel_tags=tagmod.tags_for(conn, "channel", channel))
+
+
+@app.post("/chat/{msg_id}/pin")
+def pin_chat(msg_id: str, request: Request):
+    conn = get_conn()
+    on = chat.toggle_pin(conn, msg_id, get_me(request))
+    return RedirectResponse(request.headers.get("referer") or "/chat", status_code=303)
+
+
+@app.post("/chat/{msg_id}/save")
+def save_chat(msg_id: str, request: Request):
+    conn = get_conn()
+    chat.toggle_saved(conn, get_me(request), msg_id)
+    return RedirectResponse(request.headers.get("referer") or "/chat", status_code=303)
+
+
+@app.post("/chat/channels/{name}/mute")
+def mute_channel(name: str, request: Request):
+    conn = get_conn()
+    chat.toggle_mute(conn, get_me(request), name)
+    return RedirectResponse(f"/chat?channel={name}&info=1", status_code=303)
+
+
+@app.post("/chat/channels/{name}/update")
+def update_channel(name: str, request: Request, description: str = Form(None), title: str = Form(None), members: list[str] = Form(None)):
+    conn = get_conn()
+    ch = chat.get_channel(conn, name)
+    chat.ensure_channel(conn, name) if ch["kind"] == "channel" else None
+    chat.update_channel(conn, name, description=description, title=title if ch["kind"] != "channel" else None,
+                        members=list(members) if members is not None and ch["kind"] in ("group", "team") else None)
+    return RedirectResponse(f"/chat?channel={name}&info=1", status_code=303)
+
+
+@app.post("/chat/channels/{name}/leave")
+def leave_channel(name: str, request: Request):
+    conn = get_conn()
+    me = get_me(request)
+    ch = chat.get_channel(conn, name)
+    if ch["kind"] in ("group", "dm") and me in ch["members"]:
+        rest = [m for m in ch["members"] if m != me]
+        chat.update_channel(conn, name, members=rest)
+        chat.post_message(conn, name, "システム", f"{me} が退出しました")
+    return RedirectResponse("/chat", status_code=303)
+
+
+@app.post("/chat/upload")
+async def chat_upload(request: Request, channel: str = Form("general"), file: UploadFile = File(...), text: str = Form(""),
+                      reply_to: str = Form("")):
+    """ファイルをそのまま投稿。成果物ライブラリの「チャット添付/<チャンネル>」に版として保存し、リンク付きで発言する"""
+    actor = who(request)
+    name = Path(file.filename or "upload.bin").name
+    conn = get_conn()
+    ch = chat.get_channel(conn, channel)
+    folder = "チャット添付/" + re.sub(r"[^\w\-ぁ-んァ-ン一-龥ー@]", "_", ch["title"] if ch["kind"] != "channel" else channel)
+    rel_path = f"{folder}/{name}"
+    root = LIB()
+    try:
+        dest = _register_version(conn, rel_path, await file.read(), actor, "", "")
+        versions = json.loads((root / "versions.json").read_text(encoding="utf-8"))
+        url = versions[str(dest.relative_to(root))]["url"]
+    except HTTPException:   # 同じ内容 → 既存の最新版のリンクを使う
+        versions = json.loads((root / "versions.json").read_text(encoding="utf-8"))
+        stem = Path(name).stem
+        cands = sorted(k for k in versions if k.startswith(folder + "/") and Path(k).stem.rsplit("_v", 1)[0] == stem)
+        url = versions[cands[-1]]["url"] if cands else f"{config.APP_BASE_URL}/artifacts?path={folder}"
+    mid = chat.post_message(conn, channel, actor, f"{text.strip()} {url}".strip(), reply_to=reply_to.strip() or None,
+                            attachments=[{"url": url, "name": name}])
+    _ingest_chat(conn)
+    from app import agent, rtc
+    rtc.notify_chat(channel, mid)
+    agent.request_tick(f"チャットにファイル投稿（#{channel} {actor}）")
+    return RedirectResponse(f"/chat?channel={channel}" + (f"&thread={reply_to}" if reply_to else ""), status_code=303)
 
 
 @app.get("/chat/team/{name}")

@@ -31,6 +31,23 @@ CREATE TABLE IF NOT EXISTS chat_reactions (
     actor       TEXT NOT NULL,
     PRIMARY KEY (message_id, emoji, actor)
 );
+CREATE TABLE IF NOT EXISTS chat_pins (
+    message_id  TEXT PRIMARY KEY,
+    channel     TEXT NOT NULL,
+    actor       TEXT NOT NULL,
+    pinned_at   TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS chat_saved (
+    user        TEXT NOT NULL,
+    message_id  TEXT NOT NULL,
+    saved_at    TEXT NOT NULL,
+    PRIMARY KEY (user, message_id)
+);
+CREATE TABLE IF NOT EXISTS chat_mutes (
+    user        TEXT NOT NULL,
+    channel     TEXT NOT NULL,
+    PRIMARY KEY (user, channel)
+);
 """
 
 _COLUMNS = {"reply_to": "TEXT", "edited_at": "TEXT", "deleted": "INTEGER NOT NULL DEFAULT 0", "attachments": "TEXT"}
@@ -173,6 +190,83 @@ def ensure_conversation(conn: sqlite3.Connection, members: list[str], title: str
                       json.dumps(members, ensure_ascii=False), title))
     conn.commit()
     return name
+
+
+def _now() -> str:
+    return datetime.now().replace(microsecond=0).isoformat()
+
+
+def toggle_pin(conn: sqlite3.Connection, msg_id: str, actor: str) -> bool:
+    if conn.execute("SELECT 1 FROM chat_pins WHERE message_id=?", (msg_id,)).fetchone():
+        conn.execute("DELETE FROM chat_pins WHERE message_id=?", (msg_id,)); conn.commit(); return False
+    r = conn.execute("SELECT channel FROM chat_messages WHERE id=?", (msg_id,)).fetchone()
+    if not r:
+        return False
+    conn.execute("INSERT INTO chat_pins (message_id, channel, actor, pinned_at) VALUES (?,?,?,?)", (msg_id, r["channel"], actor, _now()))
+    conn.commit(); return True
+
+
+def pins(conn: sqlite3.Connection, channel: str) -> list[sqlite3.Row]:
+    return conn.execute("SELECT m.* FROM chat_pins p JOIN chat_messages m ON m.id = p.message_id WHERE p.channel=? AND m.deleted=0 ORDER BY p.pinned_at DESC", (channel,)).fetchall()
+
+
+def pinned_ids(conn: sqlite3.Connection, channel: str) -> set[str]:
+    return {r[0] for r in conn.execute("SELECT message_id FROM chat_pins WHERE channel=?", (channel,))}
+
+
+def toggle_saved(conn: sqlite3.Connection, user: str, msg_id: str) -> bool:
+    if conn.execute("SELECT 1 FROM chat_saved WHERE user=? AND message_id=?", (user, msg_id)).fetchone():
+        conn.execute("DELETE FROM chat_saved WHERE user=? AND message_id=?", (user, msg_id)); conn.commit(); return False
+    conn.execute("INSERT INTO chat_saved (user, message_id, saved_at) VALUES (?,?,?)", (user, msg_id, _now())); conn.commit(); return True
+
+
+def saved(conn: sqlite3.Connection, user: str) -> list[sqlite3.Row]:
+    return conn.execute("SELECT m.* FROM chat_saved s JOIN chat_messages m ON m.id = s.message_id WHERE s.user=? AND m.deleted=0 ORDER BY s.saved_at DESC", (user,)).fetchall()
+
+
+def saved_ids(conn: sqlite3.Connection, user: str) -> set[str]:
+    return {r[0] for r in conn.execute("SELECT message_id FROM chat_saved WHERE user=?", (user,))}
+
+
+def toggle_mute(conn: sqlite3.Connection, user: str, channel: str) -> bool:
+    if conn.execute("SELECT 1 FROM chat_mutes WHERE user=? AND channel=?", (user, channel)).fetchone():
+        conn.execute("DELETE FROM chat_mutes WHERE user=? AND channel=?", (user, channel)); conn.commit(); return False
+    conn.execute("INSERT INTO chat_mutes (user, channel) VALUES (?,?)", (user, channel)); conn.commit(); return True
+
+
+def muted(conn: sqlite3.Connection, user: str) -> set[str]:
+    return {r[0] for r in conn.execute("SELECT channel FROM chat_mutes WHERE user=?", (user,))}
+
+
+def update_channel(conn: sqlite3.Connection, name: str, description: str | None = None, title: str | None = None,
+                   members: list[str] | None = None) -> None:
+    import json
+    if description is not None:
+        conn.execute("UPDATE chat_channels SET description=? WHERE name=?", (description or None, name))
+    if title is not None:
+        conn.execute("UPDATE chat_channels SET title=? WHERE name=?", (title or None, name))
+    if members is not None:
+        conn.execute("UPDATE chat_channels SET members=? WHERE name=?", (json.dumps(sorted(set(members)), ensure_ascii=False), name))
+    conn.commit()
+
+
+def channel_files(conn: sqlite3.Connection, channel: str) -> list[dict]:
+    """チャンネルで共有されたファイル（添付＋本文中の成果物リンク）"""
+    import json, re
+    out, seen = [], set()
+    for r in conn.execute("SELECT * FROM chat_messages WHERE channel=? AND deleted=0 ORDER BY posted_at DESC", (channel,)):
+        for a in (json.loads(r["attachments"]) if r["attachments"] else []):
+            if a["url"] not in seen:
+                seen.add(a["url"]); out.append({**a, "actor": r["actor"], "at": r["posted_at"], "msg": r["id"]})
+        for url in re.findall(r"https?://[^\s<>\"']+", r["text"]):
+            if "/artifacts/" in url and url not in seen:
+                seen.add(url); out.append({"url": url, "name": url.rstrip("/").rsplit("/", 1)[-1], "actor": r["actor"], "at": r["posted_at"], "msg": r["id"]})
+    return out
+
+
+def channel_stats(conn: sqlite3.Connection, channel: str) -> dict:
+    r = conn.execute("SELECT COUNT(*) n, MIN(posted_at) first, COUNT(DISTINCT actor) people FROM chat_messages WHERE channel=? AND deleted=0", (channel,)).fetchone()
+    return dict(r)
 
 
 class ChatAdapter:

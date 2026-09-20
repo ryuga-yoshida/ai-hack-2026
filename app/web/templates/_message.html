@@ -1,5 +1,5 @@
 {# m: message dict, compact: bool #}
-<div class="group flex gap-3 px-4 py-2 hover:bg-gray-50 rounded-lg" id="msg-{{ m.id }}" x-data="{ editing: false }">
+<div class="group flex gap-3 px-4 py-2 hover:bg-gray-50 rounded-lg {% if m.pinned %}bg-amber-50/60{% endif %}" id="msg-{{ m.id }}" x-data="{ editing: false }">
   <div data-person="{{ m.actor }}" class="w-8 h-8 rounded-full shrink-0 grid place-items-center text-xs font-semibold text-white cursor-default
     {% set colors = ['bg-indigo-500','bg-emerald-500','bg-amber-500','bg-rose-500','bg-sky-500'] %}{{ colors[(PEOPLE.index(m.actor) if m.actor in PEOPLE else 4) % 5] }}">{{ m.actor|initials }}</div>
   <div class="min-w-0 flex-1">
@@ -7,6 +7,8 @@
       <span class="font-semibold text-sm" data-person="{{ m.actor }}">{{ m.actor }}</span>
       <span class="text-xs text-gray-400" title="{{ m.posted_at|dt }}">{{ m.posted_at|rel }}</span>
       {% if m.edited %}<span class="text-[10px] text-gray-400">（編集済み）</span>{% endif %}
+      {% if m.pinned %}<span class="text-[10px] text-amber-600" title="ピン留め">📌</span>{% endif %}
+      {% if saved_ids is defined and m.id in saved_ids %}<span class="text-[10px] text-indigo-500" title="保存済み">🔖</span>{% endif %}
       <span class="inline-flex items-center gap-0.5">
       {% if m.task %}
       <a href="/tasks/{{ m.task.id }}" class="text-[11px] px-1.5 py-0.5 rounded-l-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 truncate max-w-[260px]" title="紐付け: {{ m.task.method }} ({{ '%.2f' % m.task.confidence }})">
@@ -22,7 +24,7 @@
     </div>
     <div class="text-sm mt-0.5 leading-relaxed break-words" x-show="!editing">{{ m.html|safe }}</div>
     <form method="post" action="/chat/{{ m.id }}/edit" x-show="editing" x-cloak class="mt-1 flex gap-2">
-      <input name="text" value="{{ m.text }}" class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1">
+      <textarea name="text" rows="2" class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1" @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); $event.target.form.requestSubmit(); }">{{ m.text }}</textarea>
       <button class="text-xs bg-indigo-600 text-white rounded px-2">保存</button>
       <button type="button" @click="editing = false" class="text-xs text-gray-500">取消</button>
     </form>
@@ -48,7 +50,10 @@
     </div>
     {% if not compact %}<a href="/chat?channel={{ m.channel }}&thread={{ m.id }}" class="p-1 hover:text-gray-700" title="スレッドで返信">↩</a>{% endif %}
     <button type="button" @click="toTask('{{ m.id }}')" class="p-1 hover:text-gray-700" title="この発言からタスクを作る">☑</button>
-    <button @click="editing = true" class="p-1 hover:text-gray-700" title="編集">✎</button>
-    <form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="p-1 hover:text-red-600" title="削除">🗑</button></form>
+    <form method="post" action="/chat/{{ m.id }}/pin"><button class="p-1 hover:text-gray-700 {% if m.pinned %}text-amber-600{% endif %}" title="{{ 'ピン留めを外す' if m.pinned else 'ピン留め' }}">📌</button></form>
+    <form method="post" action="/chat/{{ m.id }}/save"><button class="p-1 hover:text-gray-700 {% if saved_ids is defined and m.id in saved_ids %}text-indigo-600{% endif %}" title="あとで見る（保存）">🔖</button></form>
+    <button type="button" @click="navigator.clipboard.writeText(location.origin + '/chat?channel={{ m.channel }}#msg-{{ m.id }}').then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="p-1 hover:text-gray-700" title="リンクをコピー">🔗</button>
+    {% if m.actor == me %}<button @click="editing = true" class="p-1 hover:text-gray-700" title="編集">✎</button>{% endif %}
+    {% if m.actor == me %}<form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="p-1 hover:text-red-600" title="削除">🗑</button></form>{% endif %}
   </div>
 </div>
