@@ -530,8 +530,9 @@ def autonomy_stats(conn: sqlite3.Connection) -> dict:
     """自律性の数値化（デモ・ダッシュボード用）"""
     changes = conn.execute("SELECT COUNT(*) FROM processed WHERE stage='detect'").fetchone()[0]
     with_finding = conn.execute("SELECT COUNT(*) FROM processed WHERE stage='detect' AND json_extract(result,'$.finding') IS NOT NULL").fetchone()[0]
-    notified = conn.execute("SELECT COUNT(*) FROM findings WHERE status IN ('notified','acknowledged') AND kind != 'status_suggestion'").fetchone()[0]
-    review = conn.execute("SELECT COUNT(*) FROM findings WHERE status='pending' AND kind != 'status_suggestion'").fetchone()[0]
+    # 成果物の変更に由来する Finding だけで「自動完結率」を出す（停滞・提案は別枠）
+    notified = conn.execute("SELECT COUNT(*) FROM findings WHERE status IN ('notified','acknowledged') AND kind IN ('contradiction','orphan_change')").fetchone()[0]
+    review = conn.execute("SELECT COUNT(*) FROM findings WHERE status='pending' AND kind IN ('contradiction','orphan_change')").fetchone()[0]
     dismissed = conn.execute("SELECT COUNT(*) FROM findings WHERE status='dismissed'").fetchone()[0]
     suggestions = conn.execute("SELECT COUNT(*) FROM findings WHERE kind='status_suggestion'").fetchone()[0]
     applied = conn.execute("SELECT COUNT(*) FROM findings WHERE kind='status_suggestion' AND status='acknowledged'").fetchone()[0]
@@ -547,4 +548,4 @@ def autonomy_stats(conn: sqlite3.Connection) -> dict:
             "dismissed": dismissed, "suggestions": suggestions, "applied": applied,
             "tasks_auto": tasks_auto, "tasks_manual": tasks_manual, "link_auto": link_auto, "link_manual": link_manual,
             "ticks_auto": ticks_auto, "ticks_manual": ticks_manual, "reminders": reminders,
-            "auto_rate": round(100 * (changes - with_finding + notified) / changes) if changes else 0}
+            "auto_rate": min(100, round(100 * (changes - with_finding + min(notified, with_finding)) / changes)) if changes else 0}
