@@ -83,11 +83,7 @@
             <span class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800"><a href="/tags/{{ tg.name }}">#{{ tg.name }}</a><button class="opacity-60 hover:opacity-100">×</button></span></form>
           {% endfor %}
         </div>
-        <form method="post" action="/tags/_/link" onsubmit="this.action='/tags/'+encodeURIComponent(this.tagname.value.replace(/^#/,''))+'/link'" class="flex gap-1 mt-1">
-          <input type="hidden" name="target_type" value="task"><input type="hidden" name="target_id" value="{{ task.id }}">
-          <input name="tagname" list="taglist" placeholder="#タグを追加" required class="flex-1 border border-gray-300 rounded-lg px-2 py-1 text-xs"><button class="text-xs border border-gray-300 rounded-lg px-2">追加</button>
-          <datalist id="taglist">{% for t in all_tags %}<option value="{{ t.name }}">{% endfor %}</datalist>
-        </form>
+        <div class="mt-1">{% with tp_type='task', tp_id=task.id %}{% include "_tag_picker.html" %}{% endwith %}</div>
       </div>
       <div class="text-xs text-gray-400 pt-2 border-t">ID {{ task.id }}</div>
     </div>

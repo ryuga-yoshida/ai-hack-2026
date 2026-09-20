@@ -72,6 +72,7 @@ def fmt_dt(v, with_date=True) -> str:
 templates.env.filters["linkify"] = linkify
 templates.env.filters["initials"] = initials
 templates.env.filters["dt"] = fmt_dt
+templates.env.filters["tag_colors"] = lambda tags: {t["name"]: t["color"] for t in tags}
 templates.env.globals.update(STATUSES=STATUSES, STATUS_LABEL=STATUS_LABEL, KIND_LABEL=KIND_LABEL,
                              EVENT_LABEL=EVENT_LABEL, FINDING_STATUS_LABEL=FINDING_STATUS_LABEL, PEOPLE=PEOPLE)
 
