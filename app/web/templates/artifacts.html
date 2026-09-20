@@ -38,7 +38,7 @@
       <div class="min-w-0">
         <div class="font-semibold flex items-center gap-2 flex-wrap">{% if tag and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-xs text-gray-400 font-normal">📁 {{ a.folder }} /</a>{% endif %}{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · {{ a.latest.actor or '—' }} · {{ a.latest.at|dt }}</span>
           {% for t in a.tags %}<form method="post" action="/tags/{{ t.name }}/unlink" class="inline"><input type="hidden" name="target_type" value="artifact"><input type="hidden" name="target_id" value="{{ a.key }}">
-            <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800 font-normal"><a href="/artifacts?tag={{ t.name }}">#{{ t.name }}</a><button class="opacity-50 hover:opacity-100" title="タグを外す">×</button></span></form>{% endfor %}
+            <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded {% if t.name == tag %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %} font-normal"><a href="/artifacts?path={{ folder }}&tag={{ '' if t.name == tag else t.name }}" title="{{ '絞り込みを解除' if t.name == tag else 'このタグで絞り込む' }}">#{{ t.name }}{% if t.name == tag %} ×{% endif %}</a><button class="opacity-50 hover:opacity-100" title="タグを外す">×</button></span></form>{% endfor %}
           {% with tp_type='artifact', tp_id=a.key %}{% include "_tag_picker.html" %}{% endwith %}
         </div>
         <div class="text-xs text-gray-500 truncate">{{ a.latest.url }}</div>

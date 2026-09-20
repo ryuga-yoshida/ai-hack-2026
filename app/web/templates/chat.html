@@ -2,7 +2,7 @@
 {% block title %}チャット{% endblock %}
 {% block heading %}チャット <span class="text-gray-400 font-normal">{% if ch.kind == 'channel' %}#{{ channel }}{% else %}{{ ch.title }}{% endif %}</span>
   {% if ch.description %}<span class="text-sm text-gray-400 font-normal ml-2">{{ ch.description }}</span>{% endif %}
-  {% for t in channel_tags %}<a href="/tags/{{ t.name }}" class="ml-2 text-xs px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800 font-normal">#{{ t.name }}</a>{% endfor %}{% endblock %}
+  {% for t in channel_tags %}<a href="/chat?channel={{ channel }}{% if q != '#' + t.name %}&q=%23{{ t.name }}{% endif %}" class="ml-2 text-xs px-1.5 py-0.5 rounded {% if q == '#' + t.name %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %} font-normal" title="{{ '絞り込みを解除' if q == '#' + t.name else 'このタグの発言を検索' }}">#{{ t.name }}{% if q == '#' + t.name %} ×{% endif %}</a>{% endfor %}{% endblock %}
 {% block actions %}
 <form method="get" action="/chat" class="flex items-center gap-2">
   <input type="hidden" name="channel" value="{{ channel }}">

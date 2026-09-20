@@ -17,7 +17,7 @@
       {% endif %}
       </span>
       {% if m.decision %}<span class="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700" title="{{ m.decision }}">決定として抽出</span>{% endif %}
-      {% for t in m.tags %}<a href="/tags/{{ t.name }}" class="text-[11px] px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
+      {% for t in m.tags %}<a href="/chat?channel={{ m.channel }}{% if q is not defined or q != '#' + t.name %}&q=%23{{ t.name }}{% endif %}" class="text-[11px] px-1.5 py-0.5 rounded {% if q is defined and q == '#' + t.name %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %}" title="このタグの発言で絞り込み（もう一度で解除）">#{{ t.name }}{% if q is defined and q == '#' + t.name %} ×{% endif %}</a>{% endfor %}
       {% if m.mentions %}<span class="text-[10px] text-gray-400" title="メンション先">→ {{ m.mentions|join('・') }}</span>{% endif %}
     </div>
     <div class="text-sm mt-0.5 leading-relaxed break-words" x-show="!editing">{{ m.html|safe }}</div>
