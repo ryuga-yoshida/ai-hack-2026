@@ -17923,5 +17923,635 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "judge"
+ },
+ "273486c3ce9910ed58d82586": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"task\",\n      \"text\": \"残り3社を来週回る\",\n      \"actor\": \"<PERSON_2>\",\n      \"quote\": \"残り3社は来週回ります。\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 343,
+   "completion_tokens": 686,
+   "total_tokens": 1029,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 343,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 75,
+    "audio_tokens": 0,
+    "reasoning_tokens": 611
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "842a0d7122c4fe6cce8c8a98": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 0.9,\n  \"reason\": \"発言は本日訪問した2社の得意先ヒアリング結果に関する報告であり、候補にある「残り3社を来週回る」「残り5社のヒアリングを行う」といった今後のタスクのいずれにも直接合致しないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 267,
+   "completion_tokens": 823,
+   "total_tokens": 1090,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 267,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 77,
+    "audio_tokens": 0,
+    "reasoning_tokens": 746
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "602626519594cefea510846f": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": \"T1\",\n  \"confidence\": 0.85,\n  \"reason\": \"発言内の「残り3社もお願いします」という表現が、タスク[T1]の「残り3社を来週回る」の内容と一致しているため。\"\n}",
+  "usage": {
+   "prompt_tokens": 331,
+   "completion_tokens": 957,
+   "total_tokens": 1288,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 331,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 68,
+    "audio_tokens": 0,
+    "reasoning_tokens": 889
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "ae531a84f0b323866263ebae": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 1.0,\n  \"reason\": \"発言「誰が買ってるんですかね」は直前の「自販機の商品A、また売り切れてる」に関する雑談であり、候補に挙げられたどのタスク（契約状況確認、得意先回りを指すもの）にも該当しないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 301,
+   "completion_tokens": 297,
+   "total_tokens": 598,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 301,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 84,
+    "audio_tokens": 0,
+    "reasoning_tokens": 213
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "0b4fc150b39d834f16a6e4e4": {
+  "tier": "mid",
+  "content": "{\"task_id\": null, \"confidence\": 1.0, \"reason\": \"発言は自販機の商品Aの購入者についての雑談に対する返答であり、提示されたどの仕事上のタスクにも該当しないため。\"}",
+  "usage": {
+   "prompt_tokens": 295,
+   "completion_tokens": 248,
+   "total_tokens": 543,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 295,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 51,
+    "audio_tokens": 0,
+    "reasoning_tokens": 197
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "321519758a1386327a9e89c4": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"予算会議の日程が9/29（月）午後に確定した\",\n      \"actor\": \"<PERSON_2>\",\n      \"quote\": \"予算会議は 9/29（月）午後で確定しました。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"decision\",\n      \"text\": \"資料の締切が9/26（金）に設定された\",\n      \"actor\": \"<PERSON_2>\",\n      \"quote\": \"資料の締切は 9/26（金）です。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"<PERSON_1>の最新版売上見込表を資料へ流し込む\",\n      \"actor\": \"<PERSON_2>\",\n      \"quote\": \"売上見込表は<PERSON_1>さんの最新版をもとに私が資料へ流し込みます。\",\n      \"confidence\": 1.0\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 345,
+   "completion_tokens": 959,
+   "total_tokens": 1304,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 345,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 253,
+    "audio_tokens": 0,
+    "reasoning_tokens": 706
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "18b709b6e8e1cad564b2c1c8": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": \"T1\",\n  \"confidence\": 1.0,\n  \"reason\": \"発言内で<PERSON_3>が「売上見込表は<PERSON_1>さんの最新版をもとに私が資料へ流し込みます」と述べており、T1のタスク内容および担当者と一致するため。\"\n}",
+  "usage": {
+   "prompt_tokens": 320,
+   "completion_tokens": 476,
+   "total_tokens": 796,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 320,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 82,
+    "audio_tokens": 0,
+    "reasoning_tokens": 394
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "3596a60b96f9363e8f017a51": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"書面が2社とも揃うまでは見込みを動かさず据え置く\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"書面が2社とも揃うまでは見込みは動かしません。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"書面が2社とも揃ったら再度申請・報告を上げる\",\n      \"actor\": \"PERSON_3\",\n      \"quote\": \"揃ったら再度上げてください。\",\n      \"confidence\": 0.95\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"見込み表を据え置く\",\n      \"actor\": \"PERSON_2\",\n      \"quote\": \"<PERSON_2>さんも見込み表は据え置きでお願いします。\",\n      \"confidence\": 0.95\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 422,
+   "completion_tokens": 1205,
+   "total_tokens": 1627,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 422,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 231,
+    "audio_tokens": 0,
+    "reasoning_tokens": 974
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "23c26854d09ceb969e95d9a9": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 1.0,\n  \"reason\": \"「今日暑くないですか」という発言は気温に関する雑談であり、提示されたどのタスクにも該当しないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 301,
+   "completion_tokens": 346,
+   "total_tokens": 647,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 301,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 54,
+    "audio_tokens": 0,
+    "reasoning_tokens": 292
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "1fd6690a9587a62687e08a9b": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 1.0,\n  \"reason\": \"「暑い」という発言は日常会話・雑談であり、提示されたどのタスクにも該当しないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 292,
+   "completion_tokens": 283,
+   "total_tokens": 575,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 292,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 53,
+    "audio_tokens": 0,
+    "reasoning_tokens": 230
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "8319593c1c6484a527c2be7a": {
+  "tier": "mid",
+  "content": "{\"items\": []}",
+  "usage": {
+   "prompt_tokens": 321,
+   "completion_tokens": 365,
+   "total_tokens": 686,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 321,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 5,
+    "audio_tokens": 0,
+    "reasoning_tokens": 360
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "5009ec54fff15dab5e95ffb4": {
+  "tier": "mid",
+  "content": "{\"task_id\": null, \"confidence\": 0.95, \"reason\": \"判定対象の発言は商品Aに関する数字の反映依頼ですが、候補タスクの中には商品Aに関連するタスクが存在しないため。\"}",
+  "usage": {
+   "prompt_tokens": 376,
+   "completion_tokens": 617,
+   "total_tokens": 993,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 376,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 50,
+    "audio_tokens": 0,
+    "reasoning_tokens": 567
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "93aad69137c076e21fbca4ce": {
+  "tier": "mid",
+  "content": "{\"task_id\": null, \"confidence\": 1.0, \"reason\": \"判定対象の発言および直前の会話は「商品Dの四半期数値の修正」や「商品Aの数値反映」に関するものであり、候補タスク（得意先ヒアリング、外回り、書面提出）のいずれとも一致しないため。\"}",
+  "usage": {
+   "prompt_tokens": 360,
+   "completion_tokens": 511,
+   "total_tokens": 871,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 360,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 75,
+    "audio_tokens": 0,
+    "reasoning_tokens": 436
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "42c78327fe572f1e92ea60ff": {
+  "tier": "mid",
+  "content": "{\"task_id\": null, \"confidence\": 1.0, \"reason\": \"「3階の給湯室のコーヒーメーカー直りました」という発言は設備に関する報告・雑談であり、提示されたどのタスク（T1: 営業訪問、T2: 書面揃い後の申請報告、T3: 社内イベント精算）にも該当しないため。\"}",
+  "usage": {
+   "prompt_tokens": 299,
+   "completion_tokens": 475,
+   "total_tokens": 774,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 299,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 83,
+    "audio_tokens": 0,
+    "reasoning_tokens": 392
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "9df7490e058d0a86ccc6a4fa": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 1.0,\n  \"reason\": \"「神」という発言は直前の「コーヒーメーカー直りました」という連絡に対する感謝・感嘆の雑談であり、提示されたどのタスク（T1, T2, T3）にも該当しないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 293,
+   "completion_tokens": 401,
+   "total_tokens": 694,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 293,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 75,
+    "audio_tokens": 0,
+    "reasoning_tokens": 326
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "7bc595d0d4e858963d09c472": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"予算会議の日程を9/30（火）午前に変更する\",\n      \"actor\": \"PERSON_3\",\n      \"quote\": \"予算会議が 9/30（火）午前に変更になりました。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"decision\",\n      \"text\": \"資料締切日を9/26から変更しない\",\n      \"actor\": \"PERSON_3\",\n      \"quote\": \"資料締切は 9/26 のままです。\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 333,
+   "completion_tokens": 1009,
+   "total_tokens": 1342,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 333,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 161,
+    "audio_tokens": 0,
+    "reasoning_tokens": 848
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "9631e8d53b63ee236d6460b8": {
+  "tier": "mid",
+  "content": "{\n  \"items\": []\n}",
+  "usage": {
+   "prompt_tokens": 312,
+   "completion_tokens": 281,
+   "total_tokens": 593,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 312,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 9,
+    "audio_tokens": 0,
+    "reasoning_tokens": 272
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "595825c54384cac8478cdc09": {
+  "tier": "mid",
+  "content": "{\"task_id\": \"T1\", \"confidence\": 0.95, \"reason\": \"発言内容は書面が1社届き、残り1社が来週届くという状況報告であり、タスク[T1]『書面が2社とも揃ったら再度申請・報告を上げる』の進行状況に直接関連しているため。\"}",
+  "usage": {
+   "prompt_tokens": 293,
+   "completion_tokens": 507,
+   "total_tokens": 800,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 293,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 78,
+    "audio_tokens": 0,
+    "reasoning_tokens": 429
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "9441f855cc1ceaf69b1f1548": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 0.95,\n  \"reason\": \"発言「お願いします」は直前の売上見込みファイルの更新や資料への流し込み、原価試算共有に対するやり取りに対するものと考えられますが、提示された候補タスク（T1, T2, T3）のいずれの作業内容にも該当しないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 358,
+   "completion_tokens": 588,
+   "total_tokens": 946,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 358,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 89,
+    "audio_tokens": 0,
+    "reasoning_tokens": 499
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "ebb2745587c12a5ad634eadd": {
+  "tier": "mid",
+  "content": "{\"task_id\": null, \"confidence\": 1.0, \"reason\": \"発言内容は全社避難訓練に関するお知らせであり、提示されたどのタスク（精算、案内、得意先訪問）にも該当しないため。\"}",
+  "usage": {
+   "prompt_tokens": 296,
+   "completion_tokens": 339,
+   "total_tokens": 635,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 296,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 52,
+    "audio_tokens": 0,
+    "reasoning_tokens": 287
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "c7dcb133cf8a89d0ee2a4322": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 1.0,\n  \"reason\": \"「また階段か」という発言は直前の「全社の避難訓練」に関する反応であり、提示されたどの候補タスク（T1〜T3）にも該当しないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 297,
+   "completion_tokens": 441,
+   "total_tokens": 738,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 297,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 68,
+    "audio_tokens": 0,
+    "reasoning_tokens": 373
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "46d5c03f6615ec233d9e607a": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.95,\n  \"reason\": \"決定事項は数値（第4四半期の見込みを450に変更）に関するものであり、変更対象は商品D_企画書.docxの得意先ヒアリング状況を記述した段落。対象が異なるため、矛盾は生じない。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1549,
+   "completion_tokens": 203,
+   "total_tokens": 1752,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1549,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "240704ba8d0d4cecde82f329": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.95,\n  \"reason\": \"決定事項は「商品Aの第3四半期」の価格据え置きに関するものだが、成果物の変更は「商品D_企画書.docx」の得意先情報であり、対象が異なる。別物であるため矛盾は生じない。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1561,
+   "completion_tokens": 202,
+   "total_tokens": 1763,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1561,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "bee07947a18cb16200be61f9": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.95,\n  \"reason\": \"09/19 13:35 に PERSON_1 が「商品Dの第4四半期について、確定分を反映し450に変更する」と明示的に承認しており、これが元の決定を上書きしている。成果物の変更（2社確定を反映した記述更新）はその後の決定と整合する。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1544,
+   "completion_tokens": 227,
+   "total_tokens": 1771,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1544,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
  }
 }
