@@ -2143,6 +2143,15 @@ def meet_finalize(meeting_id: str, background: BackgroundTasks):
 
 # ---------- エージェント ----------
 
+@app.post("/api/agent/reset")
+def agent_reset(background: BackgroundTasks):
+    """展示用: DB を初期状態に戻してキャッシュ再生（LLM は呼ばない）。バックグラウンドで約1分"""
+    from app import agent
+    import threading
+    threading.Thread(target=agent.reset_demo, daemon=True).start()
+    return {"ok": True, "message": "リセットを開始しました（約1分）。ログに進捗が出ます"}
+
+
 @app.get("/agent", response_class=HTMLResponse)
 def agent_page(request: Request):
     conn = get_conn()

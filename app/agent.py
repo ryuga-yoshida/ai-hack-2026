@@ -549,3 +549,49 @@ def autonomy_stats(conn: sqlite3.Connection) -> dict:
             "tasks_auto": tasks_auto, "tasks_manual": tasks_manual, "link_auto": link_auto, "link_manual": link_manual,
             "ticks_auto": ticks_auto, "ticks_manual": ticks_manual, "reminders": reminders,
             "auto_rate": min(100, round(100 * (changes - with_finding + min(notified, with_finding)) / changes)) if changes else 0}
+
+
+# ---------- デモのリセット（展示用） ----------
+
+_reset_lock = threading.Lock()
+
+
+def reset_demo() -> dict:
+    """DB を初期状態に戻し、キャッシュだけで replay する（LLM は呼ばない・約1分）。
+    fixtures/excel の版も git で戻す。展示で同じデモを何度も回すために使う"""
+    if not _reset_lock.acquire(blocking=False):
+        return {"ok": False, "reason": "リセット実行中"}
+    try:
+        import subprocess
+        from fixtures import seed
+        was_enabled = state["enabled"]
+        state["enabled"] = False
+        global _log_conn
+        conn = db.connect()
+        db.init_db(conn)
+        _log_conn = conn
+        say("action: デモをリセットします（DB 初期化 → 版の復元 → キャッシュ再生）")
+        root = config.FIXTURES_DIR / "excel"
+        try:
+            subprocess.run(["git", "checkout", "--", str(root)], cwd=str(config.FIXTURES_DIR.parent), capture_output=True, timeout=30)
+            subprocess.run(["git", "clean", "-fdq", str(root)], cwd=str(config.FIXTURES_DIR.parent), capture_output=True, timeout=30)
+        except Exception as e:   # git が無い環境でも DB のリセットだけは行う
+            log.warning("fixtures の復元に失敗: %s", e)
+        conn.execute("PRAGMA foreign_keys = OFF")
+        for t in db.table_names(conn):
+            if t.startswith("sqlite_"):
+                continue
+            conn.execute(f"DELETE FROM {t}")
+        conn.commit()
+        conn.execute("PRAGMA foreign_keys = ON")
+        seed.run(conn)
+        results = replay(conn, speed=0, record=False)
+        router.CACHE_ONLY = False
+        n = sum(len(r.findings) for r in results)
+        global _file_sig
+        _file_sig = _excel_signature()   # 復元した版を「既知」にして二重取込を防ぐ
+        say(f"action: リセット完了。Finding {n} 件を再生しました")
+        state["enabled"] = was_enabled
+        return {"ok": True, "findings": n}
+    finally:
+        _reset_lock.release()

@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}エージェント{% endblock %}
+{% block actions %}
+<button onclick="if (confirm('デモを初期状態に戻します（DB を初期化してキャッシュから再生・約1分・LLM は呼びません）。よろしいですか？')) fetch('/api/agent/reset', { method: 'POST' }).then(r => r.json()).then(j => Alpine.$data(document.body).toast(j.message))" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="展示で同じデモを何度も回すために、初期状態に戻す">↺ デモをリセット</button>
+{% endblock %}
 {% block content %}
 <div class="grid grid-cols-3 gap-6" x-data="agentPage()" x-init="start()">
   <div class="col-span-2 bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-100 h-[calc(100vh-7rem)] flex flex-col">
