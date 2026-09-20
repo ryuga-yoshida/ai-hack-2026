@@ -407,7 +407,7 @@ def stage_calendar(conn, stats: TickResult, now: datetime | None = None) -> None
                 f"会議室を用意しました → {url}  参加: {'・'.join(ev['attendees'])}")
         agenda = propose_agenda(conn, ev["attendees"], now)
         if agenda:
-            text += "\n\n📋 今日話すべきこと（エージェントの提案）\n" + "\n".join(f"・{a}" for a in agenda)
+            text += "\n\n今日話すべきこと（エージェントの提案）\n" + "\n".join(f"・{a}" for a in agenda)
         chat.post_message(conn, ev.get("channel") or "general", "エージェント", text)
         calendar.update(conn, ev["id"], reminded_at=db.now_iso())
         say(f"calendar: 「{ev['title']}」の {mins} 分前。会議室 {mid} を用意して #{ev.get('channel') or 'general'} にリマインド")

@@ -2,8 +2,8 @@
 {% block title %}{{ task.title }}{% endblock %}
 {% block heading %}<a href="/tasks" class="text-gray-400 hover:text-gray-600 mr-2">タスク</a><span class="text-gray-300 mr-2">/</span>{{ task.title|truncate(40) }}{% endblock %}
 {% block actions %}
-<form method="post" action="/tasks/{{ task.id }}/watch"><button class="text-sm border rounded-lg px-3 py-1.5 {% if me in meta.watchers %}bg-indigo-50 border-indigo-300 text-indigo-700{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}">{{ '👁 ウォッチ中' if me in meta.watchers else '👁 ウォッチ' }}</button></form>
-<button onclick="navigator.clipboard.writeText(location.href).then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">🔗</button>
+<form method="post" action="/tasks/{{ task.id }}/watch"><button class="text-sm border rounded-lg px-3 py-1.5 {% if me in meta.watchers %}bg-indigo-50 border-indigo-300 text-indigo-700{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}">{{ 'ウォッチ中' if me in meta.watchers else 'ウォッチ' }}</button></form>
+<button onclick="navigator.clipboard.writeText(location.href).then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">{{ icon('link') }}</button>
 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
   <button @click="open = !open" class="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white hover:bg-gray-50">⋯</button>
   <div x-show="open" x-cloak class="absolute right-0 top-10 z-30 w-48 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1">
@@ -76,9 +76,9 @@
               {% if m.mentions %}<span class="text-gray-400 ml-1">→ {{ m.mentions|join('・') }}</span>{% endif %}
               {% for t in m.tags %}<a href="/tags/{{ t.name }}" class="ml-1 px-1.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}</div>
             <div class="text-sm mt-0.5">{{ m.html|safe }}</div>
-            {% for a in m.attachments %}<a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-1 mt-1 text-xs border border-gray-200 rounded px-2 py-0.5 hover:bg-gray-50">📎 {{ a.name }}</a>{% endfor %}
+            {% for a in m.attachments %}<a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-1 mt-1 text-xs border border-gray-200 rounded px-2 py-0.5 hover:bg-gray-50">{{ icon('clip') }} {{ a.name }}</a>{% endfor %}
           </div>
-          <form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="text-gray-300 hover:text-red-600 text-xs">🗑</button></form>
+          <form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="text-gray-300 hover:text-red-600 text-xs">{{ icon('trash') }}</button></form>
         </div>
         {% else %}<div class="text-sm text-gray-400">まだコメントはありません。</div>{% endfor %}
       </div>
@@ -100,7 +100,7 @@
       <div>
         <label class="text-xs text-gray-500">優先度</label>
         <select x-model="t.priority" @change="save({priority: t.priority}, '優先度を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
-          {% for k, l in PRIORITIES %}<option value="{{ k }}">{{ {'urgent':'🔴','high':'🟠','normal':'🟢','low':'⚪'}[k] }} {{ l }}</option>{% endfor %}
+          {% for k, l in PRIORITIES %}<option value="{{ k }}">{{ {'urgent':'','high':'','normal':'','low':''}[k] }} {{ l }}</option>{% endfor %}
         </select>
       </div>
       <div>
@@ -121,7 +121,7 @@
           {% for d in meta.deps %}
           <div class="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1"><span class="w-1.5 h-1.5 rounded-full {% if d.status == 'done' %}bg-emerald-500{% else %}bg-amber-400{% endif %}"></span>
             <a href="/tasks/{{ d.id }}" class="flex-1 truncate hover:underline {% if d.status == 'done' %}text-gray-400{% endif %}">{{ d.title }}</a>
-            {% if d in meta.dep_warn %}<span class="text-red-600" title="依存先の期限（{{ d.due_date }}）がこのタスクの期限より後">⚠ 順序</span>{% endif %}
+            {% if d in meta.dep_warn %}<span class="text-red-600" title="依存先の期限（{{ d.due_date }}）がこのタスクの期限より後">{{ icon('warn') }} 順序</span>{% endif %}
             <form method="post" action="/tasks/{{ task.id }}/deps/remove"><input type="hidden" name="depends_on" value="{{ d.id }}"><button class="text-gray-400 hover:text-red-600">×</button></form></div>
           {% else %}<div class="text-xs text-gray-400">なし</div>{% endfor %}
           {% if meta.dependents %}<div class="text-[11px] text-gray-500 pt-1">このタスクを待っている: {% for d in meta.dependents %}<a href="/tasks/{{ d.id }}" class="hover:underline">{{ d.title|truncate(18) }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
@@ -135,7 +135,7 @@
         <label class="text-xs text-gray-500">成果物 <span class="text-gray-400">（チャットに貼られた SPO リンクから自動登録）</span></label>
         <div class="mt-1 space-y-1">
           <template x-for="(a, i) in t.artifacts" :key="a">
-            <div class="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1"><span class="flex-1 truncate">📎 <span x-text="a"></span></span>
+            <div class="flex items-center gap-2 bg-gray-50 rounded-lg px-2 py-1"><span class="flex-1 truncate">{{ icon('clip') }} <span x-text="a"></span></span>
               <button @click="t.artifacts.splice(i,1); save({artifacts: t.artifacts}, '成果物を外しました')" class="text-gray-400 hover:text-red-600">×</button></div>
           </template>
           <form @submit.prevent="if (newArt.trim()) { t.artifacts.push(newArt.trim()); newArt=''; save({artifacts: t.artifacts}, '成果物を追加しました') }" class="flex gap-1">

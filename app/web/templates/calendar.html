@@ -38,7 +38,7 @@
     {% for d in days %}
     <div class="border-b border-l border-gray-200 p-1 min-h-[28px] space-y-0.5">
       {% for e in d.events if e.all_day %}<a href="/calendar/{{ e.id }}" class="block rounded px-1.5 py-0.5 text-[10px] bg-gray-100 border border-gray-300 text-gray-800 truncate" title="終日">{{ e.title }}</a>{% endfor %}
-      {% for t in d.due %}<a href="/tasks/{{ t.id }}" class="block rounded px-1.5 py-0.5 text-[10px] bg-amber-50 border border-amber-200 text-amber-900 truncate" title="タスクの期限">⏳ {{ t.title }}</a>{% endfor %}
+      {% for t in d.due %}<a href="/tasks/{{ t.id }}" class="block rounded px-1.5 py-0.5 text-[10px] bg-amber-50 border border-amber-200 text-amber-900 truncate" title="タスクの期限">{{ icon('clock') }} {{ t.title }}</a>{% endfor %}
     </div>
     {% endfor %}
   </div>
@@ -57,9 +57,9 @@
       {% set sm = (e.start.hour - H0) * 60 + e.start.minute %}{% set em = (e.end.hour - H0) * 60 + e.end.minute %}
       {% set top = (sm if sm > 0 else 0) * HPX / 60 %}{% set height = ((em if em < hours|length * 60 else hours|length * 60) - (sm if sm > 0 else 0)) * HPX / 60 %}
       <a href="/calendar/{{ e.id }}" @click.stop draggable="true" @dragstart="drag($event, '{{ e.id }}', '{{ e.start.isoformat() }}', '{{ e.end.isoformat() }}')" class="absolute left-1 right-1 rounded-md px-2 py-1 text-xs leading-snug overflow-hidden border shadow-sm hover:shadow-md cursor-grab {% if e.meeting_status == 'done' %}bg-emerald-50 border-emerald-200 text-emerald-900{% elif e.meeting_status == 'recording' %}bg-red-50 border-red-200 text-red-800{% elif e.kind == 'appointment' %}bg-gray-50 border-gray-300 text-gray-800{% else %}bg-indigo-50 border-indigo-200 text-indigo-900{% endif %}" style="top: {{ top }}px; height: {{ [height, 22]|max }}px;">
-        <div class="font-medium truncate">{% if e.kind != 'appointment' %}📹 {% endif %}{% if e.series_id %}🔁 {% endif %}{{ e.start.strftime('%H:%M') }} {{ e.title }}{% if e.rsvp.get(me) == 'declined' %} <span class="text-gray-400">(欠席)</span>{% endif %}</div>
+        <div class="font-medium truncate">{% if e.kind != 'appointment' %}{{ icon('video') }} {% endif %}{% if e.series_id %}{{ icon('repeat') }} {% endif %}{{ e.start.strftime('%H:%M') }} {{ e.title }}{% if e.rsvp.get(me) == 'declined' %} <span class="text-gray-400">(欠席)</span>{% endif %}</div>
         {% if height >= 40 %}<div class="text-[10px] text-gray-500 truncate">{{ e.attendees|join('・') }}</div>{% endif %}
-        {% if height >= 56 %}{% if e.meeting_status == 'done' %}<div class="text-[10px] text-emerald-700">📝 議事録あり{% if e.n_decisions %} · 決定 {{ e.n_decisions }}{% endif %}</div>{% elif e.meeting_status == 'recording' %}<div class="text-[10px] text-red-700">● 進行中</div>{% endif %}{% endif %}
+        {% if height >= 56 %}{% if e.meeting_status == 'done' %}<div class="text-[10px] text-emerald-700">{{ icon('doc') }} 議事録あり{% if e.n_decisions %} · 決定 {{ e.n_decisions }}{% endif %}</div>{% elif e.meeting_status == 'recording' %}<div class="text-[10px] text-red-700">● 進行中</div>{% endif %}{% endif %}
       </a>
       {% endfor %}
     </div>
@@ -76,13 +76,13 @@
       {% for e in d.events %}
       <a href="/calendar/{{ e.id }}" class="flex items-center gap-3 text-sm rounded-lg px-3 py-1.5 border {% if e.meeting_status == 'done' %}bg-emerald-50 border-emerald-200{% elif e.kind == 'appointment' %}bg-gray-50 border-gray-200{% else %}bg-indigo-50 border-indigo-200{% endif %} hover:shadow-sm">
         <span class="text-xs text-gray-500 w-24 shrink-0">{{ '終日' if e.all_day else e.start.strftime('%H:%M') + '〜' + e.end.strftime('%H:%M') }}</span>
-        <span class="font-medium">{% if e.kind != 'appointment' %}📹 {% endif %}{% if e.series_id %}🔁 {% endif %}{{ e.title }}</span>
+        <span class="font-medium">{% if e.kind != 'appointment' %}{{ icon('video') }} {% endif %}{% if e.series_id %}{{ icon('repeat') }} {% endif %}{{ e.title }}</span>
         <span class="text-xs text-gray-500 truncate">{{ e.attendees|join('・') }}</span>
-        {% if e.location %}<span class="text-xs text-gray-400">📍 {{ e.location }}</span>{% endif %}
-        {% if e.meeting_status == 'done' %}<span class="ml-auto text-[10px] text-emerald-700">📝 議事録あり</span>{% endif %}
+        {% if e.location %}<span class="text-xs text-gray-400">{{ icon('location') }} {{ e.location }}</span>{% endif %}
+        {% if e.meeting_status == 'done' %}<span class="ml-auto text-[10px] text-emerald-700">{{ icon('doc') }} 議事録あり</span>{% endif %}
       </a>
       {% endfor %}
-      {% for t in d.due %}<a href="/tasks/{{ t.id }}" class="flex items-center gap-3 text-sm rounded-lg px-3 py-1.5 border bg-amber-50 border-amber-200 text-amber-900"><span class="text-xs w-24 shrink-0">期限</span>⏳ {{ t.title }}<span class="text-xs text-gray-500">{{ t.assignee or '' }}</span></a>{% endfor %}
+      {% for t in d.due %}<a href="/tasks/{{ t.id }}" class="flex items-center gap-3 text-sm rounded-lg px-3 py-1.5 border bg-amber-50 border-amber-200 text-amber-900"><span class="text-xs w-24 shrink-0">期限</span>{{ icon('clock') }} {{ t.title }}<span class="text-xs text-gray-500">{{ t.assignee or '' }}</span></a>{% endfor %}
     </div>
   </div>
   {% endfor %}
@@ -101,7 +101,7 @@
       </a>
       {% endfor %}
       {% for t in d.due %}
-      <a href="/tasks/{{ t.id }}" @click.stop class="block rounded-md px-2 py-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-900 truncate" title="タスクの期限">⏳ {{ t.title }}</a>
+      <a href="/tasks/{{ t.id }}" @click.stop class="block rounded-md px-2 py-1 text-[11px] bg-amber-50 border border-amber-200 text-amber-900 truncate" title="タスクの期限">{{ icon('clock') }} {{ t.title }}</a>
       {% endfor %}
     </div>
   </div>
@@ -127,7 +127,7 @@
         <span x-show="repeat !== 'none'" class="flex items-center gap-1"><input type="number" name="count" value="4" min="1" max="52" class="w-14 border border-gray-300 rounded-lg px-2 py-1">回</span>
       </div>
       <div x-show="busy.length" x-cloak class="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-900">
-        <div class="font-semibold">⚠ この時間に別の予定がある人がいます</div>
+        <div class="font-semibold">{{ icon('warn') }} この時間に別の予定がある人がいます</div>
         <template x-for="b in busy" :key="b.title + b.start"><div><span x-text="b.people.join('・')"></span>: <span x-text="b.title"></span> <span class="text-gray-500" x-text="b.start + '〜' + b.end"></span></div></template>
       </div>
       <label class="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 cursor-pointer">

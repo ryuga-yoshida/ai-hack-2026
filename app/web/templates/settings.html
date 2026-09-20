@@ -42,7 +42,7 @@
         <tr class="border-t"><td class="py-1.5 font-semibold">embed</td><td>{{ models.embed }}</td><td>候補絞り込み・紐付け第4段</td></tr>
         <tr class="border-t"><td class="py-1.5 font-semibold text-emerald-700">なし</td><td>—</td><td>分割・正規化・差分の自然言語化・紐付け第1〜3段・時系列ガード・停滞/根拠なし/状態提案</td></tr>
       </table>
-      <div class="text-xs text-gray-500 mt-3">変更は <code>.env</code> の <code>ORCA_MODEL_*</code>。接続: {{ '✅' if orca else '❌ 未設定' }} {{ base_url }} · 音声文字起こし（Gemini）: {{ '✅' if gemini else '❌ 未設定' }}</div>
+      <div class="text-xs text-gray-500 mt-3">変更は <code>.env</code> の <code>ORCA_MODEL_*</code>。接続: {{ 'OK' if orca else '未設定' }} {{ base_url }} · 音声文字起こし（Gemini）: {{ 'OK' if gemini else '未設定' }}</div>
     </div>
   </form>
 

@@ -56,8 +56,8 @@
     <span class="text-xs text-gray-500">判定モデル: {{ f.model_used or 'ルールベース（LLM 不使用）' }}</span>
     {% if f.status in ('pending', 'notified') %}
     <div class="ml-auto flex items-center gap-2" x-data="{ more: false }">
-      <form method="post" action="/findings/{{ f.id }}/to_task"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1 bg-white hover:bg-gray-50" title="対応タスクを作る">☑ タスク化</button></form>
-      <form method="post" action="/findings/{{ f.id }}/notify_chat" class="flex gap-1"><select name="channel" class="text-xs border border-gray-300 rounded-lg px-1 bg-white"><option value="general">#general</option><option value="sales">#sales</option></select><button class="text-sm border border-gray-300 rounded-lg px-3 py-1 bg-white hover:bg-gray-50" title="担当者に @メンションで知らせる">💬 通知</button></form>
+      <form method="post" action="/findings/{{ f.id }}/to_task"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1 bg-white hover:bg-gray-50" title="対応タスクを作る">{{ icon('task') }} タスク化</button></form>
+      <form method="post" action="/findings/{{ f.id }}/notify_chat" class="flex gap-1"><select name="channel" class="text-xs border border-gray-300 rounded-lg px-1 bg-white"><option value="general">#general</option><option value="sales">#sales</option></select><button class="text-sm border border-gray-300 rounded-lg px-3 py-1 bg-white hover:bg-gray-50" title="担当者に @メンションで知らせる">{{ icon('chat') }} 通知</button></form>
     </div>
     <form method="post" action="/findings/{{ f.id }}/ack"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1 bg-white hover:bg-gray-50">確認済みにする</button></form>
     <form method="post" action="/findings/{{ f.id }}/dismiss" class="flex gap-2">

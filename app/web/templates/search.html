@@ -15,9 +15,9 @@
       {% elif key == 'findings' %}<a href="/findings?status=all#finding-{{ it.id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50"><span class="text-[10px] px-1.5 rounded bg-red-100 text-red-700 mr-2">{{ KIND_LABEL.get(it.kind, it.kind) }}</span>{{ it.summary }}</a>
       {% elif key == 'messages' %}<a href="/chat?channel={{ it.channel }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50"><span class="text-xs text-gray-400 mr-2"># {{ it.channel }} · {{ it.actor }} · {{ it.posted_at|dt }}</span><div>{{ it.text|truncate(120) }}</div></a>
       {% elif key == 'mails' %}<a href="/mail?thread={{ it.thread_id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50"><span class="text-xs text-gray-400 mr-2">{{ it.sender }} · {{ it.sent_at|dt }}</span>{{ it.subject }}</a>
-      {% elif key == 'files' %}<a href="/artifacts?path={{ it.rsplit('/', 1)[0] if '/' in it else '' }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50">📎 {{ it }}</a>
-      {% elif key == 'wiki' %}<a href="/wiki/{{ it.id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50">📖 {{ it.title }} <span class="text-xs text-gray-400">{{ it.updated_at|dt }}</span></a>
-      {% elif key == 'meetings' %}<a href="/meet/{{ it.id }}/minutes" class="block px-4 py-2.5 text-sm hover:bg-gray-50">📝 {{ it.title }} <span class="text-xs text-gray-400">{{ it.at|dt }}</span></a>
+      {% elif key == 'files' %}<a href="/artifacts?path={{ it.rsplit('/', 1)[0] if '/' in it else '' }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50">{{ icon('clip') }} {{ it }}</a>
+      {% elif key == 'wiki' %}<a href="/wiki/{{ it.id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50">{{ icon('book') }} {{ it.title }} <span class="text-xs text-gray-400">{{ it.updated_at|dt }}</span></a>
+      {% elif key == 'meetings' %}<a href="/meet/{{ it.id }}/minutes" class="block px-4 py-2.5 text-sm hover:bg-gray-50">{{ icon('doc') }} {{ it.title }} <span class="text-xs text-gray-400">{{ it.at|dt }}</span></a>
       {% endif %}
       {% endfor %}
     </div>

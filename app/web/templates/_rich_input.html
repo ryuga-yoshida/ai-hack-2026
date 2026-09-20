@@ -12,7 +12,7 @@
     <button type="button" @mousedown.prevent @click="code()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-mono" data-tip="コード">&lt;/&gt;</button>
     <button type="button" @mousedown.prevent @click="quote()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="引用">❝</button>
     <button type="button" @mousedown.prevent @click="cmd('insertUnorderedList')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="箇条書き">•</button>
-    <div class="relative"><button type="button" @mousedown.prevent @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="絵文字">😊</button>
+    <div class="relative"><button type="button" @mousedown.prevent @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="絵文字">{{ icon('smile') }}</button>
       <div x-show="emo" x-cloak @click.outside="emo = false" class="absolute left-0 bottom-8 bg-white border border-gray-200 rounded-lg shadow-lg p-2 grid grid-cols-8 gap-0.5 z-20 w-64">
         <template x-for="e in emojis" :key="e"><button type="button" @mousedown.prevent @click="insert(e); emo = false" class="text-lg hover:bg-gray-100 rounded" x-text="e"></button></template></div></div>
     <span class="flex-1"></span>

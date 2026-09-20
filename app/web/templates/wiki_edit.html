@@ -9,7 +9,7 @@
 {% block heading %}<a href="/wiki/{{ page.id }}" class="text-gray-400 hover:text-gray-600 mr-2">{{ page.title|truncate(30) }}</a><span class="text-gray-300 mr-2">/</span>編集{% endblock %}
 {% block actions %}
 <span id="saveState" class="text-xs text-gray-400"></span>
-<button id="collabBtn" onclick="toggleCollab()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="複数人で同時に編集（Yjs の CRDT で競合なく統合）">👥 同時編集</button>
+<button id="collabBtn" onclick="toggleCollab()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="複数人で同時に編集（Yjs の CRDT で競合なく統合）">{{ icon('users') }} 同時編集</button>
 <input id="noteInput" placeholder="変更メモ（任意）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-44">
 <select id="channelInput" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
 <a href="/wiki/{{ page.id }}" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white">キャンセル</a>
@@ -24,7 +24,7 @@
     <div id="editor" class="flex-1 min-h-0"></div>
     <div id="collab" class="hidden flex-1 min-h-0 flex flex-col">
       <div class="px-6 py-1.5 border-y border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-3">
-        <span class="font-semibold">👥 同時編集モード</span><span id="peers" class="text-emerald-700">接続中…</span>
+        <span class="font-semibold">{{ icon('users') }} 同時編集モード</span><span id="peers" class="text-emerald-700">接続中…</span>
         <span id="cursors" class="text-gray-500"></span>
         <span class="ml-auto text-gray-500">Markdown で編集。他の人の変更はその場で反映（CRDT）。「保存」で改訂として記録</span>
       </div>

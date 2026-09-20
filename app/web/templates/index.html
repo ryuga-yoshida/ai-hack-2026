@@ -86,7 +86,7 @@
         <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full shrink-0 {% if t.status == 'in_progress' %}bg-indigo-500{% elif t.status == 'blocked' %}bg-red-500{% else %}bg-gray-300{% endif %}"></span>
           <a href="/tasks/{{ t.id }}" class="truncate hover:underline flex-1">{{ t.title }}</a>
           {% if t.due_date %}<span class="text-xs {% if m.overdue %}text-red-600 font-semibold{% else %}text-gray-400{% endif %}">{{ t.due_date.strftime('%m/%d') }}</span>{% endif %}
-          {% if m.n_findings %}<span class="text-xs text-red-600">⚠</span>{% endif %}</li>
+          {% if m.n_findings %}<span class="text-xs text-red-600">{{ icon('warn') }}</span>{% endif %}</li>
         {% else %}<li class="text-gray-400 text-xs">未完了のタスクはありません</li>{% endfor %}
       </ul>
     </div>
@@ -113,7 +113,7 @@
     <div class="bg-white border border-gray-200 rounded-xl p-4">
       <h2 class="font-semibold text-sm mb-2">最近の動き <span class="text-xs text-gray-400 font-normal">チャット・メール・Wiki・成果物</span></h2>
       <ul class="text-xs space-y-1.5">
-        {% for f in feed %}<li class="flex gap-2"><span class="shrink-0">{{ f.icon }}</span><a href="{{ f.href }}" class="min-w-0 flex-1 truncate hover:underline"><b>{{ f.who }}</b> {{ f.text }}</a><span class="text-gray-400 shrink-0">{{ f.at|rel }}</span></li>{% else %}<li class="text-gray-400">まだありません</li>{% endfor %}
+        {% for f in feed %}<li class="flex gap-2"><span class="shrink-0 text-gray-400">{{ icon(f.icon) }}</span><a href="{{ f.href }}" class="min-w-0 flex-1 truncate hover:underline"><b>{{ f.who }}</b> {{ f.text }}</a><span class="text-gray-400 shrink-0">{{ f.at|rel }}</span></li>{% else %}<li class="text-gray-400">まだありません</li>{% endfor %}
       </ul>
     </div>
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">

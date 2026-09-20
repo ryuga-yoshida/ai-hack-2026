@@ -7,8 +7,8 @@
       <span class="font-semibold text-sm" data-person="{{ m.actor }}">{{ m.actor }}</span>
       <span class="text-xs text-gray-400" title="{{ m.posted_at|dt }}">{{ m.posted_at|rel }}</span>
       {% if m.edited %}<span class="text-[10px] text-gray-400">（編集済み）</span>{% endif %}
-      {% if m.pinned %}<span class="text-[10px] text-amber-600" title="ピン留め">📌</span>{% endif %}
-      {% if saved_ids is defined and m.id in saved_ids %}<span class="text-[10px] text-indigo-500" title="保存済み">🔖</span>{% endif %}
+      {% if m.pinned %}<span class="text-[10px] text-amber-600" title="ピン留め">{{ icon('pin') }}</span>{% endif %}
+      {% if saved_ids is defined and m.id in saved_ids %}<span class="text-[10px] text-indigo-500" title="保存済み">{{ icon('bookmark') }}</span>{% endif %}
       <span class="inline-flex items-center gap-0.5">
       {% if m.task %}
       <a href="/tasks/{{ m.task.id }}" class="text-[11px] px-1.5 py-0.5 rounded-l-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 truncate max-w-[260px]" title="紐付け: {{ m.task.method }} ({{ '%.2f' % m.task.confidence }})">
@@ -43,17 +43,17 @@
   </div>
   <div class="opacity-0 group-hover:opacity-100 flex items-start gap-0.5 text-gray-400 shrink-0" x-data="{ emo: false }">
     <div class="relative">
-      <button @click="emo = !emo" class="p-1 hover:text-gray-700" data-tip="リアクション">☺</button>
+      <button @click="emo = !emo" class="p-1 hover:text-gray-700" data-tip="リアクション">{{ icon('smile') }}</button>
       <div x-show="emo" x-cloak @click.outside="emo = false" class="absolute right-0 top-7 bg-white border border-gray-200 rounded-lg shadow p-1 flex gap-1 z-10">
         {% for e in ['👍','✅','👀','🙏','🎉','❗'] %}<button @click="react('{{ m.id }}', '{{ e }}'); emo = false" class="px-1 hover:bg-gray-100 rounded">{{ e }}</button>{% endfor %}
       </div>
     </div>
-    {% if not compact %}<a href="/chat?channel={{ m.channel }}&thread={{ m.id }}" class="p-1 hover:text-gray-700" data-tip="スレッドで返信">↩</a>{% endif %}
-    <button type="button" @click="toTask('{{ m.id }}')" class="p-1 hover:text-gray-700" data-tip="この発言からタスクを作る">☑</button>
-    <form method="post" action="/chat/{{ m.id }}/pin"><button class="p-1 hover:text-gray-700 {% if m.pinned %}text-amber-600{% endif %}" data-tip="{{ 'ピン留めを外す' if m.pinned else 'ピン留め' }}">📌</button></form>
-    <form method="post" action="/chat/{{ m.id }}/save"><button class="p-1 hover:text-gray-700 {% if saved_ids is defined and m.id in saved_ids %}text-indigo-600{% endif %}" data-tip="あとで見る（保存）">🔖</button></form>
-    <button type="button" @click="navigator.clipboard.writeText(location.origin + '/chat?channel={{ m.channel }}#msg-{{ m.id }}').then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="p-1 hover:text-gray-700" data-tip="リンクをコピー">🔗</button>
-    {% if m.actor == me %}<button @click="editing = true" class="p-1 hover:text-gray-700" data-tip="編集">✎</button>{% endif %}
-    {% if m.actor == me %}<form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="p-1 hover:text-red-600" data-tip="削除">🗑</button></form>{% endif %}
+    {% if not compact %}<a href="/chat?channel={{ m.channel }}&thread={{ m.id }}" class="p-1 hover:text-gray-700" data-tip="スレッドで返信">{{ icon('reply') }}</a>{% endif %}
+    <button type="button" @click="toTask('{{ m.id }}')" class="p-1 hover:text-gray-700" data-tip="この発言からタスクを作る">{{ icon('task') }}</button>
+    <form method="post" action="/chat/{{ m.id }}/pin"><button class="p-1 hover:text-gray-700 {% if m.pinned %}text-amber-600{% endif %}" data-tip="{{ 'ピン留めを外す' if m.pinned else 'ピン留め' }}">{{ icon('pin') }}</button></form>
+    <form method="post" action="/chat/{{ m.id }}/save"><button class="p-1 hover:text-gray-700 {% if saved_ids is defined and m.id in saved_ids %}text-indigo-600{% endif %}" data-tip="あとで見る（保存）">{{ icon('bookmark') }}</button></form>
+    <button type="button" @click="navigator.clipboard.writeText(location.origin + '/chat?channel={{ m.channel }}#msg-{{ m.id }}').then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="p-1 hover:text-gray-700" data-tip="リンクをコピー">{{ icon('link') }}</button>
+    {% if m.actor == me %}<button @click="editing = true" class="p-1 hover:text-gray-700" data-tip="編集">{{ icon('edit') }}</button>{% endif %}
+    {% if m.actor == me %}<form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="p-1 hover:text-red-600" data-tip="削除">{{ icon('trash') }}</button></form>{% endif %}
   </div>
 </div>

@@ -32,7 +32,7 @@
   <a href="/tasks?{{ qs }}&quick={{ '' if quick == key and key else key }}" class="px-2.5 py-1 rounded-full border {% if quick == key %}bg-gray-900 text-white border-gray-900{% else %}bg-white border-gray-300 text-gray-600 hover:bg-gray-50{% endif %}">{{ label }}{% if badge %} <span class="opacity-70">{{ badge }}</span>{% endif %}</a>
   {% endfor %}
   <span class="text-gray-300 mx-1">|</span>
-  {% for key, label in PRIORITIES %}<a href="/tasks?view={{ view }}&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}&quick={{ quick }}&priority={{ '' if priority == key else key }}" class="px-2 py-1 rounded-full border {% if priority == key %}bg-gray-900 text-white border-gray-900{% else %}bg-white border-gray-300 text-gray-600 hover:bg-gray-50{% endif %}">{{ {'urgent':'🔴','high':'🟠','normal':'🟢','low':'⚪'}[key] }} {{ label }}</a>{% endfor %}
+  {% for key, label in PRIORITIES %}<a href="/tasks?view={{ view }}&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}&quick={{ quick }}&priority={{ '' if priority == key else key }}" class="px-2 py-1 rounded-full border {% if priority == key %}bg-gray-900 text-white border-gray-900{% else %}bg-white border-gray-300 text-gray-600 hover:bg-gray-50{% endif %}">{{ {'urgent':'','high':'','normal':'','low':''}[key] }} {{ label }}</a>{% endfor %}
 </div>
 {% if team %}<div class="mb-3 text-sm text-gray-600">チーム <a href="/tags/{{ team }}" class="px-1.5 py-0.5 rounded bg-violet-100 text-violet-800">@{{ team }}</a> のタスク（チームに紐付いたもの ＋ 担当者がメンバーのもの）<a href="/tasks?view={{ view }}" class="text-indigo-600 ml-2">解除</a></div>{% endif %}
 {% if view == 'gantt' %}
@@ -59,8 +59,8 @@
         <div class="shrink-0 px-4 flex items-center gap-2 min-w-0" style="width: {{ LW }}px">
           <span class="w-2 h-2 rounded-full shrink-0 {% if t.status == 'done' %}bg-emerald-500{% elif t.status == 'in_progress' %}bg-indigo-500{% elif t.status == 'blocked' %}bg-red-500{% else %}bg-gray-300{% endif %}"></span>
           <a href="/tasks/{{ t.id }}" class="text-sm truncate hover:underline {% if t.status == 'done' %}text-gray-400 line-through{% endif %}">{{ t.title }}</a>
-          {% if b.blocked_by %}<span class="text-[10px] text-amber-700 shrink-0" title="待ち: {{ b.blocked_by|map(attribute='title')|join('、') }}">⛓ {{ b.blocked_by|length }}</span>{% endif %}
-          {% if b.dep_warn %}<span class="text-[10px] text-red-600 shrink-0" title="依存先の期限がこのタスクの期限より後">⚠</span>{% endif %}
+          {% if b.blocked_by %}<span class="text-[10px] text-amber-700 shrink-0" title="待ち: {{ b.blocked_by|map(attribute='title')|join('、') }}">{{ icon('link') }} {{ b.blocked_by|length }}</span>{% endif %}
+          {% if b.dep_warn %}<span class="text-[10px] text-red-600 shrink-0" title="依存先の期限がこのタスクの期限より後">{{ icon('warn') }}</span>{% endif %}
           <span class="ml-auto text-[10px] text-gray-400 shrink-0">{{ t.assignee or '' }}</span>
         </div>
         <div class="absolute rounded-md text-[11px] leading-6 px-2 truncate cursor-grab select-none {% if b.tentative %}border-2 border-dashed border-gray-400 text-gray-500 bg-white{% elif t.status == 'done' %}text-white bg-emerald-400{% elif t.status == 'blocked' %}text-white bg-red-400{% elif b.overdue %}text-white bg-red-500{% elif t.status == 'in_progress' %}text-white bg-indigo-500{% else %}text-white bg-gray-400{% endif %}"
@@ -101,7 +101,7 @@
         {% for key, label in [('title','タスク'),('priority','優先度'),('status','状態'),('assignee','担当'),('due','期限'),('findings','検知'),('updated','更新')] %}
         <th class="px-3 py-2"><a href="/tasks?view=list&sort={{ key }}&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}&quick={{ quick }}&priority={{ priority }}" class="hover:text-gray-900 {% if sort == key %}text-gray-900 font-semibold{% endif %}">{{ label }}{% if sort == key %} ▾{% endif %}</a></th>
         {% endfor %}
-        <th class="px-3 py-2">タグ / チーム</th><th class="px-3 py-2 text-right">☑ 💬</th>
+        <th class="px-3 py-2">タグ / チーム</th><th class="px-3 py-2 text-right">{{ icon('task') }} {{ icon('chat') }}</th>
       </tr>
     </thead>
     <tbody>
@@ -109,7 +109,7 @@
       <tr class="border-t border-gray-100 hover:bg-gray-50 {% if t.status == 'done' %}text-gray-400{% endif %}" :class="sel.includes('{{ t.id }}') && 'bg-indigo-50'">
         <td class="pl-4 pr-1 py-2"><input type="checkbox" name="ids" value="{{ t.id }}" x-model="sel"></td>
         <td class="px-3 py-2 min-w-[260px]"><a href="/tasks/{{ t.id }}" class="font-medium hover:underline">{{ t.title }}</a>{% if m.origin %}<div class="text-[11px] text-gray-400">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成</div>{% endif %}</td>
-        <td class="px-3 py-2"><select onchange="window.shellPatch('/tasks/{{ t.id }}', {priority: this.value}, '優先度を更新しました')" class="text-xs border-0 bg-transparent hover:bg-gray-100 rounded px-1 py-0.5 cursor-pointer">{% for k, l in PRIORITIES %}<option value="{{ k }}" {% if k == t.priority %}selected{% endif %}>{{ {'urgent':'🔴','high':'🟠','normal':'🟢','low':'⚪'}[k] }} {{ l }}</option>{% endfor %}</select></td>
+        <td class="px-3 py-2"><select onchange="window.shellPatch('/tasks/{{ t.id }}', {priority: this.value}, '優先度を更新しました')" class="text-xs border-0 bg-transparent hover:bg-gray-100 rounded px-1 py-0.5 cursor-pointer">{% for k, l in PRIORITIES %}<option value="{{ k }}" {% if k == t.priority %}selected{% endif %}>{{ {'urgent':'','high':'','normal':'','low':''}[k] }} {{ l }}</option>{% endfor %}</select></td>
         <td class="px-3 py-2">
           <select onchange="window.shellPatch('/tasks/{{ t.id }}', {status: this.value}, '状態を更新しました')" class="text-xs rounded-full border-0 py-0.5 pl-2 pr-6 cursor-pointer {% if t.status == 'todo' %}bg-gray-100 text-gray-700{% elif t.status == 'in_progress' %}bg-indigo-100 text-indigo-700{% elif t.status == 'blocked' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
             {% for s_, l_ in STATUSES %}<option value="{{ s_ }}" {% if s_ == t.status %}selected{% endif %}>{{ l_ }}</option>{% endfor %}</select></td>
@@ -119,12 +119,12 @@
         <td class="px-3 py-2">
           <input type="date" value="{{ t.due_date.isoformat() if t.due_date else '' }}" onchange="window.shellPatch('/tasks/{{ t.id }}', {due_date: this.value || null}, '期限を更新しました').then(() => { this.classList.toggle('text-red-600', this.value && this.value < '{{ today }}') })"
                  class="text-sm border-0 bg-transparent hover:bg-gray-100 rounded px-1 py-0.5 cursor-pointer w-32 {% if m.overdue %}text-red-600 font-medium{% elif not t.due_date %}text-gray-400{% endif %}"></td>
-        <td class="px-3 py-2">{% if m.n_findings %}<a href="/findings?status=open" class="text-red-600 font-semibold">⚠ {{ m.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
+        <td class="px-3 py-2">{% if m.n_findings %}<a href="/findings?status=open" class="text-red-600 font-semibold">{{ icon('warn') }} {{ m.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
         <td class="px-4 py-2 text-gray-500 text-xs">{{ m.updated_at|dt }}</td>
         <td class="px-3 py-2"><div class="flex flex-wrap gap-1 items-center">{% for tm in m.teams %}<a href="/tasks?view=list&team={{ '' if tm.name == team else tm.name }}&tag={{ tag }}&assignee={{ assignee }}" class="text-[10px] px-1.5 rounded {% if tm.name == team %}bg-violet-600 text-white{% else %}bg-violet-100 text-violet-800{% endif %}" title="{{ '絞り込みを解除' if tm.name == team else 'このチームで絞り込む' }}">@{{ tm.name }}{% if tm.name == team %} ×{% endif %}</a>{% endfor %}{% for tg in m.tags %}<form method="post" action="/tags/{{ tg.name }}/unlink" class="inline"><input type="hidden" name="target_type" value="task"><input type="hidden" name="target_id" value="{{ t.id }}"><span class="inline-flex items-center gap-0.5 text-[10px] px-1.5 rounded {% if tg.name == tag %}bg-{{ tg.color }}-500 text-white{% else %}bg-{{ tg.color }}-100 text-{{ tg.color }}-800{% endif %}"><a href="/tasks?view=list&tag={{ '' if tg.name == tag else tg.name }}&team={{ team }}&assignee={{ assignee }}" title="{{ '絞り込みを解除' if tg.name == tag else 'このタグで絞り込む' }}">#{{ tg.name }}</a><button class="opacity-40 hover:opacity-100" title="タグを外す">×</button></span></form>{% endfor %}
           {% with tp_task_id=t.id, tp_mine=m.teams|map(attribute='name')|list %}{% include "_team_picker.html" %}{% endwith %}
           {% with tp_type='task', tp_id=t.id %}{% include "_tag_picker.html" %}{% endwith %}</div></td>
-        <td class="px-3 py-2 text-right text-gray-500 text-xs whitespace-nowrap">{% if m.check_total %}<span class="{% if m.check_done == m.check_total %}text-emerald-600{% endif %}">☑ {{ m.check_done }}/{{ m.check_total }}</span>{% endif %} {{ ('💬 ' ~ m.n_msgs) if m.n_msgs else '' }}</td>
+        <td class="px-3 py-2 text-right text-gray-500 text-xs whitespace-nowrap">{% if m.check_total %}<span class="{% if m.check_done == m.check_total %}text-emerald-600{% endif %}">{{ icon('task') }} {{ m.check_done }}/{{ m.check_total }}</span>{% endif %} {{ ('' ~ m.n_msgs) if m.n_msgs else '' }}</td>
       </tr>
     {% else %}<tr><td colspan="10" class="px-4 py-8 text-center text-gray-400">該当するタスクはありません。</td></tr>{% endfor %}
     </tbody>
@@ -148,17 +148,17 @@
       <div draggable="true" @dragstart="drag('{{ t.id }}')" @dragend="dragging = null"
          class="block bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md hover:border-indigo-300 transition cursor-grab {% if t.status == 'done' %}opacity-70{% endif %}"
          id="task-{{ t.id }}">
-        <div class="flex items-start gap-1.5">{% if t.priority != 'normal' %}<span class="text-[10px] mt-0.5" title="優先度: {{ PRIORITY_LABEL[t.priority] }}">{{ {'urgent':'🔴','high':'🟠','low':'⚪'}[t.priority] }}</span>{% endif %}<a href="/tasks/{{ t.id }}" class="text-sm font-medium leading-snug hover:underline block">{{ t.title }}</a></div>
+        <div class="flex items-start gap-1.5">{% if t.priority != 'normal' %}<span class="text-[10px] mt-0.5" title="優先度: {{ PRIORITY_LABEL[t.priority] }}">{{ {'urgent':'','high':'','low':''}[t.priority] }}</span>{% endif %}<a href="/tasks/{{ t.id }}" class="text-sm font-medium leading-snug hover:underline block">{{ t.title }}</a></div>
         {% if m.tags or m.teams %}<div class="flex flex-wrap gap-1 mt-1">{% for tm in m.teams %}<a href="/tasks?view=board&team={{ '' if tm.name == team else tm.name }}&tag={{ tag }}" class="text-[10px] px-1.5 rounded {% if tm.name == team %}bg-violet-600 text-white{% else %}bg-violet-100 text-violet-800{% endif %}">@{{ tm.name }}{% if tm.name == team %} ×{% endif %}</a>{% endfor %}{% for tg in m.tags %}<a href="/tasks?view=board&tag={{ '' if tg.name == tag else tg.name }}&team={{ team }}" class="text-[10px] px-1.5 rounded {% if tg.name == tag %}bg-{{ tg.color }}-500 text-white{% else %}bg-{{ tg.color }}-100 text-{{ tg.color }}-800{% endif %}">#{{ tg.name }}{% if tg.name == tag %} ×{% endif %}</a>{% endfor %}</div>{% endif %}
         <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
           <span data-person="{{ t.assignee }}" class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>
           <a href="/tasks?view=board&assignee={{ '' if t.assignee == assignee else (t.assignee or '') }}&tag={{ tag }}&team={{ team }}" data-person="{{ t.assignee }}" class="hover:underline {% if t.assignee == assignee and assignee %}font-semibold text-indigo-700{% endif %}">{{ t.assignee or "未割当" }}{% if t.assignee == assignee and assignee %} ×{% endif %}</a>
           {% if t.due_date %}<span class="{% if m.overdue %}text-red-600 font-medium{% endif %}">期限 {{ t.due_date.strftime('%m/%d') }}</span>{% endif %}
           <span class="ml-auto flex items-center gap-2">
-            {% if m.n_findings %}<span class="text-red-600 font-semibold" title="未対応の検知">⚠ {{ m.n_findings }}</span>{% endif %}
-            {% if m.n_msgs %}<span title="紐付いた発言">💬 {{ m.n_msgs }}</span>{% endif %}
-            {% if t.artifacts %}<span title="成果物">📎 {{ t.artifacts|length }}</span>{% endif %}
-            {% if m.check_total %}<span title="チェックリスト" class="{% if m.check_done == m.check_total %}text-emerald-600{% endif %}">☑ {{ m.check_done }}/{{ m.check_total }}</span>{% endif %}
+            {% if m.n_findings %}<span class="text-red-600 font-semibold" title="未対応の検知">{{ icon('warn') }} {{ m.n_findings }}</span>{% endif %}
+            {% if m.n_msgs %}<span title="紐付いた発言">{{ icon('chat') }} {{ m.n_msgs }}</span>{% endif %}
+            {% if t.artifacts %}<span title="成果物">{{ icon('clip') }} {{ t.artifacts|length }}</span>{% endif %}
+            {% if m.check_total %}<span title="チェックリスト" class="{% if m.check_done == m.check_total %}text-emerald-600{% endif %}">{{ icon('task') }} {{ m.check_done }}/{{ m.check_total }}</span>{% endif %}
           </span>
         </div>
         <div class="mt-1.5 flex items-center gap-2">

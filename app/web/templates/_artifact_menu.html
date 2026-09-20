@@ -1,9 +1,9 @@
 {# a: file row #}
-<button type="button" @click="menu = false; navigator.clipboard.writeText({{ a.share_url|tojson|forceescape }}).then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="w-full text-left px-3 py-1.5 hover:bg-gray-50">🔗 リンクをコピー</button>
-<button type="button" @click="menu = false; $dispatch('open-share', { key: {{ a.key|tojson|forceescape }}, name: {{ a.name|tojson|forceescape }} })" class="w-full text-left px-3 py-1.5 hover:bg-gray-50">💬 チャットで共有</button>
+<button type="button" @click="menu = false; navigator.clipboard.writeText({{ a.share_url|tojson|forceescape }}).then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="w-full text-left px-3 py-1.5 hover:bg-gray-50">{{ icon('link') }} リンクをコピー</button>
+<button type="button" @click="menu = false; $dispatch('open-share', { key: {{ a.key|tojson|forceescape }}, name: {{ a.name|tojson|forceescape }} })" class="w-full text-left px-3 py-1.5 hover:bg-gray-50">{{ icon('chat') }} チャットで共有</button>
 <a href="/artifacts/file/{{ a.latest.rel }}" class="block px-3 py-1.5 hover:bg-gray-50">↓ ダウンロード（v{{ a.latest.n }}）</a>
-{% if a.versions|length > 1 %}<a href="/artifacts/diff/{{ a.latest.rel }}" class="block px-3 py-1.5 hover:bg-gray-50">⇄ 最新版の差分を見る</a>{% endif %}
-{% if a.n_findings %}<a href="/findings?status=all&file={{ a.latest.file }}" class="block px-3 py-1.5 hover:bg-gray-50 text-red-600">⚠ このファイルの検知 {{ a.n_findings }}</a>{% endif %}
+{% if a.versions|length > 1 %}<a href="/artifacts/diff/{{ a.latest.rel }}" class="block px-3 py-1.5 hover:bg-gray-50">{{ icon('repeat') }} 最新版の差分を見る</a>{% endif %}
+{% if a.n_findings %}<a href="/findings?status=all&file={{ a.latest.file }}" class="block px-3 py-1.5 hover:bg-gray-50 text-red-600">{{ icon('warn') }} このファイルの検知 {{ a.n_findings }}</a>{% endif %}
 <div class="border-t my-1"></div>
-<button type="button" @click="menu = false; $dispatch('open-rename', { key: {{ a.key|tojson|forceescape }}, name: {{ a.stem|tojson|forceescape }}, folder: {{ a.folder|tojson|forceescape }} })" class="w-full text-left px-3 py-1.5 hover:bg-gray-50">✎ 名前の変更 / 移動</button>
-<form method="post" action="/artifacts/delete" onsubmit="return confirm('「{{ a.name }}」の全ての版をごみ箱へ移しますか？')"><input type="hidden" name="key" value="{{ a.key }}"><button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50">🗑 削除</button></form>
+<button type="button" @click="menu = false; $dispatch('open-rename', { key: {{ a.key|tojson|forceescape }}, name: {{ a.stem|tojson|forceescape }}, folder: {{ a.folder|tojson|forceescape }} })" class="w-full text-left px-3 py-1.5 hover:bg-gray-50">{{ icon('edit') }} 名前の変更 / 移動</button>
+<form method="post" action="/artifacts/delete" onsubmit="return confirm('「{{ a.name }}」の全ての版をごみ箱へ移しますか？')"><input type="hidden" name="key" value="{{ a.key }}"><button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50">{{ icon('trash') }} 削除</button></form>

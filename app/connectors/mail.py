@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS mail_drafts (
 );
 """
 
-FOLDERS = [("inbox", "受信トレイ", "📥"), ("flagged", "フラグ付き", "🚩"), ("sent", "送信済み", "📤"),
-           ("drafts", "下書き", "📝"), ("archive", "アーカイブ", "📦"), ("trash", "ごみ箱", "🗑")]
+FOLDERS = [("inbox", "受信トレイ", "download"), ("flagged", "フラグ付き", "flag"), ("sent", "送信済み", "upload"),
+           ("drafts", "下書き", "edit"), ("archive", "アーカイブ", "archive"), ("trash", "ごみ箱", "trash")]
 
 
 def init(conn: sqlite3.Connection) -> None:

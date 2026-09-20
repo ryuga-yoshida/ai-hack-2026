@@ -41,7 +41,7 @@
   <div class="grid grid-cols-4 gap-3">
     {% for f in folders %}
     <div class="group relative flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-3 hover:border-indigo-300 hover:shadow-sm" x-data="{ menu: false }">
-      <a href="/artifacts?path={{ f.path }}&tag={{ tag }}&view={{ view }}" class="flex items-center gap-3 flex-1 min-w-0"><span class="text-2xl">📁</span><div class="min-w-0"><div class="font-medium text-sm truncate">{{ f.name }}</div><div class="text-xs text-gray-500">{{ f.n_files }} ファイル</div></div></a>
+      <a href="/artifacts?path={{ f.path }}&tag={{ tag }}&view={{ view }}" class="flex items-center gap-3 flex-1 min-w-0"><span class="text-2xl">{{ icon('folder') }}</span><div class="min-w-0"><div class="font-medium text-sm truncate">{{ f.name }}</div><div class="text-xs text-gray-500">{{ f.n_files }} ファイル</div></div></a>
       <button @click="menu = !menu" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 px-1">⋯</button>
       <div x-show="menu" x-cloak @click.outside="menu = false" class="absolute right-2 top-12 z-20 w-56 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1">
         <form method="post" action="/artifacts/folder/rename" class="px-3 py-1.5 flex gap-1"><input type="hidden" name="path" value="{{ f.path }}"><input name="new_name" value="{{ f.name }}" class="flex-1 text-xs border border-gray-300 rounded px-2 py-1"><button class="text-xs border border-gray-300 rounded px-2">改名</button></form>
@@ -60,12 +60,12 @@
       {% for a in files %}
       <tr class="border-t border-gray-100 hover:bg-gray-50 group" x-data="{ menu: false }">
         <td class="px-4 py-2"><div class="flex items-center gap-2 min-w-0"><span class="w-7 h-7 rounded grid place-items-center font-bold text-[10px] shrink-0 {{ a.color }}">{{ a.icon }}</span>
-          <div class="min-w-0"><a href="{% if a.editable %}/artifacts/edit/{{ a.key[:-5] }}{% elif a.ext in ('.docx', '.md', '.txt') %}/artifacts/write/{{ a.key }}{% else %}/artifacts/file/{{ a.latest.rel }}{% endif %}" class="font-medium hover:underline block truncate">{{ a.name }}</a>{% if (q or tag or mine) and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-[11px] text-gray-400 hover:underline">📁 {{ a.folder }}</a>{% endif %}</div></div></td>
+          <div class="min-w-0"><a href="{% if a.editable %}/artifacts/edit/{{ a.key[:-5] }}{% elif a.ext in ('.docx', '.md', '.txt') %}/artifacts/write/{{ a.key }}{% else %}/artifacts/file/{{ a.latest.rel }}{% endif %}" class="font-medium hover:underline block truncate">{{ a.name }}</a>{% if (q or tag or mine) and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-[11px] text-gray-400 hover:underline">{{ icon('folder') }} {{ a.folder }}</a>{% endif %}</div></div></td>
         <td class="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title="{{ a.latest.at|dt }}">{{ a.latest.at|rel }}</td>
         <td class="px-3 py-2 text-xs" data-person="{{ a.latest.actor }}">{{ a.latest.actor or '—' }}</td>
         <td class="px-3 py-2 text-right text-xs"><a href="/artifacts?path={{ a.folder }}&view=cards#f-{{ a.key }}" class="hover:underline">v{{ a.latest.n }}</a></td>
         <td class="px-3 py-2 text-right text-xs text-gray-500">{{ (a.latest.size / 1024)|round(1) }} KB</td>
-        <td class="px-3 py-2 text-right text-xs">{% if a.n_findings %}<a href="/findings?status=all&file={{ a.latest.file }}" class="text-red-600 font-semibold">⚠ {{ a.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
+        <td class="px-3 py-2 text-right text-xs">{% if a.n_findings %}<a href="/findings?status=all&file={{ a.latest.file }}" class="text-red-600 font-semibold">{{ icon('warn') }} {{ a.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
         <td class="px-3 py-2"><div class="flex flex-wrap gap-1 items-center">{% for t in a.tags %}<a href="/artifacts?path={{ folder }}&tag={{ '' if t.name == tag else t.name }}&view=list" class="text-[10px] px-1.5 rounded {% if t.name == tag %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %}">#{{ t.name }}</a>{% endfor %}{% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="text-[10px] px-1.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[160px]">⇢ {{ t.title }}</a>{% endfor %}{% with tp_type='artifact', tp_id=a.key %}{% include "_tag_picker.html" %}{% endwith %}</div></td>
         <td class="px-3 py-2 text-right relative">
           <button @click="menu = !menu" class="text-gray-400 hover:text-gray-700 px-1.5 py-0.5 rounded hover:bg-gray-100">⋯</button>
@@ -84,7 +84,7 @@
     <div class="flex items-center gap-3">
       <span class="w-9 h-9 rounded-lg grid place-items-center font-bold text-xs {{ a.color }}">{{ a.icon }}</span>
       <div class="min-w-0">
-        <div class="font-semibold flex items-center gap-2 flex-wrap">{% if (tag or q or mine) and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-xs text-gray-400 font-normal">📁 {{ a.folder }} /</a>{% endif %}{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · <span data-person="{{ a.latest.actor }}">{{ a.latest.actor or '—' }}</span> · {{ a.latest.at|rel }}</span>
+        <div class="font-semibold flex items-center gap-2 flex-wrap">{% if (tag or q or mine) and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-xs text-gray-400 font-normal">{{ icon('folder') }} {{ a.folder }} /</a>{% endif %}{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · <span data-person="{{ a.latest.actor }}">{{ a.latest.actor or '—' }}</span> · {{ a.latest.at|rel }}</span>
           {% for t in a.tags %}<form method="post" action="/tags/{{ t.name }}/unlink" class="inline"><input type="hidden" name="target_type" value="artifact"><input type="hidden" name="target_id" value="{{ a.key }}">
             <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded {% if t.name == tag %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %} font-normal"><a href="/artifacts?path={{ folder }}&tag={{ '' if t.name == tag else t.name }}" title="{{ '絞り込みを解除' if t.name == tag else 'このタグで絞り込む' }}">#{{ t.name }}{% if t.name == tag %} ×{% endif %}</a><button class="opacity-50 hover:opacity-100" title="タグを外す">×</button></span></form>{% endfor %}
           {% with tp_type='artifact', tp_id=a.key %}{% include "_tag_picker.html" %}{% endwith %}
@@ -92,10 +92,10 @@
         <div class="text-xs text-gray-500 truncate">{{ a.share_url }}</div>
       </div>
       <div class="ml-auto flex items-center gap-2 text-xs shrink-0">
-        {% if a.editable %}<a href="/artifacts/edit/{{ a.key[:-5] }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ ブラウザで編集</a>{% endif %}
-        {% if a.ext in ('.docx', '.md', '.txt') %}<a href="/artifacts/write/{{ a.key }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ 編集</a>{% endif %}
-        {% if a.textual %}<button @click="open = !open; if (open && !$refs.pv.dataset.loaded) { fetch('/artifacts/text/{{ a.latest.rel }}').then(r => r.json()).then(j => { $refs.pv.innerHTML = j.paragraphs.map(p => '<p>' + p.replace(/</g,'&lt;') + '</p>').join('') || '<p class=\'text-gray-400\'>本文なし</p>'; $refs.pv.dataset.loaded = 1; }); }" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">👁 本文</button>{% endif %}
-        {% if a.image or a.pdf %}<button @click="preview = !preview" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">👁 プレビュー</button>{% endif %}
+        {% if a.editable %}<a href="/artifacts/edit/{{ a.key[:-5] }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">{{ icon('edit') }} ブラウザで編集</a>{% endif %}
+        {% if a.ext in ('.docx', '.md', '.txt') %}<a href="/artifacts/write/{{ a.key }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">{{ icon('edit') }} 編集</a>{% endif %}
+        {% if a.textual %}<button @click="open = !open; if (open && !$refs.pv.dataset.loaded) { fetch('/artifacts/text/{{ a.latest.rel }}').then(r => r.json()).then(j => { $refs.pv.innerHTML = j.paragraphs.map(p => '<p>' + p.replace(/</g,'&lt;') + '</p>').join('') || '<p class=\'text-gray-400\'>本文なし</p>'; $refs.pv.dataset.loaded = 1; }); }" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">{{ icon('eye') }} 本文</button>{% endif %}
+        {% if a.image or a.pdf %}<button @click="preview = !preview" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">{{ icon('eye') }} プレビュー</button>{% endif %}
         <a href="/artifacts/file/{{ a.latest.rel }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">↓</a>
         <div class="relative"><button @click="menu = !menu" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">⋯</button>
           <div x-show="menu" x-cloak @click.outside="menu = false" class="absolute right-0 top-8 z-20 w-64 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1 text-left">{% with a=a %}{% include "_artifact_menu.html" %}{% endwith %}</div></div>
@@ -111,9 +111,9 @@
         <tr class="border-t border-gray-100 group"><td class="py-1.5">v{{ v.n }} <span class="text-gray-400">{{ v.file }}</span></td><td data-person="{{ v.actor }}">{{ v.actor or '—' }}</td><td>{{ v.at|dt }}</td><td class="text-xs text-gray-500">{{ v.note }}</td>
           <td class="text-right text-gray-500">{{ (v.size / 1024)|round(1) }} KB</td>
           <td class="text-right">{% if v.changes %}<a href="/artifacts/diff/{{ v.rel }}" class="text-indigo-600 hover:underline" title="この版で何が変わったか">{{ v.changes }} 件</a>{% else %}<span class="text-gray-400">{{ '初版' if v.n == 1 else '未処理' }}</span>{% endif %}</td>
-          <td class="text-right">{% if v.findings %}<a href="/findings?status=all&file={{ v.file }}" class="text-red-600 font-semibold hover:underline" title="この版の検知だけを見る">⚠ {{ v.findings }}</a>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+          <td class="text-right">{% if v.findings %}<a href="/findings?status=all&file={{ v.file }}" class="text-red-600 font-semibold hover:underline" title="この版の検知だけを見る">{{ icon('warn') }} {{ v.findings }}</a>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
           <td class="text-right whitespace-nowrap"><a href="/artifacts/file/{{ v.rel }}" class="text-gray-400 hover:text-gray-700" title="この版をダウンロード">↓</a>
-            {% if not loop.first %}<form method="post" action="/artifacts/restore/{{ v.rel }}" class="inline" onsubmit="return confirm('v{{ v.n }} の内容を新しい版として復元しますか？')"><button class="ml-2 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title="この版に戻す">↶ 復元</button></form>{% endif %}</td></tr>
+            {% if not loop.first %}<form method="post" action="/artifacts/restore/{{ v.rel }}" class="inline" onsubmit="return confirm('v{{ v.n }} の内容を新しい版として復元しますか？')"><button class="ml-2 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title="この版に戻す">{{ icon('undo') }} 復元</button></form>{% endif %}</td></tr>
       {% endfor %}</tbody>
     </table>
   </div>

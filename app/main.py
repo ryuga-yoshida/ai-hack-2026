@@ -206,7 +206,8 @@ def fmt_rel(v) -> str:
 templates.env.filters["dt"] = fmt_dt
 templates.env.filters["rel"] = fmt_rel
 templates.env.filters["tag_colors"] = lambda tags: {t["name"]: t["color"] for t in tags}
-templates.env.globals.update(STATUSES=STATUSES, STATUS_LABEL=STATUS_LABEL, KIND_LABEL=KIND_LABEL, PRIORITIES=PRIORITIES, PRIORITY_LABEL=PRIORITY_LABEL, ACTIVITY_LABEL=ACTIVITY_LABEL,
+from app.web.icons import icon as _icon
+templates.env.globals.update(icon=_icon, STATUSES=STATUSES, STATUS_LABEL=STATUS_LABEL, KIND_LABEL=KIND_LABEL, PRIORITIES=PRIORITIES, PRIORITY_LABEL=PRIORITY_LABEL, ACTIVITY_LABEL=ACTIVITY_LABEL,
                              EVENT_LABEL=EVENT_LABEL, FINDING_STATUS_LABEL=FINDING_STATUS_LABEL, PEOPLE=PEOPLE)
 
 
@@ -547,14 +548,14 @@ def dashboard(request: Request):
             f_trend[r["d"]] = r["n"]
     feed = []
     for r in conn.execute("SELECT id, channel, actor, text, posted_at FROM chat_messages WHERE deleted=0 AND channel NOT LIKE 'task:%' AND channel NOT LIKE 'wiki:%' ORDER BY posted_at DESC LIMIT 6"):
-        feed.append({"at": r["posted_at"], "icon": "💬", "who": r["actor"], "text": r["text"][:80], "href": f"/chat?channel={r['channel']}#msg-{r['id']}"})
+        feed.append({"at": r["posted_at"], "icon": "chat", "who": r["actor"], "text": r["text"][:80], "href": f"/chat?channel={r['channel']}#msg-{r['id']}"})
     for r in conn.execute("SELECT id, thread_id, sender, subject, sent_at FROM mails ORDER BY sent_at DESC LIMIT 4"):
-        feed.append({"at": r["sent_at"], "icon": "✉", "who": r["sender"], "text": r["subject"], "href": f"/mail?thread={r['thread_id']}"})
+        feed.append({"at": r["sent_at"], "icon": "mail", "who": r["sender"], "text": r["subject"], "href": f"/mail?thread={r['thread_id']}"})
     for r in conn.execute("SELECT id, title, actor, updated_at FROM wiki_pages ORDER BY updated_at DESC LIMIT 3"):
-        feed.append({"at": r["updated_at"], "icon": "📄", "who": r["actor"], "text": f"Wiki「{r['title']}」を更新", "href": f"/wiki/{r['id']}"})
+        feed.append({"at": r["updated_at"], "icon": "doc", "who": r["actor"], "text": f"Wiki「{r['title']}」を更新", "href": f"/wiki/{r['id']}"})
     for r in conn.execute("SELECT id, actor, occurred_at, json_extract(meta,'$.file') f FROM events WHERE kind='artifact_change' ORDER BY occurred_at DESC LIMIT 20"):
         if not any(x["text"].endswith(str(r["f"])) for x in feed):
-            feed.append({"at": r["occurred_at"], "at_src": True, "icon": "📎", "who": r["actor"], "text": f"成果物を更新 {r['f']}", "href": f"/artifacts?q={str(r['f']).rsplit('_v', 1)[0]}"})
+            feed.append({"at": r["occurred_at"], "at_src": True, "icon": "clip", "who": r["actor"], "text": f"成果物を更新 {r['f']}", "href": f"/artifacts?q={str(r['f']).rsplit('_v', 1)[0]}"})
     feed.sort(key=lambda x: x["at"], reverse=True)
     return render("index.html", request, conn, autonomy=agent.autonomy_stats(conn), stalled=stalled, trend=trend, f_trend=f_trend, days=days, feed=feed[:10],
                   config_stalled_days=config.STALLED_DAYS, my_tasks=my_tasks, today_evs=today_evs, my_notifs=my_notifs,
@@ -672,7 +673,7 @@ def finding_notify_chat(request: Request, finding_id: str, channel: str = Form("
     if task and task.assignee:
         to.append(task.assignee)
     mention = " ".join(f"@{a}" for a in dict.fromkeys(to)) or ""
-    chat.post_message(conn, channel, who(request), f"{mention} ⚠ {f.summary} {config.APP_BASE_URL}/findings?status=all#finding-{f.id}")
+    chat.post_message(conn, channel, who(request), f"{mention} [検知] {f.summary} {config.APP_BASE_URL}/findings?status=all#finding-{f.id}")
     _ingest_chat(conn)
     conn.execute("UPDATE findings SET status='notified' WHERE id=? AND status='pending'", (finding_id,))
     conn.commit()
@@ -1178,13 +1179,13 @@ def _internal_link_chips(html: str, conn: sqlite3.Connection) -> str:
         if kind == "tasks":
             t = db.get_task(conn, ident.split("/")[0])
             if t:
-                label, icon = f"{t.title}", "☑"; cls = "bg-indigo-50 text-indigo-700 border-indigo-100"
+                label, icon = f"{t.title}", "task"; cls = "bg-indigo-50 text-indigo-700 border-indigo-100"
         elif kind == "wiki":
             r = conn.execute("SELECT title FROM wiki_pages WHERE id=?", (ident.split("/")[0],)).fetchone()
             if r:
-                label, icon, cls = r["title"], "📄", "bg-violet-50 text-violet-700 border-violet-100"
+                label, icon, cls = r["title"], "doc", "bg-violet-50 text-violet-700 border-violet-100"
         elif kind == "artifacts/file":
-            label, icon, cls = ident.rsplit("/", 1)[-1], "📎", "bg-emerald-50 text-emerald-700 border-emerald-100"
+            label, icon, cls = ident.rsplit("/", 1)[-1], "clip", "bg-emerald-50 text-emerald-700 border-emerald-100"
         elif kind == "meet":
             mid = ident.split("/")[0]
             r = conn.execute("SELECT title FROM meetings WHERE id=?", (mid,)).fetchone()
@@ -1194,16 +1195,17 @@ def _internal_link_chips(html: str, conn: sqlite3.Connection) -> str:
                 ev = conn.execute("SELECT json_extract(meta,'$.meeting_title') t FROM events WHERE source='meet' AND json_extract(meta,'$.meeting_id')=? LIMIT 1", (mid,)).fetchone()
                 title = ev["t"] if ev else None
             if title:
-                label, icon, cls = (title + ("（議事録）" if ident.endswith("/minutes") else "")), "📹", "bg-sky-50 text-sky-700 border-sky-100"
+                label, icon, cls = (title + ("（議事録）" if ident.endswith("/minutes") else "")), "video", "bg-sky-50 text-sky-700 border-sky-100"
         elif kind == "calendar":
             r = conn.execute("SELECT title, start_at FROM cal_events WHERE id=?", (ident.split("/")[0],)).fetchone()
             if r:
-                label, icon, cls = f"{r['title']} {r['start_at'][5:16].replace('T', ' ')}", "📅", "bg-amber-50 text-amber-800 border-amber-100"
+                label, icon, cls = f"{r['title']} {r['start_at'][5:16].replace('T', ' ')}", "calendar", "bg-amber-50 text-amber-800 border-amber-100"
         if not label:
             return m.group(0)
         href = url[len(base):] if url.startswith(base) else url
+        from app.web.icons import icon as _ic
         return (f'<a href="{escape(href)}" class="inline-flex items-center gap-1 align-middle text-xs border rounded-md px-1.5 py-0.5 {cls} hover:shadow-sm max-w-[320px] truncate" '
-                f'title="{escape(url)}">{icon} {escape(label)}</a>')
+                f'title="{escape(url)}">{_ic(icon, "w-3.5 h-3.5")} {escape(label)}</a>')
     return _INTERNAL.sub(chip, html)
 
 
@@ -1799,7 +1801,7 @@ def calendar_create(request: Request, title: str = Form(...), date_: str = Form(
     if channel.strip():
         rep = {"daily": "毎日", "weekly": "毎週", "biweekly": "隔週", "monthly": "毎月"}.get(repeat)
         chat.post_message(conn, channel.strip(), who_,
-                          f"📅 予定を追加しました: {title.strip()} {st:%m/%d %H:%M}〜{en:%H:%M}{'（' + rep + '×' + str(len(ids)) + '回）' if rep else ''} 参加: {'・'.join(attendees)}")
+                          f"予定を追加しました: {title.strip()} {st:%m/%d %H:%M}〜{en:%H:%M}{'（' + rep + '×' + str(len(ids)) + '回）' if rep else ''} 参加: {'・'.join(attendees)}")
         _ingest_chat(conn)
     return RedirectResponse(f"/calendar?view=week&d={date_}", status_code=303)
 
@@ -1889,7 +1891,7 @@ def calendar_start_meeting(request: Request, event_id: str, me: str = Form("")):
         mid = meet.create_meeting(conn, e["title"], channel=e.get("channel"))
         cal.update(conn, event_id, meeting_id=mid)
         if e.get("channel"):
-            chat.post_message(conn, e["channel"], who_, f"📹 「{e['title']}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
+            chat.post_message(conn, e["channel"], who_, f"「{e['title']}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
             _ingest_chat(conn)
     meet.join(conn, mid, who_)
     return RedirectResponse(f"/meet/{mid}", status_code=303)
@@ -1962,7 +1964,7 @@ def create_meeting(request: Request, title: str = Form("定例会議"), me: str 
     meet.join(conn, mid, me)
     if channel.strip():
         chat.post_message(conn, channel.strip(), me,
-                          f"📹 会議「{title}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
+                          f"会議「{title}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
         _ingest_chat(conn)
     resp = RedirectResponse(f"/meet/{mid}", status_code=303)
     set_me(resp, me)
@@ -2196,7 +2198,7 @@ def share_minutes(request: Request, meeting_id: str, channel: str = Form("genera
         raise HTTPException(404)
     me = who(request)
     n_dec = conn.execute("SELECT COUNT(*) FROM events WHERE kind='decision' AND json_extract(meta,'$.meeting_id')=?", (meeting_id,)).fetchone()[0]
-    chat.post_message(conn, channel, me, f"📝 「{src[0]['title']}」の議事録サマリーです（決定 {n_dec} 件） {config.APP_BASE_URL}/meet/{meeting_id}/minutes")
+    chat.post_message(conn, channel, me, f"「{src[0]['title']}」の議事録サマリーです（決定 {n_dec} 件） {config.APP_BASE_URL}/meet/{meeting_id}/minutes")
     _ingest_chat(conn)
     return RedirectResponse(f"/meet/{meeting_id}/minutes", status_code=303)
 
@@ -2282,7 +2284,7 @@ def _finalize_job(meeting_id: str) -> None:
     if m and m["channel"]:
         n = transcript.count("\n[")
         chat.post_message(conn, m["channel"], "エージェント",
-                          f"📝 会議「{m['title']}」の議事録ができました（{n} 発言）。次の巡回で決定・タスクに分解します。 {config.APP_BASE_URL}/meet/{meeting_id}")
+                          f"会議「{m['title']}」の議事録ができました（{n} 発言）。次の巡回で決定・タスクに分解します。 {config.APP_BASE_URL}/meet/{meeting_id}")
         _ingest_chat(conn)
         for t in tagmod.tags_for(conn, "channel", m["channel"]):
             tagmod.link(conn, t["name"], "meeting", meeting_id)
@@ -2944,7 +2946,7 @@ def wiki_save(request: Request, page_id: str, title: str = Form(...), body: str 
         wikimod.clear_collab_state(conn, page_id)   # 通常エディタで保存 → 共同編集の途中状態は破棄
     if changed:
         if channel.strip():
-            chat.post_message(conn, channel.strip(), who(request), f"📖 Wiki「{title.strip()}」を更新しました{('（' + note.strip() + '）') if note.strip() else ''} {config.APP_BASE_URL}/wiki/{page_id}")
+            chat.post_message(conn, channel.strip(), who(request), f"Wiki「{title.strip()}」を更新しました{('（' + note.strip() + '）') if note.strip() else ''} {config.APP_BASE_URL}/wiki/{page_id}")
             _ingest_chat(conn)
         from app import agent
         agent.request_tick(f"Wiki 更新（{title.strip()}）")

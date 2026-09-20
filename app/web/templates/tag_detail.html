@@ -5,7 +5,7 @@
   {% if tag.description %}<span class="text-sm text-gray-400 font-normal ml-2">{{ tag.description }}</span>{% endif %}{% endblock %}
 {% block actions %}
 <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-  <button @click="open = !open" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">⚙ 編集</button>
+  <button @click="open = !open" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50"> 編集</button>
   <div x-show="open" x-cloak class="absolute right-0 top-10 z-30 w-80 bg-white border border-gray-200 rounded-lg shadow-lg text-sm p-4 space-y-3">
     <form method="post" action="/tags/{{ tag.name }}/update" class="space-y-2">
       <div><label class="text-xs text-gray-500">名前</label><input name="new_name" value="{{ tag.name }}" class="w-full border border-gray-300 rounded-lg px-2 py-1"></div>
