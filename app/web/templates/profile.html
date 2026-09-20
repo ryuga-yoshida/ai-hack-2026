@@ -25,6 +25,11 @@
       <div class="text-[11px] text-gray-400">会議室に参加中は自動で「会議中」になります。</div>
     </form>
     {% endif %}
+    <div class="border-t pt-4 text-sm flex items-center gap-3">
+      <div><div class="font-semibold text-gray-800 text-xs">デスクトップ通知</div><div class="text-xs text-gray-400">新しい検知・メンション・リマインドを OS の通知で受け取る（このブラウザのみ）</div></div>
+      <button @click="enableDesktopNotify()" class="ml-auto text-xs border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">オンにする</button>
+      <button @click="try { localStorage.setItem('desktop-notify', '0') } catch (e) {}; toast('デスクトップ通知をオフにしました')" class="text-xs text-gray-500 hover:text-gray-800">オフ</button>
+    </div>
     <div class="border-t pt-4 text-xs text-gray-500">別のアカウントで使うには「サインアウト」してからサインインし直してください。</div>
   </div>
   <aside class="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-600 space-y-2">

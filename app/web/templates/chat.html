@@ -206,13 +206,9 @@
       <div class="mx-4 my-1 text-xs text-gray-400 border-b border-gray-200 pb-1">{{ thread.replies|length }} 件の返信</div>
       {% for m in thread.replies %}{% with compact=true %}{% include "_message.html" %}{% endwith %}{% endfor %}
     </div>
-    <form method="post" action="/chat" class="border-t border-gray-200 p-3 flex gap-2">
+    <form method="post" action="/chat" class="border-t border-gray-200 p-3" x-data="composer('{{ channel }}')" @submit="if (!syncHidden()) { $event.preventDefault(); return; } stopTyping()">
       <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="reply_to" value="{{ thread.root.id }}">
-      <div class="flex-1 relative" x-data="mentionInput()">
-        <textarea name="text" rows="1" placeholder="返信…（@ でメンション、Shift+Enter で改行）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-none" @input="onInput($event); $event.target.style.height = 'auto'; $event.target.style.height = Math.min($event.target.scrollHeight, 160) + 'px'" @keydown="onKey" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
-        {% include "_mention_menu.html" %}
-      </div>
-      <button class="text-sm bg-indigo-600 text-white rounded-lg px-3">送信</button>
+      {% with ri_placeholder='返信…（@ でメンション、Shift+Enter で改行）', ri_button='返信' %}{% include "_rich_input.html" %}{% endwith %}
     </form>
   </aside>
   {% endif %}
@@ -297,69 +293,6 @@ function chatPage() {
       const inp = document.querySelector('form[action="/chat"] input[name="text"]');
       if (!inp || !inp.value) setTimeout(() => { if (!inp || !inp.value) location.reload(); }, 6000);
     },
-  };
-}
-// contenteditable → 投稿用の軽量 Markdown（描画側の _markdown_lite と対）
-function toMarkdown(node) {
-  let out = '';
-  for (const n of node.childNodes) {
-    if (n.nodeType === 3) { out += n.textContent.replace(/\u00a0/g, ' ').replace(/\u200b/g, ''); continue; }
-    if (n.nodeType !== 1) continue;
-    const tag = n.tagName.toLowerCase(); const inner = toMarkdown(n);
-    if (tag === 'br') out += '\n';
-    else if (tag === 'b' || tag === 'strong') out += inner.trim() ? '**' + inner.trim() + '**' + (inner.endsWith(' ') ? ' ' : '') : inner;
-    else if (tag === 's' || tag === 'strike' || tag === 'del') out += inner.trim() ? '~~' + inner.trim() + '~~' + (inner.endsWith(' ') ? ' ' : '') : inner;
-    else if (tag === 'code') out += inner.trim() ? '`' + inner + '`' : inner;
-    else if (tag === 'blockquote') out += (out && !out.endsWith('\n') ? '\n' : '') + inner.replace(/\n+$/, '').split('\n').map(l => '> ' + l).join('\n') + '\n';
-    else if (tag === 'ul' || tag === 'ol') out += (out && !out.endsWith('\n') ? '\n' : '') + [...n.children].map(li => '- ' + toMarkdown(li).trim()).join('\n') + '\n';
-    else if (tag === 'div' || tag === 'p') out += (out && !out.endsWith('\n') ? '\n' : '') + inner + (inner.endsWith('\n') ? '' : '\n');
-    else out += inner;
-  }
-  return out.replace(/\n{3,}/g, '\n\n');
-}
-function composer(channel) {
-  return {
-    attach: false, emo: false, typers: {}, lastSent: 0,
-    emojis: ['👍','👎','✅','❌','👀','🙏','🎉','🔥','💯','😀','😂','😅','🤔','😢','😮','🙌','👏','💪','🚀','⭐','❗','❓','📌','📎','📅','⏰','💡','📝','☕','🍵','🍺','🎯'],
-    get typingText() { const n = Object.keys(this.typers); return n.length ? n.join('、') + ' が入力中…' : ''; },
-    init() {
-      window.addEventListener('chat-typing', e => { const m = e.detail; if (m.channel !== channel || m.actor === ME) return;
-        this.typers[m.actor] = Date.now(); setTimeout(() => { if (Date.now() - this.typers[m.actor] > 3500) delete this.typers[m.actor]; }, 4000); });
-    },
-    typing() { const ws = window.chatWs && window.chatWs(); if (ws && ws.readyState === 1 && Date.now() - this.lastSent > 2000) { this.lastSent = Date.now(); ws.send(JSON.stringify({ type: 'typing', channel, actor: ME })); } },
-    stopTyping() { this.lastSent = 0; },
-    ed() { return this.$root.querySelector('[contenteditable]'); },
-    focus() { const e = this.ed(); e.focus(); },
-    cmd(name, arg) { this.focus(); document.execCommand(name, false, arg || null); this.syncHidden(); },
-    inside(tag) { const sel = window.getSelection(); if (!sel.rangeCount) return null; const n = sel.anchorNode; const el = n.nodeType === 3 ? n.parentElement : n; return el && el.closest ? el.closest(tag) : null; },
-    quote() {
-      this.focus();
-      if (this.inside('blockquote')) document.execCommand('outdent'); else document.execCommand('formatBlock', false, 'blockquote');
-      this.syncHidden();
-    },
-    code() {
-      this.focus(); const sel = window.getSelection(); if (!sel.rangeCount) return;
-      const c = this.inside('code');
-      if (c) {
-        if (sel.isCollapsed) {   // コードの中にカーソル → コードの外に出る（以降は通常の文字）
-          let t = c.nextSibling;
-          if (!t || t.nodeType !== 3) { t = document.createTextNode('\u00a0'); c.after(t); }
-          else if (!t.textContent.startsWith(' ') && !t.textContent.startsWith('\u00a0')) { t.textContent = '\u00a0' + t.textContent; }
-          const r = document.createRange(); r.setStart(t, 1); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
-        } else {                 // 範囲選択 → コード解除
-          const t = document.createTextNode(c.textContent); c.replaceWith(t);
-          const r = document.createRange(); r.selectNodeContents(t); sel.removeAllRanges(); sel.addRange(r);
-        }
-        this.syncHidden(); return;
-      }
-      const r = sel.getRangeAt(0); const text = r.toString();
-      const el = document.createElement('code'); el.textContent = text || '\u200b';
-      r.deleteContents(); r.insertNode(el);
-      const nr = document.createRange(); nr.selectNodeContents(el); if (!text) nr.collapse(false); sel.removeAllRanges(); sel.addRange(nr);
-      this.syncHidden();
-    },
-    insert(t) { this.focus(); document.execCommand('insertText', false, t); this.syncHidden(); },
-    syncHidden() { const md = toMarkdown(this.ed()); this.$root.querySelector('input[name=text]').value = md; return md.trim().length > 0; },
   };
 }
 async function toTask(id) {

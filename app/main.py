@@ -151,19 +151,25 @@ def people_list(conn: sqlite3.Connection) -> list[str]:
     return names
 
 
-def nav_context(conn: sqlite3.Connection) -> dict:
+def nav_context(conn: sqlite3.Connection, me: str = "") -> dict:
     from app import agent
     open_findings = conn.execute(
         "SELECT COUNT(*) FROM findings WHERE status IN ('notified','pending')").fetchone()[0]
-    unread_mail = 0
-    return {"nav_open_findings": open_findings, "agent_state": dict(agent.state), "people": people_list(conn),
+    unread_chat = unread_mail = overdue = 0
+    if me:
+        muted = chat.muted(conn, me)
+        unread_chat = sum(n for ch, n in _unread_counts(conn, me).items() if ch not in muted and not ch.startswith(("task:", "wiki:")))
+        unread_mail = sum(t["unread"] for t in mailmod.inbox(conn, me, "inbox"))
+        overdue = sum(1 for t in db.list_tasks(conn) if t.assignee == me and t.due_date and t.due_date < date.today() and t.status != "done")
+    return {"nav_open_findings": open_findings, "nav_unread_chat": unread_chat, "nav_unread_mail": unread_mail, "nav_overdue": overdue,
+            "agent_state": dict(agent.state), "people": people_list(conn),
             "teams_all": [t["name"] for t in tagmod.teams(conn)]}
 
 
 def render(name: str, request: Request, conn: sqlite3.Connection | None = None, **ctx) -> HTMLResponse:
-    if conn is not None:
-        ctx.update(nav_context(conn))
     ctx.setdefault("me", get_me(request))
+    if conn is not None:
+        ctx.update(nav_context(conn, ctx["me"]))
     if conn is not None and ctx["me"]:
         ctx.setdefault("my_presence", presence_of(conn, ctx["me"]))
     ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar").replace("wiki_edit", "wiki").replace("wiki_diff", "wiki"))
@@ -1014,7 +1020,53 @@ def render_message(text: str, conn: sqlite3.Connection | None = None) -> str:
         return m.group(0)
     html = _MENTION.sub(mention, html)
     html = _HASH.sub(lambda m: f'<a href="/tags/{escape(m.group(1))}" class="text-indigo-600 hover:underline">#{m.group(1)}</a>', html)
+    if conn is not None:
+        html = _internal_link_chips(html, conn)
     return _markdown_lite(html)
+
+
+_INTERNAL = re.compile(r'<a href="(?P<url>https?://[^"]*?/(?P<kind>tasks|wiki|artifacts/file|meet|calendar)/(?P<id>[^"?#]+)[^"]*)"[^>]*>[^<]*</a>')
+
+
+def _internal_link_chips(html: str, conn: sqlite3.Connection) -> str:
+    """アプリ内リンク（タスク/Wiki/成果物/会議/予定）を、対象の名前つきチップに置き換える"""
+    base = config.APP_BASE_URL.rstrip("/")
+
+    def chip(m):
+        url, kind, ident = m.group("url"), m.group("kind"), unquote(m.group("id"))
+        if not url.startswith(base) and "localhost" not in url:
+            return m.group(0)
+        label, icon, cls = None, "", "bg-indigo-50 text-indigo-700 border-indigo-100"
+        if kind == "tasks":
+            t = db.get_task(conn, ident.split("/")[0])
+            if t:
+                label, icon = f"{t.title}", "☑"; cls = "bg-indigo-50 text-indigo-700 border-indigo-100"
+        elif kind == "wiki":
+            r = conn.execute("SELECT title FROM wiki_pages WHERE id=?", (ident.split("/")[0],)).fetchone()
+            if r:
+                label, icon, cls = r["title"], "📄", "bg-violet-50 text-violet-700 border-violet-100"
+        elif kind == "artifacts/file":
+            label, icon, cls = ident.rsplit("/", 1)[-1], "📎", "bg-emerald-50 text-emerald-700 border-emerald-100"
+        elif kind == "meet":
+            mid = ident.split("/")[0]
+            r = conn.execute("SELECT title FROM meetings WHERE id=?", (mid,)).fetchone()
+            if r:
+                title = r["title"]
+            else:   # fixtures 由来の会議
+                ev = conn.execute("SELECT json_extract(meta,'$.meeting_title') t FROM events WHERE source='meet' AND json_extract(meta,'$.meeting_id')=? LIMIT 1", (mid,)).fetchone()
+                title = ev["t"] if ev else None
+            if title:
+                label, icon, cls = (title + ("（議事録）" if ident.endswith("/minutes") else "")), "📹", "bg-sky-50 text-sky-700 border-sky-100"
+        elif kind == "calendar":
+            r = conn.execute("SELECT title, start_at FROM cal_events WHERE id=?", (ident.split("/")[0],)).fetchone()
+            if r:
+                label, icon, cls = f"{r['title']} {r['start_at'][5:16].replace('T', ' ')}", "📅", "bg-amber-50 text-amber-800 border-amber-100"
+        if not label:
+            return m.group(0)
+        href = url[len(base):] if url.startswith(base) else url
+        return (f'<a href="{escape(href)}" class="inline-flex items-center gap-1 align-middle text-xs border rounded-md px-1.5 py-0.5 {cls} hover:shadow-sm max-w-[320px] truncate" '
+                f'title="{escape(url)}">{icon} {escape(label)}</a>')
+    return _INTERNAL.sub(chip, html)
 
 
 def _markdown_lite(html: str) -> str:

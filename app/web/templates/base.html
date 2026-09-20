@@ -66,6 +66,9 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
         <span class="flex-1">{{ label }}</span>
         {% if key == 'findings' and nav_open_findings %}<span class="text-xs bg-red-100 text-red-700 rounded-full px-2 py-0.5">{{ nav_open_findings }}</span>{% endif %}
+        {% if key == 'chat' and nav_unread_chat %}<span class="text-[10px] bg-indigo-600 text-white rounded-full px-1.5 py-0.5" title="未読">{{ nav_unread_chat }}</span>{% endif %}
+        {% if key == 'mail' and nav_unread_mail %}<span class="text-[10px] bg-indigo-600 text-white rounded-full px-1.5 py-0.5" title="未読">{{ nav_unread_mail }}</span>{% endif %}
+        {% if key == 'tasks' and nav_overdue %}<span class="text-[10px] bg-red-600 text-white rounded-full px-1.5 py-0.5" title="期限超過（自分）">{{ nav_overdue }}</span>{% endif %}
         {% if key == 'agent' %}<span class="w-2 h-2 rounded-full" :class="agent.enabled ? 'bg-emerald-500' : 'bg-gray-300'" title="自動巡回"></span>{% endif %}
       </a>
       {% endfor %}
@@ -143,6 +146,21 @@
         <div x-show="!items.length" class="px-4 py-6 text-sm text-gray-400 text-center">該当なし</div>
       </div>
       <div class="px-4 py-1.5 border-t border-gray-100 text-[10px] text-gray-400 flex gap-3"><span>⌘K / Ctrl+K で開く</span><span>g+d ダッシュボード · g+t タスク · g+c チャット · / 検索</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ショートカット一覧 (?) -->
+<div x-data="{ show: false }" @open-shortcuts.window="show = !show" x-cloak>
+  <div x-show="show" class="fixed inset-0 bg-black/30 z-[60]" @click="show = false"></div>
+  <div x-show="show" class="fixed inset-0 z-[61] grid place-items-center pointer-events-none">
+    <div class="w-[520px] bg-white rounded-xl shadow-2xl border border-gray-200 pointer-events-auto p-5 text-sm" @keydown.escape.window="show = false">
+      <div class="flex items-center justify-between mb-3"><h3 class="font-semibold">キーボードショートカット</h3><button @click="show = false" class="text-gray-400 hover:text-gray-700">✕</button></div>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+        {% for k, l in [('⌘K / Ctrl+K','どこへでも移動（パレット）'),('/','検索ボックスへ'),('?','この一覧'),('Esc','モーダルを閉じる / 入力から抜ける'),('g → d','ダッシュボード'),('g → f','検知結果'),('g → t','タスク'),('g → c','チャット'),('g → m','メール'),('g → k','予定表'),('g → w','Wiki'),('g → a','エージェント'),('g → n','通知'),('Enter','送信（変換確定は除く）'),('Shift+Enter','改行'),('⌘B','太字（チャット入力）')] %}
+        <div class="flex items-center gap-2"><kbd class="font-mono bg-gray-100 border border-gray-300 rounded px-1.5 py-0.5 text-[11px] whitespace-nowrap">{{ k }}</kbd><span class="text-gray-600">{{ l }}</span></div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </div>
@@ -226,11 +244,87 @@ function mentionInput() {
     },
   };
 }
+(function trackRecent() {
+  try {
+    const skip = ['/login', '/logout', '/tick'].some(p => location.pathname.startsWith(p));
+    if (skip) return;
+    const title = document.title.replace(/ [-|–] .*$/, ''); const href = location.pathname + location.search;
+    let recent = JSON.parse(localStorage.getItem('recent-pages') || '[]');
+    recent = [{ href, title }, ...recent.filter(r => r.href !== href)].slice(0, 8);
+    localStorage.setItem('recent-pages', JSON.stringify(recent));
+  } catch (e) {}
+})();
+// contenteditable → 投稿用の軽量 Markdown（描画側の _markdown_lite と対）
+function toMarkdown(node) {
+  let out = '';
+  for (const n of node.childNodes) {
+    if (n.nodeType === 3) { out += n.textContent.replace(/\u00a0/g, ' ').replace(/\u200b/g, ''); continue; }
+    if (n.nodeType !== 1) continue;
+    const tag = n.tagName.toLowerCase(); const inner = toMarkdown(n);
+    if (tag === 'br') out += '\n';
+    else if (tag === 'b' || tag === 'strong') out += inner.trim() ? '**' + inner.trim() + '**' + (inner.endsWith(' ') ? ' ' : '') : inner;
+    else if (tag === 's' || tag === 'strike' || tag === 'del') out += inner.trim() ? '~~' + inner.trim() + '~~' + (inner.endsWith(' ') ? ' ' : '') : inner;
+    else if (tag === 'code') out += inner.trim() ? '`' + inner + '`' : inner;
+    else if (tag === 'blockquote') out += (out && !out.endsWith('\n') ? '\n' : '') + inner.replace(/\n+$/, '').split('\n').map(l => '> ' + l).join('\n') + '\n';
+    else if (tag === 'ul' || tag === 'ol') out += (out && !out.endsWith('\n') ? '\n' : '') + [...n.children].map(li => '- ' + toMarkdown(li).trim()).join('\n') + '\n';
+    else if (tag === 'div' || tag === 'p') out += (out && !out.endsWith('\n') ? '\n' : '') + inner + (inner.endsWith('\n') ? '' : '\n');
+    else out += inner;
+  }
+  return out.replace(/\n{3,}/g, '\n\n');
+}
+window.ME_NAME = {{ me|tojson }};
+function composer(channel) {
+  return {
+    attach: false, emo: false, typers: {}, lastSent: 0,
+    emojis: ['👍','👎','✅','❌','👀','🙏','🎉','🔥','💯','😀','😂','😅','🤔','😢','😮','🙌','👏','💪','🚀','⭐','❗','❓','📌','📎','📅','⏰','💡','📝','☕','🍵','🍺','🎯'],
+    get typingText() { const n = Object.keys(this.typers); return n.length ? n.join('、') + ' が入力中…' : ''; },
+    init() {
+      window.addEventListener('chat-typing', e => { const m = e.detail; if (m.channel !== channel || m.actor === window.ME_NAME) return;
+        this.typers[m.actor] = Date.now(); setTimeout(() => { if (Date.now() - this.typers[m.actor] > 3500) delete this.typers[m.actor]; }, 4000); });
+    },
+    typing() { const ws = window.chatWs && window.chatWs(); if (ws && ws.readyState === 1 && Date.now() - this.lastSent > 2000) { this.lastSent = Date.now(); ws.send(JSON.stringify({ type: 'typing', channel, actor: window.ME_NAME })); } },
+    stopTyping() { this.lastSent = 0; },
+    ed() { return this.$root.querySelector('[contenteditable]'); },
+    focus() { const e = this.ed(); e.focus(); },
+    cmd(name, arg) { this.focus(); document.execCommand(name, false, arg || null); this.syncHidden(); },
+    inside(tag) { const sel = window.getSelection(); if (!sel.rangeCount) return null; const n = sel.anchorNode; const el = n.nodeType === 3 ? n.parentElement : n; return el && el.closest ? el.closest(tag) : null; },
+    quote() {
+      this.focus();
+      if (this.inside('blockquote')) document.execCommand('outdent'); else document.execCommand('formatBlock', false, 'blockquote');
+      this.syncHidden();
+    },
+    code() {
+      this.focus(); const sel = window.getSelection(); if (!sel.rangeCount) return;
+      const c = this.inside('code');
+      if (c) {
+        if (sel.isCollapsed) {   // コードの中にカーソル → コードの外に出る（以降は通常の文字）
+          let t = c.nextSibling;
+          if (!t || t.nodeType !== 3) { t = document.createTextNode('\u00a0'); c.after(t); }
+          else if (!t.textContent.startsWith(' ') && !t.textContent.startsWith('\u00a0')) { t.textContent = '\u00a0' + t.textContent; }
+          const r = document.createRange(); r.setStart(t, 1); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
+        } else {                 // 範囲選択 → コード解除
+          const t = document.createTextNode(c.textContent); c.replaceWith(t);
+          const r = document.createRange(); r.selectNodeContents(t); sel.removeAllRanges(); sel.addRange(r);
+        }
+        this.syncHidden(); return;
+      }
+      const r = sel.getRangeAt(0); const text = r.toString();
+      const el = document.createElement('code'); el.textContent = text || '\u200b';
+      r.deleteContents(); r.insertNode(el);
+      const nr = document.createRange(); nr.selectNodeContents(el); if (!text) nr.collapse(false); sel.removeAllRanges(); sel.addRange(nr);
+      this.syncHidden();
+    },
+    insert(t) { this.focus(); document.execCommand('insertText', false, t); this.syncHidden(); },
+    syncHidden() { const md = toMarkdown(this.ed()); this.$root.querySelector('input[name=text]').value = md; return md.trim().length > 0; },
+  };
+}
 function palette() {
   return {
     show: false, q: '', items: [], idx: 0, timer: null,
     open() { this.show = true; this.q = ''; this.load(); this.$nextTick(() => this.$refs.q.focus()); },
-    load() { clearTimeout(this.timer); this.timer = setTimeout(async () => { const r = await fetch('/api/palette?q=' + encodeURIComponent(this.q)); this.items = (await r.json()).items; this.idx = 0; }, 120); },
+    load() { clearTimeout(this.timer); this.timer = setTimeout(async () => { const r = await fetch('/api/palette?q=' + encodeURIComponent(this.q)); let items = (await r.json()).items;
+      if (!this.q) { try { const recent = JSON.parse(localStorage.getItem('recent-pages') || '[]').filter(x => x.href !== location.pathname + location.search); items = [...recent.map(x => ({ kind: '最近', label: x.title, href: x.href })), ...items]; } catch (e) {} }
+      this.items = items; this.idx = 0; }, 120); },
     go() { const it = this.items[this.idx]; if (it) location.href = it.href; },
   };
 }
@@ -248,13 +342,27 @@ function shell() {
         if (['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable) { if (e.key === 'Escape') e.target.blur(); return; }
         if (e.key === '/') { e.preventDefault(); const s = document.getElementById('globalSearch'); if (s) s.focus(); }
         else if (e.key === 'Escape') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); }
+        else if (e.key === '?') { window.dispatchEvent(new CustomEvent('open-shortcuts')); }
         else if (e.key === 'g') { g = true; setTimeout(() => g = false, 800); }
         else if (g) { const map = { d: '/', f: '/findings', t: '/tasks', c: '/chat', m: '/mail', k: '/calendar', w: '/wiki', a: '/agent', n: '/notifications' }; if (map[e.key]) location.href = map[e.key]; g = false; }
       });
     },
     async refresh() {
       try { const r = await fetch('/api/agent/status'); const j = await r.json(); this.agent = j.state; } catch (e) {}
-      try { const r = await fetch('/api/notifications/count'); this.notif = (await r.json()).count; } catch (e) {}
+      try { const r = await fetch('/api/notifications/count'); const n = (await r.json()).count;
+        if (this.notifInit && n > this.notif) { this.toast('新しい通知が ' + (n - this.notif) + ' 件あります'); this.desktopNotify('進行管理エージェント', '新しい通知が ' + (n - this.notif) + ' 件あります'); }
+        this.notif = n; this.notifInit = true; } catch (e) {}
+    },
+    notifInit: false,
+    desktopNotify(title, body) {
+      try { if (localStorage.getItem('desktop-notify') !== '1' || !('Notification' in window) || Notification.permission !== 'granted') return;
+        const n = new Notification(title, { body }); n.onclick = () => { window.focus(); location.href = '/notifications'; }; } catch (e) {}
+    },
+    async enableDesktopNotify() {
+      if (!('Notification' in window)) { this.toast('このブラウザは通知に対応していません'); return; }
+      const p = await Notification.requestPermission();
+      try { localStorage.setItem('desktop-notify', p === 'granted' ? '1' : '0'); } catch (e) {}
+      this.toast(p === 'granted' ? 'デスクトップ通知をオンにしました' : '通知が許可されませんでした');
     },
     toast(text) { const id = Date.now(); this.toasts.push({ id, text }); setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 3500); },
     async toggleAgent() {

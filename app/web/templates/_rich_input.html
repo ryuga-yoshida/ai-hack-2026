@@ -1,0 +1,21 @@
+{# リッチ入力（chat.html の composer() の中で使う）: ri_placeholder, ri_compact #}
+<div class="border border-gray-300 rounded-xl focus-within:ring-2 focus-within:ring-indigo-200 bg-white">
+  <div class="relative" x-data="mentionInput()">
+    <div contenteditable="true" data-placeholder="{{ ri_placeholder }}"
+      class="rich w-full text-sm px-3 py-2 min-h-[38px] max-h-40 overflow-y-auto outline-none rounded-t-xl" @input="onInput($event); typing(); syncHidden()" @keydown="onKey" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; if (!$event.shiftKey && !open) { $event.preventDefault(); if (syncHidden()) $event.target.closest('form').requestSubmit(); }" @blur="setTimeout(() => open = false, 150)" @paste.prevent="document.execCommand('insertText', false, ($event.clipboardData || window.clipboardData).getData('text/plain'))"></div>
+    <input type="hidden" name="text">
+    {% include "_mention_menu.html" %}
+  </div>
+  <div class="flex items-center gap-0.5 px-2 pb-1.5 text-gray-500">
+    <button type="button" @mousedown.prevent @click="cmd('bold')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-bold" data-tip="太字（⌘B）">B</button>
+    <button type="button" @mousedown.prevent @click="cmd('strikeThrough')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs line-through" data-tip="取り消し線">S</button>
+    <button type="button" @mousedown.prevent @click="code()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-mono" data-tip="コード">&lt;/&gt;</button>
+    <button type="button" @mousedown.prevent @click="quote()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="引用">❝</button>
+    <button type="button" @mousedown.prevent @click="cmd('insertUnorderedList')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="箇条書き">•</button>
+    <div class="relative"><button type="button" @mousedown.prevent @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="絵文字">😊</button>
+      <div x-show="emo" x-cloak @click.outside="emo = false" class="absolute left-0 bottom-8 bg-white border border-gray-200 rounded-lg shadow-lg p-2 grid grid-cols-8 gap-0.5 z-20 w-64">
+        <template x-for="e in emojis" :key="e"><button type="button" @mousedown.prevent @click="insert(e); emo = false" class="text-lg hover:bg-gray-100 rounded" x-text="e"></button></template></div></div>
+    <span class="flex-1"></span>
+    <button class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1 hover:bg-indigo-700">{{ ri_button or '送信 ↵' }}</button>
+  </div>
+</div>

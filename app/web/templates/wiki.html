@@ -80,11 +80,10 @@
               <form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="text-gray-300 hover:text-red-600 text-xs">🗑</button></form></div>
             {% else %}<div class="text-sm text-gray-400">まだコメントはありません</div>{% endfor %}
           </div>
-          <form method="post" action="/wiki/{{ page.id }}/comment" class="flex gap-2">
-            <span class="w-9 h-9 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold shrink-0">{{ me|initials }}</span>
-            <div class="flex-1 relative" x-data="mentionInput()"><input name="text" placeholder="コメント（@ でメンション、#タグ）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" @input="onInput" @keydown="onKey" @blur="setTimeout(() => open = false, 150)">{% include "_mention_menu.html" %}</div>
-            <button class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-2">送信</button>
-          </form>
+          <form method="post" action="/wiki/{{ page.id }}/comment" class="flex gap-2 items-start" x-data="composer('')" @submit="if (!syncHidden()) $event.preventDefault()">
+        <span class="w-9 h-9 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold shrink-0 mt-1" title="{{ me }} としてコメント">{{ me|initials }}</span>
+        <div class="flex-1 min-w-0">{% with ri_placeholder='コメント（@ でメンション、#タグ）', ri_button='コメント' %}{% include "_rich_input.html" %}{% endwith %}</div>
+      </form>
         </div>
       </div>
       <aside class="text-sm space-y-4">
