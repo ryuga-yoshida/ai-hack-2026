@@ -189,6 +189,11 @@ function chatPage() {
     },
   };
 }
+async function toTask(id) {
+  if (!confirm('この発言からタスクを作りますか？（本文がタイトル、発言者が担当になります）')) return;
+  const r = await fetch(`/api/chat/${id}/to_task`, { method: 'POST' });
+  if (r.ok) { const j = await r.json(); location.href = '/tasks/' + j.task_id; } else alert('失敗しました');
+}
 function openLinker(msg, task) { window.dispatchEvent(new CustomEvent('open-linker', { detail: { msg, task } })); }
 function linker() {
   return {

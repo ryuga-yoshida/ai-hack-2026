@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { safelist: [
-      ...['indigo','emerald','amber','rose','sky','violet','teal','orange','gray'].flatMap(c => [`bg-${c}-100`, `text-${c}-800`, `bg-${c}-500`]) ] };
+      ...['indigo','emerald','amber','rose','sky','violet','teal','orange','gray','red'].flatMap(c => [`bg-${c}-100`, `text-${c}-800`, `bg-${c}-500`, `border-${c}-300`]) ] };
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
@@ -84,6 +84,10 @@
       <h1 class="font-semibold">{% block heading %}{{ self.title() }}{% endblock %}</h1>
       <div class="ml-auto flex items-center gap-2">
         {% block actions %}{% endblock %}
+        <a href="/notifications" class="relative w-9 h-9 grid place-items-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50" title="通知">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+          <span x-show="notif > 0" x-cloak x-text="notif" class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] grid place-items-center"></span>
+        </a>
         <button @click="tick()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 flex items-center gap-1.5" :disabled="agent.running">
           <svg class="w-4 h-4" :class="agent.running && 'animate-spin'" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.6 9A8 8 0 0119 7.5M18.4 15A8 8 0 015 16.5"/></svg>
           今すぐ巡回
@@ -172,10 +176,11 @@ function mentionInput() {
 function shell() {
   return {
     agent: {{ agent_state|tojson if agent_state is defined else '{}' }},
-    toasts: [],
-    init() { setInterval(() => this.refresh(), 5000); },
+    toasts: [], notif: 0,
+    init() { this.refresh(); setInterval(() => this.refresh(), 5000); },
     async refresh() {
       try { const r = await fetch('/api/agent/status'); const j = await r.json(); this.agent = j.state; } catch (e) {}
+      try { const r = await fetch('/api/notifications/count'); this.notif = (await r.json()).count; } catch (e) {}
     },
     toast(text) { const id = Date.now(); this.toasts.push({ id, text }); setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 3500); },
     async toggleAgent() {

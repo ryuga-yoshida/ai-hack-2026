@@ -135,6 +135,62 @@ def render(name: str, request: Request, conn: sqlite3.Connection | None = None, 
     return templates.TemplateResponse(request, name, ctx)
 
 
+# ---------- 通知（自分宛） ----------
+
+def notifications_for(conn: sqlite3.Connection, me: str, limit: int = 100) -> list[dict]:
+    """自分宛のもの: 通知先になった検知（決定者・変更者・担当者）、状態更新の提案（担当）、@メンション、会議リマインド"""
+    from app import agent
+    out: list[dict] = []
+    if not me:
+        return out
+    for r in conn.execute("SELECT * FROM findings WHERE status IN ('notified','pending') ORDER BY created_at DESC LIMIT 200"):
+        f = db.row_to_finding(r)
+        task = db.get_task(conn, f.task_id) if f.task_id else None
+        actors = set()
+        if f.kind == "contradiction":
+            actors |= {agent.decision_actor(conn, f), agent.change_actor(conn, f)}
+        elif f.kind == "orphan_change":
+            actors.add(agent.change_actor(conn, f))
+        if task and task.assignee:
+            actors.add(task.assignee)
+        if me in actors:
+            out.append({"kind": "finding", "at": r["created_at"], "title": KIND_LABEL.get(f.kind, f.kind), "text": f.summary,
+                        "href": f"/findings?status=all#finding-{f.id}", "tone": "red" if f.kind == "contradiction" else ("emerald" if f.kind == "status_suggestion" else "amber"),
+                        "id": f.id})
+    for r in conn.execute("SELECT * FROM chat_messages WHERE deleted=0 AND text LIKE '%@%' ORDER BY posted_at DESC LIMIT 200"):
+        if me in tagmod.expand_mentions(conn, r["text"], PEOPLE) and r["actor"] != me:
+            ch = r["channel"]
+            href = f"/tasks/{ch[5:]}" if ch.startswith("task:") else f"/chat?channel={ch}" + (f"&thread={r['reply_to']}" if r["reply_to"] else "")
+            out.append({"kind": "mention", "at": r["posted_at"], "title": f"@メンション · {r['actor']}", "text": r["text"], "href": href, "tone": "indigo", "id": r["id"]})
+    for r in conn.execute("SELECT * FROM cal_events WHERE reminded_at IS NOT NULL ORDER BY reminded_at DESC LIMIT 50"):
+        e = cal._row(r)
+        if me in e["attendees"]:
+            out.append({"kind": "reminder", "at": e["reminded_at"], "title": "会議のリマインド", "text": f"{e['title']}（{e['start']:%m/%d %H:%M}〜）", "href": f"/calendar/{e['id']}", "tone": "sky", "id": e["id"]})
+    out.sort(key=lambda x: x["at"] or "", reverse=True)
+    return out[:limit]
+
+
+@app.get("/notifications", response_class=HTMLResponse)
+def notifications_page(request: Request):
+    conn = get_conn()
+    me = get_me(request)
+    items = notifications_for(conn, me)
+    seen = conn.execute("SELECT value FROM settings WHERE key=?", (f"notif_seen:{me}",)).fetchone()
+    seen_at = seen["value"] if seen else ""
+    resp = render("notifications.html", request, conn, items=items, seen_at=seen_at)
+    db.set_setting(conn, f"notif_seen:{me}", db.now_iso())
+    return resp
+
+
+@app.get("/api/notifications/count")
+def notifications_count(request: Request):
+    conn = get_conn()
+    me = get_me(request)
+    seen = conn.execute("SELECT value FROM settings WHERE key=?", (f"notif_seen:{me}",)).fetchone()
+    seen_at = seen["value"] if seen else ""
+    return {"count": sum(1 for n in notifications_for(conn, me) if (n["at"] or "") > seen_at)}
+
+
 # ---------- サインイン / プロフィール ----------
 
 @app.get("/login", response_class=HTMLResponse)
@@ -282,6 +338,52 @@ def dismiss_finding(finding_id: str, request: Request, note: str = Form("")):
                  (note.strip() or None, finding_id))
     conn.commit()
     return RedirectResponse(request.headers.get("referer") or "/", status_code=303)
+
+
+@app.post("/findings/{finding_id}/notify_chat")
+def finding_notify_chat(request: Request, finding_id: str, channel: str = Form("general")):
+    """検知を担当者にチャットで知らせる（人が押したときだけ投稿する＝承認ゲート）"""
+    from app import agent
+    conn = get_conn()
+    r = conn.execute("SELECT * FROM findings WHERE id=?", (finding_id,)).fetchone()
+    if not r:
+        raise HTTPException(404)
+    f = db.row_to_finding(r)
+    to = [a for a in {agent.decision_actor(conn, f), agent.change_actor(conn, f)} if a]
+    task = db.get_task(conn, f.task_id) if f.task_id else None
+    if task and task.assignee:
+        to.append(task.assignee)
+    mention = " ".join(f"@{a}" for a in dict.fromkeys(to)) or ""
+    chat.post_message(conn, channel, who(request), f"{mention} ⚠ {f.summary} {config.APP_BASE_URL}/findings?status=all#finding-{f.id}")
+    _ingest_chat(conn)
+    conn.execute("UPDATE findings SET status='notified' WHERE id=? AND status='pending'", (finding_id,))
+    conn.commit()
+    return RedirectResponse(request.headers.get("referer") or "/", status_code=303)
+
+
+@app.post("/findings/{finding_id}/to_task")
+def finding_to_task(request: Request, finding_id: str):
+    """検知から対応タスクを作る"""
+    from app import agent
+    conn = get_conn()
+    r = conn.execute("SELECT * FROM findings WHERE id=?", (finding_id,)).fetchone()
+    if not r:
+        raise HTTPException(404)
+    f = db.row_to_finding(r)
+    assignee = agent.change_actor(conn, f) if f.kind in ("contradiction", "orphan_change") else None
+    src = db.get_task(conn, f.task_id) if f.task_id else None
+    title = {"contradiction": "決定との食い違いを確認する", "orphan_change": "根拠のない変更を確認する", "stalled": "停滞しているタスクをフォローする"}.get(f.kind, "検知を確認する")
+    if src:
+        title += f": {src.title[:40]}"
+    task = Task(id=new_id(), title=title, assignee=assignee or (src.assignee if src else None), status="todo",
+                description=f.summary, artifacts=list(src.artifacts) if src else [])
+    db.save_task(conn, task)
+    for eid in f.evidence[:2]:
+        db.save_link(conn, Link(id=new_id(), from_type="event", from_id=eid, to_type="task", to_id=task.id,
+                                relation="discusses", confidence=1.0, method="manual"))
+    conn.execute("UPDATE findings SET status='acknowledged' WHERE id=?", (finding_id,))
+    conn.commit()
+    return RedirectResponse(f"/tasks/{task.id}", status_code=303)
 
 
 @app.post("/findings/{finding_id}/apply")
@@ -715,6 +817,31 @@ def react_chat(msg_id: str, body: ReactBody):
     for x in conn.execute("SELECT emoji, actor FROM chat_reactions WHERE message_id=? ORDER BY rowid", (msg_id,)):
         reactions.setdefault(x["emoji"], []).append(x["actor"])
     return {"added": added, "reactions": reactions}
+
+
+@app.post("/api/chat/{msg_id}/to_task")
+def message_to_task(request: Request, msg_id: str):
+    """発言からタスクを作る（本文をタイトル、発言者を担当、発言を紐付け）"""
+    from app import linker
+    conn = get_conn()
+    m = conn.execute("SELECT * FROM chat_messages WHERE id=?", (msg_id,)).fetchone()
+    if not m:
+        raise HTTPException(404)
+    if not db.get_event(conn, msg_id):
+        _ingest_chat(conn)
+    title = re.sub(r"https?://\S+", "", m["text"]).strip()[:80] or "無題のタスク"
+    task = Task(id=new_id(), title=title, assignee=m["actor"], status="todo")
+    db.save_task(conn, task)
+    conn.execute("DELETE FROM links WHERE from_type='event' AND from_id=? AND to_type='task' AND relation='discusses'", (msg_id,))
+    db.save_link(conn, Link(id=new_id(), from_type="event", from_id=msg_id, to_type="task", to_id=task.id,
+                            relation="implements", confidence=1.0, method="manual"))
+    db.mark_processed(conn, "link", msg_id, {"method": "manual", "task_id": task.id})
+    ev = db.get_event(conn, msg_id)
+    if ev:
+        linker.register_artifacts(conn, task.id, ev)
+        for tname in tagmod.hashtags(ev.text):
+            tagmod.link(conn, tname, "task", task.id)
+    return {"ok": True, "task_id": task.id}
 
 
 class LinkBody(BaseModel):

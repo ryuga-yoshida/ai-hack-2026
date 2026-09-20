@@ -47,6 +47,7 @@
       </div>
     </div>
     {% if not compact %}<a href="/chat?channel={{ m.channel }}&thread={{ m.id }}" class="p-1 hover:text-gray-700" title="スレッドで返信">↩</a>{% endif %}
+    <button type="button" @click="toTask('{{ m.id }}')" class="p-1 hover:text-gray-700" title="この発言からタスクを作る">☑</button>
     <button @click="editing = true" class="p-1 hover:text-gray-700" title="編集">✎</button>
     <form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="p-1 hover:text-red-600" title="削除">🗑</button></form>
   </div>
