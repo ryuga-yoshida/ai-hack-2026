@@ -1,5 +1,5 @@
 {# タグ追加のプルダウン。tp_type / tp_id / all_tags を渡す #}
-<div class="relative inline-block" x-data="{ open: false, q: '', tags: {{ all_tags|map(attribute='name')|list|tojson }}, colors: {{ all_tags|tag_colors|tojson }},
+<div class="relative inline-block" x-data="{ open: false, q: '', tags: {{ all_tags|map(attribute='name')|list|tojson|forceescape }}, colors: {{ all_tags|tag_colors|tojson|forceescape }},
   get list() { const q = this.q.replace(/^#/, ''); return this.tags.filter(t => !q || t.includes(q)).slice(0, 8); },
   get canCreate() { const q = this.q.replace(/^#/, '').trim(); return q && !this.tags.includes(q); },
   submit(name) { const f = this.$refs.form; f.action = '/tags/' + encodeURIComponent(name) + '/link'; f.submit(); } }" @click.outside="open = false">
