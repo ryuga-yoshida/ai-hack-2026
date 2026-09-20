@@ -125,6 +125,41 @@ def apply_hashtags(conn: sqlite3.Connection, text: str, target_type: str, target
     return names
 
 
+def update_tag(conn: sqlite3.Connection, name: str, new_name: str | None = None, color: str | None = None,
+               description: str | None = None) -> str:
+    """名前・色・説明の変更。名前を変えても tag_links は tag_id 参照なのでそのまま"""
+    t = get_tag(conn, name)
+    if not t:
+        raise KeyError(name)
+    new_name = (new_name or name).strip().lstrip("#@") or name
+    if new_name != name and get_tag(conn, new_name):
+        raise ValueError("同じ名前のタグがあります")
+    conn.execute("UPDATE tags SET name=?, color=?, description=? WHERE id=?",
+                 (new_name, color if color in COLORS else t["color"], description if description is not None else t.get("description"), t["id"]))
+    conn.commit()
+    return new_name
+
+
+def delete_tag(conn: sqlite3.Connection, name: str) -> None:
+    t = get_tag(conn, name)
+    if t:
+        conn.execute("DELETE FROM tag_links WHERE tag_id=?", (t["id"],))
+        conn.execute("DELETE FROM tags WHERE id=?", (t["id"],))
+        conn.commit()
+
+
+def merge_tags(conn: sqlite3.Connection, src: str, dst: str) -> None:
+    """src の紐付けを dst に移して src を消す"""
+    a, b = get_tag(conn, src), get_tag(conn, dst)
+    if not a or not b or a["id"] == b["id"]:
+        return
+    conn.execute("INSERT OR IGNORE INTO tag_links (tag_id, target_type, target_id, created_at) "
+                 "SELECT ?, target_type, target_id, created_at FROM tag_links WHERE tag_id=?", (b["id"], a["id"]))
+    conn.execute("DELETE FROM tag_links WHERE tag_id=?", (a["id"],))
+    conn.execute("DELETE FROM tags WHERE id=?", (a["id"],))
+    conn.commit()
+
+
 def teams(conn: sqlite3.Connection) -> list[dict]:
     return [t for t in all_tags(conn) if t["kind"] == "team"]
 

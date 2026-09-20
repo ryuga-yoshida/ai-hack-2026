@@ -2779,7 +2779,7 @@ def tag_page(request: Request, name: str):
                                (name_, name_)).fetchone()[0]
         artifacts.append({"name": name_, "changes": changes})
     return render("tag_detail.html", request, conn, tag=t, msgs=msgs, tasks=tasks, meetings=meetings,
-                  artifacts=artifacts, channels=targets["channel"], all_tasks=db.list_tasks(conn))
+                  artifacts=artifacts, channels=targets["channel"], all_tasks=db.list_tasks(conn), all_tags_list=tagmod.all_tags(conn))
 
 
 @app.post("/tags/{name}/link")
@@ -2794,6 +2794,28 @@ def tag_unlink(request: Request, name: str, target_type: str = Form(...), target
     conn = get_conn()
     tagmod.unlink(conn, name, target_type, target_id.strip())
     return RedirectResponse(request.headers.get("referer") or f"/tags/{name}", status_code=303)
+
+
+@app.post("/tags/{name}/update")
+def tag_update(name: str, new_name: str = Form(""), color: str = Form(""), description: str = Form("")):
+    conn = get_conn()
+    try:
+        nn = tagmod.update_tag(conn, name, new_name or None, color or None, description)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    return RedirectResponse(f"/tags/{nn}", status_code=303)
+
+
+@app.post("/tags/{name}/delete")
+def tag_delete(name: str):
+    tagmod.delete_tag(get_conn(), name)
+    return RedirectResponse("/tags", status_code=303)
+
+
+@app.post("/tags/{name}/merge")
+def tag_merge(name: str, into: str = Form(...)):
+    tagmod.merge_tags(get_conn(), name, into)
+    return RedirectResponse(f"/tags/{into}", status_code=303)
 
 
 @app.post("/tags/{name}/members")
