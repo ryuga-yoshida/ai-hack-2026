@@ -114,9 +114,8 @@
       <div>最終活動: <span x-text="p.last_active ? p.last_active.slice(5,16).replace('T',' ') : '—'"></span></div>
     </div>
     <div class="mt-3 flex gap-2 text-xs">
-      <a :href="'/tasks?view=list&assignee=' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">タスク</a>
-      <a :href="'/chat/dm/' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">DM</a>
-      <a :href="'/mail?compose=' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">メール</a>
+      <a :href="'/tasks?view=list&assignee=' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">この人のタスク</a>
+      <a :href="'/chat/dm/' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">DM を送る</a>
     </div>
   </div>
 </div>
