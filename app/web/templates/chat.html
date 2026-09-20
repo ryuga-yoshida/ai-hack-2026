@@ -43,7 +43,7 @@
       <div class="px-2 pt-4 pb-1 text-xs font-semibold text-gray-500 flex items-center justify-between">チーム
         <a href="/tags" class="text-gray-400 hover:text-gray-700" title="タグ・チームを管理">⚙</a></div>
       {% for t in teams %}
-      <a href="/tags/{{ t.name }}" class="flex items-center gap-2 px-2 py-1 rounded-lg text-gray-600 hover:bg-gray-200">
+      <a href="/chat/team/{{ t.name }}" class="flex items-center gap-2 px-2 py-1 rounded-lg {% if ch.name == 'team-' + t.id %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}" title="チームのチャットを開く（{{ t.members|join('・') }}）">
         <span class="w-2 h-2 rounded-full bg-{{ t.color }}-500"></span><span class="truncate">@{{ t.name }}</span><span class="ml-auto text-xs text-gray-400">{{ t.members|length }}人</span></a>
       {% else %}<div class="px-2 text-xs text-gray-400">未作成（<a href="/tags" class="underline">作る</a>）</div>{% endfor %}
     </nav>
@@ -63,7 +63,10 @@
     </div>
     {% endif %}
     {% if ch.kind != 'channel' %}
-    <div class="px-4 py-2 border-b border-gray-100 text-xs text-gray-500">{{ 'ダイレクトメッセージ' if ch.kind == 'dm' else 'グループチャット' }} · メンバー: {{ ch.members|join('・') }}</div>
+    <div class="px-4 py-2 border-b border-gray-100 text-xs text-gray-500 flex items-center gap-2">
+      {{ 'ダイレクトメッセージ' if ch.kind == 'dm' else ('チームのチャット' if ch.kind == 'team' else 'グループチャット') }} · メンバー: {{ ch.members|join('・') }}
+      {% if ch.kind == 'team' %}<a href="/tags/{{ ch.title|replace('@', '') }}" class="ml-auto text-indigo-600 hover:underline">チームの設定・タグ →</a>{% endif %}
+    </div>
     {% endif %}
     {% if view == 'mentions' %}
     <div class="flex-1 overflow-y-auto p-4">

@@ -425,6 +425,18 @@ def chat_page(request: Request, channel: str = "general", thread: str = "", q: s
                   meeting=_active_meeting(conn, channel), channel_tags=tagmod.tags_for(conn, "channel", channel))
 
 
+@app.get("/chat/team/{name}")
+def team_chat(request: Request, name: str):
+    """チームのチャット（メンバー全員のグループ）を開く。無ければ作る"""
+    conn = get_conn()
+    t = tagmod.get_tag(conn, name)
+    if not t or t["kind"] != "team":
+        raise HTTPException(404)
+    ch = chat.ensure_conversation(conn, t["members"], title=f"@{t['name']}", name=f"team-{t['id']}", kind="team")
+    tagmod.link(conn, t["name"], "channel", ch)
+    return RedirectResponse(f"/chat?channel={ch}", status_code=303)
+
+
 @app.post("/chat/conversations")
 def create_conversation(request: Request, members: list[str] = Form(...), title: str = Form(""), me: str = Form("")):
     conn = get_conn()

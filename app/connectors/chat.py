@@ -129,7 +129,7 @@ def conversations(conn: sqlite3.Connection, me: str | None = None) -> list[dict]
     """dm / group の一覧。me を渡すとその人が参加しているものだけ"""
     import json
     out = []
-    for r in conn.execute("SELECT * FROM chat_channels WHERE kind != 'channel' ORDER BY created_at DESC"):
+    for r in conn.execute("SELECT * FROM chat_channels WHERE kind IN ('dm', 'group') ORDER BY created_at DESC"):
         members = json.loads(r["members"]) if r["members"] else []
         if me and me not in members:
             continue
@@ -152,22 +152,25 @@ def get_channel(conn: sqlite3.Connection, name: str) -> dict:
     return d
 
 
-def ensure_conversation(conn: sqlite3.Connection, members: list[str], title: str | None = None) -> str:
-    """メンバーの集合で dm（2人）/ group（3人以上）を作る。同じメンバーの dm は使い回す"""
+def ensure_conversation(conn: sqlite3.Connection, members: list[str], title: str | None = None,
+                        name: str | None = None, kind: str | None = None) -> str:
+    """メンバーの集合で dm（2人）/ group（3人以上）を作る。同じメンバーの dm は使い回す。
+    name を指定すると固定名（チームのチャットなど）で作り、メンバーは最新に更新する"""
     import hashlib, json
     members = sorted({m.strip() for m in members if m.strip()})
-    if len(members) < 2:
+    if len(members) < 2 and not name:
         raise ValueError("2人以上のメンバーが必要")
-    kind = "dm" if len(members) == 2 else "group"
-    if kind == "dm":
-        name = "dm-" + hashlib.sha1("|".join(members).encode()).hexdigest()[:8]
+    kind = kind or ("dm" if len(members) == 2 else "group")
+    if not name:
+        name = ("dm-" + hashlib.sha1("|".join(members).encode()).hexdigest()[:8]) if kind == "dm" else "grp-" + new_id()[:8]
+    if conn.execute("SELECT 1 FROM chat_channels WHERE name=?", (name,)).fetchone():
+        conn.execute("UPDATE chat_channels SET members=?, title=COALESCE(?, title) WHERE name=?",
+                     (json.dumps(members, ensure_ascii=False), title, name))
     else:
-        name = "grp-" + new_id()[:8]
-    if not conn.execute("SELECT 1 FROM chat_channels WHERE name=?", (name,)).fetchone():
         conn.execute("INSERT INTO chat_channels (name, description, created_at, kind, members, title) VALUES (?,?,?,?,?,?)",
                      (name, None, datetime.now().replace(microsecond=0).isoformat(), kind,
                       json.dumps(members, ensure_ascii=False), title))
-        conn.commit()
+    conn.commit()
     return name
 
 
