@@ -107,7 +107,7 @@ STATUS_LABEL = dict(STATUSES)
 PRIORITIES = [("urgent", "緊急"), ("high", "高"), ("normal", "中"), ("low", "低")]
 PRIORITY_LABEL = dict(PRIORITIES)
 PRIORITY_ORDER = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
-ACTIVITY_LABEL = {"created": "作成", "status": "状態", "assignee": "担当者", "due_date": "期限", "title": "タイトル",
+ACTIVITY_LABEL = {"created": "作成", "status": "状態", "assignee": "担当者", "due_date": "期限", "title": "タイトル", "start_date": "開始日", "deps": "依存",
                   "priority": "優先度", "artifacts": "成果物", "description": "説明", "checklist": "チェックリスト",
                   "delete": "削除", "due": "期限", "tag": "タグ", "team": "チーム"}
 
@@ -739,7 +739,13 @@ def task_meta(conn: sqlite3.Connection, t: Task) -> dict:
     tags_all = tagmod.tags_for(conn, "task", t.id)
     updated = conn.execute("SELECT updated_at FROM tasks WHERE id=?", (t.id,)).fetchone()["updated_at"]
     ck = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(done),0) d FROM task_checklist WHERE task_id=?", (t.id,)).fetchone()
+    deps = db.deps_of(conn, t.id)
+    dep_tasks = [x for x in (db.get_task(conn, d) for d in deps) if x]
+    dep_warn = [x for x in dep_tasks if x.status != "done" and t.due_date and x.due_date and x.due_date > t.due_date]
+    blocked_by = [x for x in dep_tasks if x.status != "done"]
     return {"task": t, "n_msgs": n_msgs, "n_findings": n_findings, "check_total": ck["n"], "check_done": ck["d"],
+            "deps": dep_tasks, "dependents": [x for x in (db.get_task(conn, d) for d in db.dependents_of(conn, t.id)) if x],
+            "dep_warn": dep_warn, "blocked_by": blocked_by,
             "watchers": [r["user"] for r in conn.execute("SELECT user FROM task_watchers WHERE task_id=?", (t.id,))],
             "tags": [x for x in tags_all if x["kind"] != "team"], "teams": [x for x in tags_all if x["kind"] == "team"],
             "updated_at": updated,
@@ -794,9 +800,37 @@ def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = "",
     rows = sorted(metas, key=keyf, reverse=(sort == "updated"))
     assignees = sorted({t.assignee for t in db.list_tasks(conn) if t.assignee})
     all_tags = tagmod.all_tags(conn)
+    gantt = None
+    if view == "gantt":
+        g_tasks = [m for m in rows if m["task"].status != "done" or m["task"].due_date]
+        def span(m):
+            t = m["task"]
+            if t.start_date or t.due_date:
+                st = t.start_date or (t.due_date - timedelta(days=3))
+                en = t.due_date or (st + timedelta(days=3))
+                return st, max(en, st), False
+            created = db.from_iso(m["updated_at"]).date() if m.get("updated_at") else today
+            created = min(created, today)
+            return created, created + timedelta(days=6), True   # 日付未設定: 作成日から1週間の仮置き（点線）
+        spans = {m["task"].id: span(m) for m in g_tasks}
+        dates = [d for st, en, _ in spans.values() for d in (st, en)] or [today]
+        g_start = min(min(dates), today) - timedelta(days=2)
+        g_end = max(max(dates), today) + timedelta(days=3)
+        days_ = [(g_start + timedelta(days=i)) for i in range((g_end - g_start).days + 1)]
+        bars = []
+        for m in g_tasks:
+            st, en, tentative = spans[m["task"].id]
+            bars.append({**m, "left": (st - g_start).days, "width": (en - st).days + 1, "start": st, "end": en, "tentative": tentative})
+        pos = {b["task"].id: b for b in bars}
+        arrows = []
+        for b in bars:
+            for d in b["deps"]:
+                if d.id in pos:
+                    arrows.append({"from": d.id, "to": b["task"].id, "warn": d in b["dep_warn"]})
+        gantt = {"days": days_, "bars": bars, "arrows": arrows, "today_idx": (today - g_start).days, "undated": []}
     counts = {"all": len(db.list_tasks(conn)), "overdue": sum(1 for t in db.list_tasks(conn) if t.due_date and t.due_date < today and t.status != "done"),
               "mine": sum(1 for t in db.list_tasks(conn) if t.assignee == me and t.status != "done")}
-    resp = render("tasks.html", request, conn, by_status=by_status, rows=rows, assignees=assignees, quick=quick, priority=priority,
+    resp = render("tasks.html", request, conn, by_status=by_status, rows=rows, assignees=assignees, quick=quick, priority=priority, gantt=gantt,
                   counts=counts, me=me, PRIORITIES=PRIORITIES,
                   assignee=assignee, q=q, tag=tag, team=team, view=view, sort=sort, today=date.today().isoformat(),
                   all_tags=[t for t in all_tags if t["kind"] != "team"], teams=[t for t in all_tags if t["kind"] == "team"])
@@ -951,6 +985,26 @@ def checklist_action(request: Request, task_id: str, item_id: str, action: str, 
     return RedirectResponse(f"/tasks/{task_id}#checklist", status_code=303)
 
 
+@app.post("/tasks/{task_id}/deps")
+def task_dep_add(request: Request, task_id: str, depends_on: str = Form(...)):
+    conn = get_conn()
+    if not db.get_task(conn, task_id) or not db.get_task(conn, depends_on):
+        raise HTTPException(404)
+    try:
+        db.add_dep(conn, task_id, depends_on)
+    except ValueError as e:
+        return HTMLResponse(f"<script>alert({json.dumps(str(e), ensure_ascii=False)}); history.back();</script>", status_code=409)
+    db.task_activity(conn, task_id, get_me(request), "deps", f"依存を追加: {db.get_task(conn, depends_on).title}")
+    return RedirectResponse(request.headers.get("referer") or f"/tasks/{task_id}", status_code=303)
+
+
+@app.post("/tasks/{task_id}/deps/remove")
+def task_dep_remove(request: Request, task_id: str, depends_on: str = Form(...)):
+    conn = get_conn()
+    db.remove_dep(conn, task_id, depends_on)
+    return RedirectResponse(request.headers.get("referer") or f"/tasks/{task_id}", status_code=303)
+
+
 @app.post("/tasks/{task_id}/watch")
 def task_watch(request: Request, task_id: str, user: str = Form("")):
     conn = get_conn()
@@ -1028,6 +1082,7 @@ class TaskPatch(BaseModel):
     due_date: date | None = None
     artifacts: list[str] | None = None
     priority: str | None = None
+    start_date: date | None = None
 
 
 @app.patch("/tasks/{task_id}")

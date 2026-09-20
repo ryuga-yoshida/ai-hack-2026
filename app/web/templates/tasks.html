@@ -4,6 +4,7 @@
 <div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
   <a href="/tasks?view=board&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}" class="px-3 py-1.5 {% if view == 'board' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">ボード</a>
   <a href="/tasks?view=list&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}" class="px-3 py-1.5 {% if view == 'list' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">一覧</a>
+  <a href="/tasks?view=gantt&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}" class="px-3 py-1.5 {% if view == 'gantt' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">ガント</a>
 </div>
 <form method="get" class="flex items-center gap-2">
   <input type="hidden" name="view" value="{{ view }}">
@@ -34,7 +35,52 @@
   {% for key, label in PRIORITIES %}<a href="/tasks?view={{ view }}&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}&quick={{ quick }}&priority={{ '' if priority == key else key }}" class="px-2 py-1 rounded-full border {% if priority == key %}bg-gray-900 text-white border-gray-900{% else %}bg-white border-gray-300 text-gray-600 hover:bg-gray-50{% endif %}">{{ {'urgent':'🔴','high':'🟠','normal':'🟢','low':'⚪'}[key] }} {{ label }}</a>{% endfor %}
 </div>
 {% if team %}<div class="mb-3 text-sm text-gray-600">チーム <a href="/tags/{{ team }}" class="px-1.5 py-0.5 rounded bg-violet-100 text-violet-800">@{{ team }}</a> のタスク（チームに紐付いたもの ＋ 担当者がメンバーのもの）<a href="/tasks?view={{ view }}" class="text-indigo-600 ml-2">解除</a></div>{% endif %}
-{% if view == 'list' %}
+{% if view == 'gantt' %}
+{% set DW = 34 %}{% set RH = 40 %}{% set LW = 300 %}
+<div class="bg-white border border-gray-200 rounded-xl overflow-x-auto" x-data="gantt()">
+  <div class="relative" style="min-width: {{ LW + gantt.days|length * DW }}px">
+    <!-- header -->
+    <div class="flex sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
+      <div class="shrink-0 px-4 py-2 text-xs text-gray-500 font-semibold" style="width: {{ LW }}px">タスク（ドラッグで移動・端で期間変更）</div>
+      {% for d in gantt.days %}<div class="shrink-0 text-center text-[10px] py-1 border-l border-gray-100 {% if d.weekday() >= 5 %}bg-gray-100 text-gray-400{% elif loop.index0 == gantt.today_idx %}bg-indigo-50 text-indigo-700 font-semibold{% else %}text-gray-500{% endif %}" style="width: {{ DW }}px">{{ d.month }}/{{ d.day }}<br>{{ ['月','火','水','木','金','土','日'][d.weekday()] }}</div>{% endfor %}
+    </div>
+    <!-- rows -->
+    <div class="relative">
+      {% for d in gantt.days %}<div class="absolute top-0 bottom-0 border-l {% if loop.index0 == gantt.today_idx %}border-indigo-400 border-l-2 z-[1]{% elif d.weekday() >= 5 %}border-gray-100 bg-gray-50/60{% else %}border-gray-100{% endif %}" style="left: {{ LW + loop.index0 * DW }}px; width: {{ DW }}px"></div>{% endfor %}
+      <svg class="absolute inset-0 pointer-events-none z-[2]" style="width: {{ LW + gantt.days|length * DW }}px; height: {{ gantt.bars|length * RH }}px">
+        {% for a in gantt.arrows %}{% set fi = gantt.bars|map(attribute='task.id')|list %}{% set i1 = fi.index(a.from) %}{% set i2 = fi.index(a.to) %}{% set b1 = gantt.bars[i1] %}{% set b2 = gantt.bars[i2] %}
+        {% set x1 = LW + (b1.left + b1.width) * DW %}{% set y1 = i1 * RH + RH // 2 %}{% set x2 = LW + b2.left * DW %}{% set y2 = i2 * RH + RH // 2 %}
+        <path d="M{{ x1 }} {{ y1 }} H{{ x1 + 8 }} V{{ y2 }} H{{ x2 - 2 }}" fill="none" stroke="{{ '#dc2626' if a.warn else '#9ca3af' }}" stroke-width="1.5" stroke-dasharray="{{ '4 2' if a.warn else '' }}"/>
+        <path d="M{{ x2 - 8 }} {{ y2 - 4 }} L{{ x2 - 1 }} {{ y2 }} L{{ x2 - 8 }} {{ y2 + 4 }} z" fill="{{ '#dc2626' if a.warn else '#9ca3af' }}"/>
+        {% endfor %}
+      </svg>
+      {% for b in gantt.bars %}{% set t = b.task %}
+      <div class="flex items-center border-b border-gray-100 relative" style="height: {{ RH }}px">
+        <div class="shrink-0 px-4 flex items-center gap-2 min-w-0" style="width: {{ LW }}px">
+          <span class="w-2 h-2 rounded-full shrink-0 {% if t.status == 'done' %}bg-emerald-500{% elif t.status == 'in_progress' %}bg-indigo-500{% elif t.status == 'blocked' %}bg-red-500{% else %}bg-gray-300{% endif %}"></span>
+          <a href="/tasks/{{ t.id }}" class="text-sm truncate hover:underline {% if t.status == 'done' %}text-gray-400 line-through{% endif %}">{{ t.title }}</a>
+          {% if b.blocked_by %}<span class="text-[10px] text-amber-700 shrink-0" title="待ち: {{ b.blocked_by|map(attribute='title')|join('、') }}">⛓ {{ b.blocked_by|length }}</span>{% endif %}
+          {% if b.dep_warn %}<span class="text-[10px] text-red-600 shrink-0" title="依存先の期限がこのタスクの期限より後">⚠</span>{% endif %}
+          <span class="ml-auto text-[10px] text-gray-400 shrink-0">{{ t.assignee or '' }}</span>
+        </div>
+        <div class="absolute rounded-md text-[11px] leading-6 px-2 truncate cursor-grab select-none {% if b.tentative %}border-2 border-dashed border-gray-400 text-gray-500 bg-white{% elif t.status == 'done' %}text-white bg-emerald-400{% elif t.status == 'blocked' %}text-white bg-red-400{% elif b.overdue %}text-white bg-red-500{% elif t.status == 'in_progress' %}text-white bg-indigo-500{% else %}text-white bg-gray-400{% endif %}"
+             style="left: {{ LW + b.left * DW }}px; width: {{ b.width * DW - 4 }}px; top: 8px; height: 24px"
+             data-id="{{ t.id }}" data-start="{{ b.start.isoformat() }}" data-end="{{ b.end.isoformat() }}" @mousedown="down($event, 'move')" title="{{ b.start.strftime('%m/%d') }} 〜 {{ b.end.strftime('%m/%d') }}{% if b.tentative %}（日付未設定・仮置き。ドラッグすると確定します）{% elif not t.start_date %}（開始日は未設定・期限から仮置き）{% endif %}">
+          <span class="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize" @mousedown.stop="down($event, 'start')"></span>
+          {{ t.title }}
+          <span class="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize" @mousedown.stop="down($event, 'end')"></span>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not gantt.bars %}<div class="px-4 py-10 text-center text-sm text-gray-400">期限か開始日のあるタスクがありません</div>{% endif %}
+    </div>
+  </div>
+  {% if gantt.undated %}
+  <div class="border-t border-gray-200 px-4 py-2 text-xs text-gray-500">日付なし: {% for m in gantt.undated %}<a href="/tasks/{{ m.task.id }}" class="hover:underline">{{ m.task.title|truncate(20) }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</div>
+  {% endif %}
+</div>
+<p class="text-xs text-gray-500 mt-2">点線＝日付未設定（仮置き・ドラッグで確定）。灰の矢印＝依存（先に終わる必要がある）。赤の破線＝依存先の期限がこのタスクの期限より後（順序が破綻）。バーをドラッグして日付を変更、端をつかんで期間を変更。依存はタスク詳細で追加します。</p>
+{% elif view == 'list' %}
 <form method="post" action="/tasks/bulk" x-data="bulk()" id="bulkForm">
 <div x-show="sel.length" x-cloak class="sticky top-0 z-20 mb-2 flex items-center gap-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
   <span class="font-semibold" x-text="sel.length + ' 件を選択中'"></span>
@@ -155,6 +201,30 @@
 {% block scripts %}
 <script>
 window.shellPatch = (url, body, msg) => Alpine.$data(document.body).patch(url, body, msg);
+function gantt() {
+  const DW = {{ DW if DW is defined else 34 }};
+  return {
+    drag: null,
+    down(e, mode) {
+      const el = e.target.closest('[data-id]'); if (!el) return;
+      this.drag = { el, mode, x0: e.clientX, start: new Date(el.dataset.start), end: new Date(el.dataset.end), left0: parseFloat(el.style.left), width0: parseFloat(el.style.width) };
+      const move = ev => { const dx = ev.clientX - this.drag.x0; const days = Math.round(dx / DW);
+        if (mode === 'move') { el.style.left = (this.drag.left0 + days * DW) + 'px'; }
+        else if (mode === 'end') { el.style.width = Math.max(DW - 4, this.drag.width0 + days * DW) + 'px'; }
+        else { el.style.left = (this.drag.left0 + days * DW) + 'px'; el.style.width = Math.max(DW - 4, this.drag.width0 - days * DW) + 'px'; }
+        this.drag.days = days; };
+      const up = async () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+        const d = this.drag; this.drag = null; if (!d || !d.days) return;
+        const add = (dt, n) => { const x = new Date(dt); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+        let body = {};
+        if (mode === 'move') body = { start_date: add(d.start, d.days), due_date: add(d.end, d.days) };
+        else if (mode === 'end') body = { due_date: add(d.end, d.days) };
+        else body = { start_date: add(d.start, d.days) };
+        const j = await window.shellPatch('/tasks/' + el.dataset.id, body, '日付を更新しました'); if (j) location.reload(); };
+      document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    },
+  };
+}
 function bulk() {
   const people = {{ PEOPLE|list|tojson }}.map(p => [p, p]);
   return {

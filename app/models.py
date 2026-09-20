@@ -41,6 +41,7 @@ class Task:
     created_from: str | None = None
     artifacts: list[str] = field(default_factory=list)
     priority: str = "normal"     # low|normal|high|urgent（仕様外の追加。UI 用）
+    start_date: date | None = None   # ガント用の開始日（任意）
 
 
 @dataclass

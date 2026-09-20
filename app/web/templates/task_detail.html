@@ -109,9 +109,27 @@
           <option value="">未割当</option>{% for p in PEOPLE %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
         </select>
       </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div><label class="text-xs text-gray-500">開始日</label>
+          <input type="date" x-model="t.start_date" @change="save({start_date: t.start_date || null}, '開始日を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5"></div>
+        <div><label class="text-xs text-gray-500">期限</label>
+          <input type="date" x-model="t.due_date" @change="save({due_date: t.due_date || null}, '期限を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5"></div>
+      </div>
       <div>
-        <label class="text-xs text-gray-500">期限</label>
-        <input type="date" x-model="t.due_date" @change="save({due_date: t.due_date || null}, '期限を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5">
+        <label class="text-xs text-gray-500">依存 <span class="text-gray-400">（先に終わっている必要があるタスク）</span></label>
+        <div class="mt-1 space-y-1">
+          {% for d in meta.deps %}
+          <div class="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-2 py-1"><span class="w-1.5 h-1.5 rounded-full {% if d.status == 'done' %}bg-emerald-500{% else %}bg-amber-400{% endif %}"></span>
+            <a href="/tasks/{{ d.id }}" class="flex-1 truncate hover:underline {% if d.status == 'done' %}text-gray-400{% endif %}">{{ d.title }}</a>
+            {% if d in meta.dep_warn %}<span class="text-red-600" title="依存先の期限（{{ d.due_date }}）がこのタスクの期限より後">⚠ 順序</span>{% endif %}
+            <form method="post" action="/tasks/{{ task.id }}/deps/remove"><input type="hidden" name="depends_on" value="{{ d.id }}"><button class="text-gray-400 hover:text-red-600">×</button></form></div>
+          {% else %}<div class="text-xs text-gray-400">なし</div>{% endfor %}
+          {% if meta.dependents %}<div class="text-[11px] text-gray-500 pt-1">このタスクを待っている: {% for d in meta.dependents %}<a href="/tasks/{{ d.id }}" class="hover:underline">{{ d.title|truncate(18) }}</a>{% if not loop.last %}、{% endif %}{% endfor %}</div>{% endif %}
+          <form method="post" action="/tasks/{{ task.id }}/deps" class="flex gap-1 pt-1">
+            <select name="depends_on" class="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white">{% for o in open_tasks if o.id not in (meta.deps|map(attribute='id')|list) %}<option value="{{ o.id }}">{{ o.title|truncate(30) }}</option>{% endfor %}</select>
+            <button class="text-xs border border-gray-300 rounded-lg px-2 bg-white hover:bg-gray-50">追加</button>
+          </form>
+        </div>
       </div>
       <div>
         <label class="text-xs text-gray-500">成果物 <span class="text-gray-400">（チャットに貼られた SPO リンクから自動登録）</span></label>
@@ -175,7 +193,7 @@ function detail() {
   return {
     t: { title: {{ task.title|tojson }}, description: {{ (task.description or '')|tojson }}, status: {{ task.status|tojson }},
          assignee: {{ (task.assignee or '')|tojson }}, due_date: {{ (task.due_date.isoformat() if task.due_date else '')|tojson }},
-         artifacts: {{ task.artifacts|tojson }}, priority: {{ task.priority|tojson }} },
+         artifacts: {{ task.artifacts|tojson }}, priority: {{ task.priority|tojson }}, start_date: {{ (task.start_date.isoformat() if task.start_date else '')|tojson }} },
     newArt: '',
     async save(body, msg) { await Alpine.$data(document.body).patch('/tasks/{{ task.id }}', body, msg); },
   };

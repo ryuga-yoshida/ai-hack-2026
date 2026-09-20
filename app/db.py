@@ -68,6 +68,11 @@ CREATE TABLE IF NOT EXISTS task_checklist (
     done     INTEGER NOT NULL DEFAULT 0,
     pos      INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS task_deps (
+    task_id     TEXT NOT NULL,   -- このタスクは
+    depends_on  TEXT NOT NULL,   -- このタスクの完了を待つ
+    PRIMARY KEY (task_id, depends_on)
+);
 CREATE TABLE IF NOT EXISTS task_watchers (
     task_id  TEXT NOT NULL,
     user     TEXT NOT NULL,
@@ -191,8 +196,11 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(DDL)
     if "payload" not in {r[1] for r in conn.execute("PRAGMA table_info(findings)")}:
         conn.execute("ALTER TABLE findings ADD COLUMN payload TEXT")
-    if "priority" not in {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}:
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}
+    if "priority" not in cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'")
+    if "start_date" not in cols:
+        conn.execute("ALTER TABLE tasks ADD COLUMN start_date TEXT")
     conn.commit()
     from app.connectors import calendar, chat, mail, meet, wiki  # 自作ツールのテーブル（循環importを避けて遅延）
     from app import minutes, tags
@@ -286,15 +294,15 @@ def save_task(conn: sqlite3.Connection, t: Task, at: datetime | None = None) -> 
     ts = to_iso(at) if at else now_iso()
     conn.execute(
         """INSERT INTO tasks
-           (id, title, description, assignee, status, due_date, created_from, artifacts, priority, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)
+           (id, title, description, assignee, status, due_date, created_from, artifacts, priority, start_date, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET
              title=excluded.title, description=excluded.description,
              assignee=excluded.assignee, status=excluded.status,
              due_date=excluded.due_date, created_from=excluded.created_from,
-             artifacts=excluded.artifacts, priority=excluded.priority, updated_at=excluded.updated_at""",
+             artifacts=excluded.artifacts, priority=excluded.priority, start_date=excluded.start_date, updated_at=excluded.updated_at""",
         (t.id, t.title, t.description, t.assignee, t.status, to_iso(t.due_date),
-         t.created_from, json.dumps(t.artifacts, ensure_ascii=False), t.priority or "normal", ts, ts),
+         t.created_from, json.dumps(t.artifacts, ensure_ascii=False), t.priority or "normal", to_iso(t.start_date), ts, ts),
     )
     conn.commit()
 
@@ -306,7 +314,44 @@ def row_to_task(r: sqlite3.Row) -> Task:
         due_date=date_from_iso(r["due_date"]), created_from=r["created_from"],
         artifacts=json.loads(r["artifacts"]) if r["artifacts"] else [],
         priority=(r["priority"] if "priority" in r.keys() else None) or "normal",
+        start_date=date_from_iso(r["start_date"]) if "start_date" in r.keys() else None,
     )
+
+
+# ---------- 依存関係 ----------
+
+def deps_of(conn: sqlite3.Connection, task_id: str) -> list[str]:
+    return [r[0] for r in conn.execute("SELECT depends_on FROM task_deps WHERE task_id=?", (task_id,))]
+
+
+def dependents_of(conn: sqlite3.Connection, task_id: str) -> list[str]:
+    return [r[0] for r in conn.execute("SELECT task_id FROM task_deps WHERE depends_on=?", (task_id,))]
+
+
+def would_cycle(conn: sqlite3.Connection, task_id: str, depends_on: str) -> bool:
+    """task_id が depends_on を待つ関係を足したとき循環するか（depends_on から task_id に辿り着けるなら循環）"""
+    seen, stack = set(), [depends_on]
+    while stack:
+        cur = stack.pop()
+        if cur == task_id:
+            return True
+        if cur in seen:
+            continue
+        seen.add(cur)
+        stack.extend(deps_of(conn, cur))
+    return False
+
+
+def add_dep(conn: sqlite3.Connection, task_id: str, depends_on: str) -> None:
+    if task_id == depends_on or would_cycle(conn, task_id, depends_on):
+        raise ValueError("循環する依存は追加できません")
+    conn.execute("INSERT OR IGNORE INTO task_deps (task_id, depends_on) VALUES (?,?)", (task_id, depends_on))
+    conn.commit()
+
+
+def remove_dep(conn: sqlite3.Connection, task_id: str, depends_on: str) -> None:
+    conn.execute("DELETE FROM task_deps WHERE task_id=? AND depends_on=?", (task_id, depends_on))
+    conn.commit()
 
 
 def task_activity(conn: sqlite3.Connection, task_id: str, actor: str | None, action: str, detail: str = "") -> None:
