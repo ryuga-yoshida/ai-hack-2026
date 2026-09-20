@@ -46,8 +46,9 @@
         <td class="px-4 py-2 {% if m.overdue %}text-red-600 font-medium{% endif %}">{{ t.due_date.strftime('%m/%d') if t.due_date else '—' }}</td>
         <td class="px-4 py-2">{% if m.n_findings %}<a href="/findings?status=open" class="text-red-600 font-semibold">⚠ {{ m.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
         <td class="px-4 py-2 text-gray-500 text-xs">{{ m.updated_at|dt }}</td>
-        <td class="px-4 py-2"><div class="flex flex-wrap gap-1 items-center">{% for tm in m.teams %}<a href="/tasks?view=list&team={{ tm.name }}" class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</a>{% endfor %}{% for tg in m.tags %}<a href="/tasks?view=list&tag={{ tg.name }}" class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</a>{% endfor %}
-          {% with tp_task_id=t.id, tp_mine=m.teams|map(attribute='name')|list %}{% include "_team_picker.html" %}{% endwith %}</div></td>
+        <td class="px-4 py-2"><div class="flex flex-wrap gap-1 items-center">{% for tm in m.teams %}<a href="/tasks?view=list&team={{ tm.name }}" class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</a>{% endfor %}{% for tg in m.tags %}<form method="post" action="/tags/{{ tg.name }}/unlink" class="inline"><input type="hidden" name="target_type" value="task"><input type="hidden" name="target_id" value="{{ t.id }}"><span class="inline-flex items-center gap-0.5 text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800"><a href="/tasks?view=list&tag={{ tg.name }}">#{{ tg.name }}</a><button class="opacity-40 hover:opacity-100" title="タグを外す">×</button></span></form>{% endfor %}
+          {% with tp_task_id=t.id, tp_mine=m.teams|map(attribute='name')|list %}{% include "_team_picker.html" %}{% endwith %}
+          {% with tp_type='task', tp_id=t.id %}{% include "_tag_picker.html" %}{% endwith %}</div></td>
         <td class="px-4 py-2 text-right text-gray-500">{{ m.n_msgs or '' }}</td>
       </tr>
     {% else %}<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">該当するタスクはありません。</td></tr>{% endfor %}
@@ -85,7 +86,7 @@
         </div>
         <div class="mt-1.5 flex items-center gap-2">
           {% if m.origin %}<span class="text-[11px] text-gray-400 truncate">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成 · {{ m.origin.occurred_at|dt }}</span>{% endif %}
-          <span class="ml-auto">{% with tp_task_id=t.id, tp_mine=m.teams|map(attribute='name')|list %}{% include "_team_picker.html" %}{% endwith %}</span>
+          <span class="ml-auto flex items-center gap-1">{% with tp_task_id=t.id, tp_mine=m.teams|map(attribute='name')|list %}{% include "_team_picker.html" %}{% endwith %}{% with tp_type='task', tp_id=t.id %}{% include "_tag_picker.html" %}{% endwith %}</span>
         </div>
       </div>
     {% endfor %}
