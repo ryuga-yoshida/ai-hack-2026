@@ -194,25 +194,61 @@ def task_meta(conn: sqlite3.Connection, t: Task) -> dict:
     n_findings = conn.execute(
         "SELECT COUNT(*) FROM findings WHERE task_id=? AND status IN ('notified','pending')", (t.id,)).fetchone()[0]
     origin = db.get_event(conn, t.created_from) if t.created_from else None
-    return {"task": t, "n_msgs": n_msgs, "n_findings": n_findings, "tags": tagmod.tags_for(conn, "task", t.id),
+    tags_all = tagmod.tags_for(conn, "task", t.id)
+    updated = conn.execute("SELECT updated_at FROM tasks WHERE id=?", (t.id,)).fetchone()["updated_at"]
+    return {"task": t, "n_msgs": n_msgs, "n_findings": n_findings,
+            "tags": [x for x in tags_all if x["kind"] != "team"], "teams": [x for x in tags_all if x["kind"] == "team"],
+            "updated_at": updated,
             "origin": origin, "overdue": bool(t.due_date and t.due_date < date.today() and t.status != "done")}
 
 
 @app.get("/tasks", response_class=HTMLResponse)
-def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = ""):
+def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = "", team: str = "",
+               view: str = "", sort: str = "updated"):
     conn = get_conn()
+    view = view or request.cookies.get("tasks_view", "board")
     tasks = db.list_tasks(conn)
     if assignee:
         tasks = [t for t in tasks if (t.assignee or "") == assignee]
     if tag:
         ids = set(tagmod.targets_for(conn, tag)["task"])
         tasks = [t for t in tasks if t.id in ids]
+    if team:
+        tm = tagmod.get_tag(conn, team)
+        ids = set(tagmod.targets_for(conn, team)["task"])
+        members = set(tm["members"]) if tm else set()
+        # チームに明示的に紐付いたタスク ＋ 担当者がチームのメンバーであるタスク
+        tasks = [t for t in tasks if t.id in ids or (t.assignee in members)]
     if q:
         tasks = [t for t in tasks if q in t.title or q in (t.description or "")]
-    by_status = {s: [task_meta(conn, t) for t in tasks if t.status == s] for s, _ in STATUSES}
+    metas = [task_meta(conn, t) for t in tasks]
+    by_status = {s: [m for m in metas if m["task"].status == s] for s, _ in STATUSES}
+    order = {"todo": 0, "in_progress": 1, "blocked": 2, "done": 3}
+    keyf = {"updated": lambda m: m["updated_at"], "due": lambda m: (m["task"].due_date is None, str(m["task"].due_date or "")),
+            "status": lambda m: order[m["task"].status], "assignee": lambda m: m["task"].assignee or "～",
+            "title": lambda m: m["task"].title, "findings": lambda m: -m["n_findings"]}.get(sort, lambda m: m["updated_at"])
+    rows = sorted(metas, key=keyf, reverse=(sort == "updated"))
     assignees = sorted({t.assignee for t in db.list_tasks(conn) if t.assignee})
-    return render("tasks.html", request, conn, by_status=by_status, assignees=assignees,
-                  assignee=assignee, q=q, tag=tag, all_tags=tagmod.all_tags(conn))
+    all_tags = tagmod.all_tags(conn)
+    resp = render("tasks.html", request, conn, by_status=by_status, rows=rows, assignees=assignees,
+                  assignee=assignee, q=q, tag=tag, team=team, view=view, sort=sort,
+                  all_tags=[t for t in all_tags if t["kind"] != "team"], teams=[t for t in all_tags if t["kind"] == "team"])
+    resp.set_cookie("tasks_view", view, max_age=86400 * 365)
+    return resp
+
+
+@app.post("/tasks/{task_id}/teams")
+def set_task_teams(task_id: str, teams: list[str] = Form([])):
+    """タスクをチームに紐付ける（複数可）。チームはタグ(kind=team)として保持"""
+    conn = get_conn()
+    if not db.get_task(conn, task_id):
+        raise HTTPException(404)
+    for t in tagmod.teams(conn):
+        if t["name"] in teams:
+            tagmod.link(conn, t["name"], "task", task_id)
+        else:
+            tagmod.unlink(conn, t["name"], "task", task_id)
+    return RedirectResponse(f"/tasks/{task_id}", status_code=303)
 
 
 @app.post("/tasks")
@@ -272,8 +308,10 @@ def task_detail(request: Request, task_id: str):
     task = db.get_task(conn, task_id)
     if not task:
         raise HTTPException(404)
+    all_tags = tagmod.all_tags(conn)
     return render("task_detail.html", request, conn, task=task, meta=task_meta(conn, task),
-                  timeline=task_timeline(conn, task), me=get_me(request), all_tags=tagmod.all_tags(conn))
+                  timeline=task_timeline(conn, task), me=get_me(request),
+                  all_tags=[t for t in all_tags if t["kind"] != "team"], teams=[t for t in all_tags if t["kind"] == "team"])
 
 
 class TaskPatch(BaseModel):

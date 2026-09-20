@@ -1,8 +1,17 @@
 {% extends "base.html" %}
 {% block title %}タスク{% endblock %}
 {% block actions %}
+<div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+  <a href="/tasks?view=board&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}" class="px-3 py-1.5 {% if view == 'board' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">ボード</a>
+  <a href="/tasks?view=list&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}" class="px-3 py-1.5 {% if view == 'list' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">一覧</a>
+</div>
 <form method="get" class="flex items-center gap-2">
-  <input name="q" value="{{ q }}" placeholder="検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-40">
+  <input type="hidden" name="view" value="{{ view }}">
+  <input name="q" value="{{ q }}" placeholder="検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-36">
+  <select name="team" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+    <option value="">全チーム</option>
+    {% for t in teams %}<option value="{{ t.name }}" {% if t.name == team %}selected{% endif %}>@{{ t.name }}</option>{% endfor %}
+  </select>
   <select name="tag" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
     <option value="">全タグ</option>
     {% for t in all_tags %}<option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>#{{ t.name }}</option>{% endfor %}
@@ -16,6 +25,35 @@
 {% endblock %}
 {% block main_class %}p-6 overflow-x-auto{% endblock %}
 {% block content %}
+{% if team %}<div class="mb-3 text-sm text-gray-600">チーム <a href="/tags/{{ team }}" class="px-1.5 py-0.5 rounded bg-violet-100 text-violet-800">@{{ team }}</a> のタスク（チームに紐付いたもの ＋ 担当者がメンバーのもの）<a href="/tasks?view={{ view }}" class="text-indigo-600 ml-2">解除</a></div>{% endif %}
+{% if view == 'list' %}
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-xs text-gray-500 text-left">
+      <tr>
+        {% for key, label in [('title','タスク'),('status','状態'),('assignee','担当'),('due','期限'),('findings','検知'),('updated','更新')] %}
+        <th class="px-4 py-2"><a href="/tasks?view=list&sort={{ key }}&assignee={{ assignee }}&tag={{ tag }}&team={{ team }}&q={{ q }}" class="hover:text-gray-900 {% if sort == key %}text-gray-900 font-semibold{% endif %}">{{ label }}{% if sort == key %} ▾{% endif %}</a></th>
+        {% endfor %}
+        <th class="px-4 py-2">タグ / チーム</th><th class="px-4 py-2 text-right">💬</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in rows %}{% set t = m.task %}
+      <tr class="border-t border-gray-100 hover:bg-gray-50 {% if t.status == 'done' %}text-gray-400{% endif %}">
+        <td class="px-4 py-2"><a href="/tasks/{{ t.id }}" class="font-medium hover:underline">{{ t.title }}</a>{% if m.origin %}<div class="text-[11px] text-gray-400">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成</div>{% endif %}</td>
+        <td class="px-4 py-2"><span class="text-xs px-2 py-0.5 rounded-full {% if t.status == 'todo' %}bg-gray-100 text-gray-700{% elif t.status == 'in_progress' %}bg-indigo-100 text-indigo-700{% elif t.status == 'blocked' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">{{ STATUS_LABEL[t.status] }}</span></td>
+        <td class="px-4 py-2">{% if t.assignee %}<span class="inline-flex items-center gap-1"><span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>{{ t.assignee }}</span>{% else %}<span class="text-gray-400">未割当</span>{% endif %}</td>
+        <td class="px-4 py-2 {% if m.overdue %}text-red-600 font-medium{% endif %}">{{ t.due_date.strftime('%m/%d') if t.due_date else '—' }}</td>
+        <td class="px-4 py-2">{% if m.n_findings %}<a href="/findings?status=open" class="text-red-600 font-semibold">⚠ {{ m.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
+        <td class="px-4 py-2 text-gray-500 text-xs">{{ m.updated_at|dt }}</td>
+        <td class="px-4 py-2"><div class="flex flex-wrap gap-1">{% for tm in m.teams %}<a href="/tasks?view=list&team={{ tm.name }}" class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</a>{% endfor %}{% for tg in m.tags %}<a href="/tasks?view=list&tag={{ tg.name }}" class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</a>{% endfor %}</div></td>
+        <td class="px-4 py-2 text-right text-gray-500">{{ m.n_msgs or '' }}</td>
+      </tr>
+    {% else %}<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">該当するタスクはありません。</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
 <div class="grid grid-cols-4 gap-4 min-w-[900px]" x-data="kanban()">
 {% for status, label in STATUSES %}
   <div class="bg-gray-100 rounded-xl p-3 min-h-[60vh]" data-status="{{ status }}"
@@ -33,7 +71,7 @@
          class="block bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md hover:border-indigo-300 transition cursor-grab {% if t.status == 'done' %}opacity-70{% endif %}"
          id="task-{{ t.id }}">
         <div class="text-sm font-medium leading-snug">{{ t.title }}</div>
-        {% if m.tags %}<div class="flex flex-wrap gap-1 mt-1">{% for tg in m.tags %}<span class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</span>{% endfor %}</div>{% endif %}
+        {% if m.tags or m.teams %}<div class="flex flex-wrap gap-1 mt-1">{% for tm in m.teams %}<span class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</span>{% endfor %}{% for tg in m.tags %}<span class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</span>{% endfor %}</div>{% endif %}
         <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
           <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>
           <span>{{ t.assignee or "未割当" }}</span>
@@ -51,6 +89,7 @@
   </div>
 {% endfor %}
 </div>
+{% endif %}
 
 <!-- 新規タスク モーダル -->
 <div x-data="{ open: false }" @open-new-task.window="open = true" x-cloak>
