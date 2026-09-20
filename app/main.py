@@ -1646,7 +1646,9 @@ def meeting_rows(conn: sqlite3.Connection) -> list[dict]:
         ps = [p[0] for p in conn.execute(
             "SELECT name FROM meeting_participants WHERE meeting_id=? ORDER BY joined_at", (r["id"],))]
         n_dec = conn.execute("SELECT COUNT(*) FROM events WHERE kind='decision' AND json_extract(meta,'$.meeting_id')=?", (r["id"],)).fetchone()[0]
+        st, en = db.from_iso(r["started_at"]), (db.from_iso(r["ended_at"]) if r["ended_at"] else None)
         out.append({**dict(r), "participants": ps, "n_decisions": n_dec,
+                    "duration": int((en - st).total_seconds() // 60) if en and en > st else None,
                     "n_lines": (r["transcript"] or "").count("\n[") if r["transcript"] else 0})
     return out
 
@@ -1666,10 +1668,22 @@ def fixture_meetings(conn: sqlite3.Connection) -> list[dict]:
 
 
 @app.get("/meet", response_class=HTMLResponse)
-def meet_page(request: Request):
+def meet_page(request: Request, q: str = "", status: str = ""):
+    from datetime import timedelta
     conn = get_conn()
-    return render("meet.html", request, conn, meetings=meeting_rows(conn), fixtures=fixture_meetings(conn),
-                  me=get_me(request))
+    meetings, fixtures = meeting_rows(conn), fixture_meetings(conn)
+    if q:
+        ql = q.lower()
+        meetings = [m for m in meetings if ql in m["title"].lower() or any(ql in p.lower() for p in m["participants"])]
+        fixtures = [m for m in fixtures if ql in (m["title"] or "").lower()]
+    if status:
+        meetings = [m for m in meetings if m["status"] == status]
+        if status != "done":
+            fixtures = []
+    now = datetime.now()
+    upcoming = [e for e in cal.between(conn, now, now + timedelta(days=14)) if e["kind"] != "appointment" and not e.get("meeting_id")]
+    return render("meet.html", request, conn, meetings=meetings, fixtures=fixtures, q=q, status=status, upcoming=upcoming[:8],
+                  live=[m for m in meeting_rows(conn) if m["status"] == "recording"], me=get_me(request))
 
 
 @app.post("/meet")
@@ -1723,8 +1737,49 @@ def meet_room(request: Request, meeting_id: str, me: str = ""):
             mm = re.match(r"^\[(\d{1,2}:\d{2})\]\s*([^:：]+)[:：]\s*(.*)$", raw)
             if mm:
                 lines.append({"time": mm[1], "actor": mm[2].strip(), "text": mm[3]})
-    return render("meet_room.html", request, conn, m=m, me=me,
+    return render("meet_room.html", request, conn, m=m, me=me, notes=meet.get_notes(conn, meeting_id),
+                  chat_log=meet.chat_log(conn, meeting_id) if not m.get("readonly") else [],
+                  tracks=meet.tracks(conn, meeting_id) if not m.get("readonly") else [],
                   participants=participants, lines=lines, extracted=meeting_extracted(conn, meeting_id))
+
+
+@app.post("/meet/{meeting_id}/notes")
+async def meet_notes(request: Request, meeting_id: str):
+    """会議中の共有メモ（自動保存）"""
+    conn = get_conn()
+    body = await request.json()
+    meet.save_notes(conn, meeting_id, str(body.get("body", ""))[:20000], who(request))
+    return {"ok": True}
+
+
+@app.get("/meet/{meeting_id}/notes")
+def meet_notes_get(meeting_id: str):
+    return meet.get_notes(get_conn(), meeting_id)
+
+
+@app.get("/meet/{meeting_id}/track/{track_id}")
+def meet_track(meeting_id: str, track_id: str):
+    """話者ごとの録音を再生用に返す"""
+    from fastapi.responses import Response
+    conn = get_conn()
+    r = conn.execute("SELECT mime, audio FROM meeting_tracks WHERE id=? AND meeting_id=?", (track_id, meeting_id)).fetchone()
+    if not r:
+        raise HTTPException(404)
+    return Response(content=r["audio"], media_type=r["mime"] or "audio/webm")
+
+
+@app.post("/meet/{meeting_id}/delete")
+def meet_delete(meeting_id: str):
+    conn = get_conn()
+    if not conn.execute("SELECT 1 FROM meetings WHERE id=?", (meeting_id,)).fetchone():
+        raise HTTPException(404)
+    for tbl in ("meeting_tracks", "meeting_participants", "meeting_notes", "meeting_chat"):
+        conn.execute(f"DELETE FROM {tbl} WHERE meeting_id=?", (meeting_id,))
+    conn.execute("DELETE FROM meeting_summaries WHERE meeting_id=?", (meeting_id,))
+    conn.execute("UPDATE cal_events SET meeting_id=NULL WHERE meeting_id=?", (meeting_id,))
+    conn.execute("DELETE FROM meetings WHERE id=?", (meeting_id,))
+    conn.commit()
+    return RedirectResponse("/meet", status_code=303)
 
 
 def _meeting_source(conn: sqlite3.Connection, meeting_id: str) -> tuple[dict, list[dict], str] | None:
@@ -1820,6 +1875,9 @@ def _minutes_markdown(conn: sqlite3.Connection, meeting_id: str) -> tuple[str, s
         md += ["## 未決事項"] + [f"- {o}" for o in summary["open_issues"]] + [""]
     if summary and summary.get("next"):
         md += ["## 次回", str(summary["next"]), ""]
+    notes = meet.get_notes(conn, meeting_id)["body"].strip()
+    if notes:
+        md += ["## 会議中の共有メモ", notes, ""]
     md += ["---", f"全文: {config.APP_BASE_URL}/meet/{meeting_id}"]
     return head["title"], "\n".join(md)
 

@@ -51,6 +51,19 @@ CREATE TABLE IF NOT EXISTS meeting_participants (
     joined_at     TEXT NOT NULL,
     PRIMARY KEY (meeting_id, name)
 );
+CREATE TABLE IF NOT EXISTS meeting_notes (
+    meeting_id    TEXT PRIMARY KEY,
+    body          TEXT NOT NULL DEFAULT '',
+    updated_by    TEXT,
+    updated_at    TEXT
+);
+CREATE TABLE IF NOT EXISTS meeting_chat (
+    id            TEXT PRIMARY KEY,
+    meeting_id    TEXT NOT NULL,
+    name          TEXT NOT NULL,
+    text          TEXT NOT NULL,
+    at            TEXT NOT NULL
+);
 """
 
 
@@ -68,6 +81,32 @@ def create_meeting(conn: sqlite3.Connection, title: str, started_at: datetime | 
                  (mid, title.strip() or "会議", (started_at or datetime.now()).replace(microsecond=0).isoformat(), channel))
     conn.commit()
     return mid
+
+
+def get_notes(conn: sqlite3.Connection, meeting_id: str) -> dict:
+    r = conn.execute("SELECT * FROM meeting_notes WHERE meeting_id=?", (meeting_id,)).fetchone()
+    return dict(r) if r else {"meeting_id": meeting_id, "body": "", "updated_by": None, "updated_at": None}
+
+
+def save_notes(conn: sqlite3.Connection, meeting_id: str, body: str, by: str) -> None:
+    conn.execute("INSERT INTO meeting_notes (meeting_id, body, updated_by, updated_at) VALUES (?,?,?,?) "
+                 "ON CONFLICT(meeting_id) DO UPDATE SET body=excluded.body, updated_by=excluded.updated_by, updated_at=excluded.updated_at",
+                 (meeting_id, body, by, datetime.now().replace(microsecond=0).isoformat()))
+    conn.commit()
+
+
+def add_chat(conn: sqlite3.Connection, meeting_id: str, name: str, text: str) -> None:
+    conn.execute("INSERT INTO meeting_chat (id, meeting_id, name, text, at) VALUES (?,?,?,?,?)",
+                 (new_id(), meeting_id, name, text, datetime.now().replace(microsecond=0).isoformat()))
+    conn.commit()
+
+
+def chat_log(conn: sqlite3.Connection, meeting_id: str) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT * FROM meeting_chat WHERE meeting_id=? ORDER BY at, rowid", (meeting_id,))]
+
+
+def tracks(conn: sqlite3.Connection, meeting_id: str) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT id, speaker, mime, rec_started_at, uploaded_at, length(audio) size FROM meeting_tracks WHERE meeting_id=? ORDER BY rec_started_at", (meeting_id,))]
 
 
 def join(conn: sqlite3.Connection, meeting_id: str, name: str) -> None:

@@ -30,6 +30,10 @@
         <button id="micBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="マイク">🎤</button>
         <button id="camBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="カメラ">📷</button>
         <button id="screenBtn" class="h-11 rounded-full bg-gray-700 hover:bg-gray-600 px-4 text-sm flex items-center gap-2" title="画面共有">🖥 画面共有</button>
+        <button id="handBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="挙手">✋</button>
+        <div class="relative" x-data="{ open: false }"><button @click="open = !open" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="リアクション">😊</button>
+          <div x-show="open" x-cloak @click.outside="open = false" class="absolute bottom-14 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-700 rounded-full px-2 py-1 flex gap-1 z-20">
+            {% for e in ['👍','👏','😂','❤️','🎉','🤔','❓','✅'] %}<button @click="sendReaction('{{ e }}'); open = false" class="text-xl hover:scale-125 transition">{{ e }}</button>{% endfor %}</div></div>
         <button id="chatBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="会議内チャット">💬</button>
         <button id="leaveBtn" class="h-11 rounded-full bg-red-600 hover:bg-red-700 px-5 text-sm" title="退出（自分の録音は議事録に含まれます）">退出</button>
         <span id="recInfo" class="text-xs text-gray-400 ml-4">● 録音中（自分のマイク）</span>
@@ -41,13 +45,22 @@
         <div class="text-xs text-gray-400 mb-1">参加者</div>
         <ul id="plist" class="space-y-1"></ul>
       </div>
-      <div class="flex-1 flex flex-col min-h-0">
-        <div class="px-3 pt-3 text-xs text-gray-400">会議内チャット</div>
-        <div id="rchat" class="flex-1 overflow-y-auto p-3 space-y-1 text-xs"></div>
-        <form id="rchatForm" class="p-2 border-t border-gray-800 flex gap-1">
-          <input id="rchatText" placeholder="メッセージ" class="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white">
-          <button class="bg-indigo-600 rounded px-2 text-xs">送信</button>
-        </form>
+      <div class="flex-1 flex flex-col min-h-0" x-data="{ tab: 'chat' }">
+        <div class="px-3 pt-2 flex gap-1 text-xs">
+          <button @click="tab = 'chat'" :class="tab === 'chat' ? 'bg-gray-700 text-white' : 'text-gray-400'" class="px-2.5 py-1 rounded-lg">💬 チャット</button>
+          <button @click="tab = 'notes'" :class="tab === 'notes' ? 'bg-gray-700 text-white' : 'text-gray-400'" class="px-2.5 py-1 rounded-lg">📝 共有メモ <span id="notesDot" class="hidden w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block align-middle"></span></button>
+        </div>
+        <div x-show="tab === 'chat'" class="flex-1 flex flex-col min-h-0">
+          <div id="rchat" class="flex-1 overflow-y-auto p-3 space-y-1 text-xs">{% for c in chat_log %}<div><span class="text-gray-400">{{ c.at[11:16] }}</span> <b>{{ c.name }}</b>: {{ c.text }}</div>{% endfor %}</div>
+          <form id="rchatForm" class="p-2 border-t border-gray-800 flex gap-1">
+            <input id="rchatText" placeholder="メッセージ" class="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+            <button class="bg-indigo-600 rounded px-2 text-xs">送信</button>
+          </form>
+        </div>
+        <div x-show="tab === 'notes'" x-cloak class="flex-1 flex flex-col min-h-0 p-2">
+          <textarea id="notesArea" placeholder="全員で同時に編集できるメモ。議事録サマリーと Wiki 保存に含まれます。" class="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-xs text-white resize-none">{{ notes.body }}</textarea>
+          <div id="notesState" class="text-[10px] text-gray-500 pt-1">{% if notes.updated_by %}最終更新 {{ notes.updated_by }}{% endif %}</div>
+        </div>
       </div>
     </aside>
   </div>
@@ -59,6 +72,12 @@
     <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-600"><div class="animate-pulse">全員分の録音を文字起こししています…（このページは自動で更新されます）</div></div>
     {% elif m.status == 'failed' %}
     <div class="bg-red-50 border border-red-200 rounded-xl p-5 text-sm text-red-700">文字起こしに失敗しました: {{ m.error }}</div>
+    {% endif %}
+    {% if notes.body %}
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm">
+      <h2 class="font-semibold mb-2 text-amber-900">📝 会議中の共有メモ <span class="text-xs font-normal text-amber-700">最終更新 {{ notes.updated_by }}</span></h2>
+      <div class="whitespace-pre-wrap text-gray-800">{{ notes.body }}</div>
+    </div>
     {% endif %}
     {% if lines %}
     <a href="/meet/{{ m.id }}/minutes" class="block bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl p-4 hover:opacity-95">
@@ -82,6 +101,18 @@
       <div class="text-xs text-gray-500 mt-2">参加者</div>
       <div class="flex flex-wrap gap-1 mt-1">{% for p in participants %}<span data-person="{{ p }}" class="px-2 py-0.5 rounded-full bg-gray-100 text-xs">{{ p }}</span>{% endfor %}</div>
     </div>
+    {% if tracks %}
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <h2 class="font-semibold text-sm mb-2">🎧 録音（話者別）</h2>
+      <div class="space-y-2">{% for tr in tracks %}<div><div class="text-xs text-gray-500 mb-0.5"><span data-person="{{ tr.speaker }}">{{ tr.speaker }}</span> · {{ (tr.size / 1024)|round(0)|int }} KB</div><audio controls preload="none" src="/meet/{{ m.id }}/track/{{ tr.id }}" class="w-full h-8"></audio></div>{% endfor %}</div>
+    </div>
+    {% endif %}
+    {% if chat_log %}
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <h2 class="font-semibold text-sm mb-2">💬 会議内チャット <span class="text-xs text-gray-400 font-normal">{{ chat_log|length }}</span></h2>
+      <div class="space-y-1 text-xs max-h-60 overflow-y-auto">{% for c in chat_log %}<div><span class="text-gray-400">{{ c.at[11:16] }}</span> <b>{{ c.name }}</b>: {{ c.text }}</div>{% endfor %}</div>
+    </div>
+    {% endif %}
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
       <h2 class="font-semibold text-sm mb-2">抽出された決定・タスク</h2>
       {% if extracted %}
@@ -123,14 +154,24 @@ function tileFor(name) {
 function renderParticipants() {
   const names = [me, ...Object.keys(peers)];
   $('plist').innerHTML = names.map(n => { const s = n === me ? { mic: micOn, cam: camOn } : (pstate[n] || { mic: true, cam: true });
-    const sc = (n === me ? screenOn : (pstate[n] || {}).screen) ? ' <span class="text-emerald-400">🖥 共有中</span>' : '';
+    const sc = ((n === me ? screenOn : (pstate[n] || {}).screen) ? ' <span class="text-emerald-400">🖥 共有中</span>' : '') + ((n === me ? handOn : (pstate[n] || {}).hand) ? ' <span class="text-amber-300">✋</span>' : '');
     return `<li class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-500 grid place-items-center text-[10px]">${initials(n)}</span><span class="flex-1">${n}${n === me ? '（あなた）' : ''}${sc}</span><span class="text-xs text-gray-400">${s.mic ? '🎤' : '🔇'} ${s.cam ? '📷' : '🚫'}</span></li>`; }).join('');
-  for (const n of Object.keys(peers)) { const t = $('tile-' + n); if (t) { const s = pstate[n] || {}; t.querySelector('.off').classList.toggle('hidden', s.cam !== false || s.screen === true); t.querySelector('.st').textContent = (s.mic === false ? ' 🔇' : '') + (s.screen ? ' 🖥 画面共有中' : ''); } }
+  for (const n of Object.keys(peers)) { const t = $('tile-' + n); if (t) { const s = pstate[n] || {}; t.querySelector('.off').classList.toggle('hidden', s.cam !== false || s.screen === true); t.querySelector('.st').textContent = (s.mic === false ? ' 🔇' : '') + (s.screen ? ' 🖥 画面共有中' : '') + (s.hand ? ' ✋' : ''); } }
   $('meState').textContent = screenOn ? ' 🖥 画面共有中' : '';
   layout();
 }
-let micOn = true, camOn = true, screenOn = false, screenStream = null, camTrack = null;
-function sendState() { ws && ws.readyState === 1 && ws.send(JSON.stringify({ type: 'state', mic: micOn, cam: camOn, screen: screenOn })); renderParticipants(); }
+let micOn = true, camOn = true, screenOn = false, screenStream = null, camTrack = null, handOn = false;
+function sendState() { ws && ws.readyState === 1 && ws.send(JSON.stringify({ type: 'state', mic: micOn, cam: camOn, screen: screenOn, hand: handOn })); renderParticipants(); }
+function sendReaction(emoji) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'reaction', emoji })); showReaction(me, emoji); }
+function showReaction(name, emoji) {
+  const t = $('tile-' + (name === me ? 'me' : name)) || $('tiles'); const el = document.createElement('div');
+  el.textContent = emoji; el.className = 'absolute text-4xl pointer-events-none'; el.style.cssText = 'left:' + (20 + Math.random() * 60) + '%; bottom: 20%; transition: transform 1.6s ease-out, opacity 1.6s; z-index: 30;';
+  t.appendChild(el); requestAnimationFrame(() => { el.style.transform = 'translateY(-160px) scale(1.4)'; el.style.opacity = '0'; }); setTimeout(() => el.remove(), 1700);
+}
+let notesTimer = null, notesLocal = true;
+$('notesArea').addEventListener('input', () => { notesLocal = true; clearTimeout(notesTimer); $('notesState').textContent = '保存中…';
+  notesTimer = setTimeout(async () => { const body = $('notesArea').value; if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'notes', body }));
+    await fetch(`/meet/${meetingId}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body }) }); $('notesState').textContent = '保存しました'; }, 600); });
 function layout() {
   // 画面共有中の人のタイルを全幅・大きく表示する
   const sharing = screenOn ? 'me' : Object.keys(pstate).find(n => pstate[n] && pstate[n].screen);
@@ -167,7 +208,9 @@ function connect() {
     else if (msg.type === 'offer') { const pc = peers[msg.from] || await makePeer(msg.from, false); await pc.setRemoteDescription(msg.sdp); const ans = await pc.createAnswer(); await pc.setLocalDescription(ans); ws.send(JSON.stringify({ type: 'answer', to: msg.from, sdp: pc.localDescription })); }
     else if (msg.type === 'answer') { const pc = peers[msg.from]; if (pc) await pc.setRemoteDescription(msg.sdp); }
     else if (msg.type === 'ice') { const pc = peers[msg.from]; if (pc && msg.candidate) { try { await pc.addIceCandidate(msg.candidate); } catch (e) {} } }
-    else if (msg.type === 'state') { pstate[msg.name] = { mic: msg.mic, cam: msg.cam }; renderParticipants(); }
+    else if (msg.type === 'state') { pstate[msg.name] = { mic: msg.mic, cam: msg.cam, screen: msg.screen, hand: msg.hand }; if (msg.hand) addToast(msg.name + ' が挙手しました ✋'); renderParticipants(); layout(); }
+    else if (msg.type === 'reaction') { showReaction(msg.name, msg.emoji); }
+    else if (msg.type === 'notes') { const ta = $('notesArea'); if (document.activeElement !== ta) { ta.value = msg.body; $('notesState').textContent = msg.name + ' が編集中'; $('notesDot').classList.remove('hidden'); setTimeout(() => $('notesDot').classList.add('hidden'), 3000); } }
     else if (msg.type === 'chat') { const d = document.createElement('div'); d.innerHTML = `<span class="text-gray-400">${msg.at}</span> <b>${msg.name}</b>: ${msg.text.replace(/</g, '&lt;')}`; $('rchat').appendChild(d); $('rchat').scrollTop = 1e9; }
     else if (msg.type === 'ended') { if (!ended) { addToast(msg.by + ' が会議を終了しました。録音をアップロードします'); await finish(false); } }
   };
@@ -239,6 +282,7 @@ async function stopShare() {
 }
 $('screenBtn').onclick = () => screenOn ? stopShare() : startShare();
 $('chatBtn').onclick = () => { $('rchatText').focus(); };
+$('handBtn').onclick = () => { handOn = !handOn; $('handBtn').classList.toggle('bg-amber-500', handOn); $('meState').textContent = handOn ? ' ✋' : ''; sendState(); };
 $('rchatForm').onsubmit = e => { e.preventDefault(); const t = $('rchatText').value.trim(); if (t && ws) { ws.send(JSON.stringify({ type: 'chat', text: t })); $('rchatText').value = ''; } };
 $('copyBtn').onclick = async () => { await navigator.clipboard.writeText(location.origin + '/meet/' + meetingId); addToast('招待リンクをコピーしました'); };
 window.addEventListener('beforeunload', () => { if (!ended && ws) ws.close(); });

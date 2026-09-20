@@ -1,15 +1,40 @@
 {% extends "base.html" %}
 {% block title %}会議室{% endblock %}
-{% block actions %}<button @click="$dispatch('open-new-meeting')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">＋ 会議を始める</button>{% endblock %}
+{% block actions %}
+<form method="get" action="/meet" class="flex items-center gap-1"><input name="q" value="{{ q }}" placeholder="会議名・参加者で検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-44">
+  <select name="status" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">すべて</option>{% for k, l in [('recording','進行中'),('processing','文字起こし中'),('done','議事録あり'),('failed','失敗')] %}<option value="{{ k }}" {% if status == k %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></form>
+<a href="/calendar" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">📅 予定から</a>
+<button @click="$dispatch('open-new-meeting')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">＋ 今すぐ会議</button>{% endblock %}
 {% block content %}
 <div class="max-w-4xl space-y-6">
   <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
     各参加者が自分のブラウザで会議室を開くと、<b>自分のマイクだけ</b>を録音します。終了すると全員分をまとめて文字起こしし、時刻順に統合して議事録にします。議事録は次の巡回で決定・タスクに自動で分解されます。
   </div>
 
+  {% if live %}
+  <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-sm flex items-center gap-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+    <div class="flex-1">進行中の会議: {% for m in live %}<a href="/meet/{{ m.id }}" class="font-semibold hover:underline">{{ m.title }}</a><span class="text-gray-500 text-xs">（{{ m.participants|join('・') }}）</span>{% if not loop.last %} · {% endif %}{% endfor %}</div>
+    <a href="/meet/{{ live[0].id }}" class="bg-red-600 text-white rounded-lg px-3 py-1 text-xs hover:bg-red-700">参加する</a>
+  </div>
+  {% endif %}
+  {% if upcoming and not q and not status %}
+  <div class="bg-white border border-gray-200 rounded-xl p-4">
+    <div class="text-xs font-semibold text-gray-500 mb-2">今後2週間の会議予定 <span class="font-normal text-gray-400">— 開始15分前にエージェントが会議室を用意します</span></div>
+    <div class="grid grid-cols-2 gap-2">
+      {% for e in upcoming %}
+      <a href="/calendar/{{ e.id }}" class="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2 text-sm hover:bg-gray-50">
+        <div class="text-center w-12 shrink-0"><div class="text-[10px] text-gray-400">{{ e.start.strftime('%m/%d') }}</div><div class="font-semibold">{{ e.start.strftime('%H:%M') }}</div></div>
+        <div class="min-w-0"><div class="font-medium truncate">{{ e.title }}</div><div class="text-xs text-gray-500 truncate">{{ e.attendees|join('・') }}</div></div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
     <table class="w-full text-sm">
-      <thead class="bg-gray-50 text-left text-xs text-gray-500"><tr><th class="px-4 py-2">開始</th><th class="px-4 py-2">会議名</th><th class="px-4 py-2">状態</th><th class="px-4 py-2">参加者</th><th class="px-4 py-2 text-right">発言</th><th class="px-4 py-2 text-right">決定</th><th></th></tr></thead>
+      <thead class="bg-gray-50 text-left text-xs text-gray-500"><tr><th class="px-4 py-2">開始</th><th class="px-4 py-2">会議名</th><th class="px-4 py-2">状態</th><th class="px-4 py-2">参加者</th><th class="px-4 py-2 text-right">時間</th><th class="px-4 py-2 text-right">発言</th><th class="px-4 py-2 text-right">決定</th><th></th></tr></thead>
       <tbody>
       {% for m in meetings %}
       <tr class="border-t border-gray-100 hover:bg-gray-50">
@@ -17,9 +42,11 @@
         <td class="px-4 py-2.5 font-medium"><a href="/meet/{{ m.id }}" class="hover:underline">{{ m.title }}</a></td>
         <td class="px-4 py-2.5"><span class="text-xs px-2 py-0.5 rounded-full {% if m.status == 'recording' %}bg-red-100 text-red-700{% elif m.status == 'processing' %}bg-amber-100 text-amber-700{% elif m.status == 'done' %}bg-emerald-100 text-emerald-700{% else %}bg-gray-100 text-gray-600{% endif %}">{{ {'recording': '● 進行中', 'processing': '文字起こし中', 'done': '議事録あり', 'failed': '失敗'}[m.status] }}</span></td>
         <td class="px-4 py-2.5 text-gray-600">{% for p in m.participants %}<span data-person="{{ p }}">{{ p }}</span>{% if not loop.last %}・{% endif %}{% endfor %}</td>
+        <td class="px-4 py-2.5 text-right text-gray-600 text-xs">{{ (m.duration ~ ' 分') if m.duration is not none else '—' }}</td>
         <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_lines }}</td>
         <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_decisions }}</td>
-        <td class="px-4 py-2.5 text-right"><a href="/meet/{{ m.id }}" class="text-indigo-600 hover:underline">{% if m.status == 'recording' %}参加{% else %}開く{% endif %} →</a></td>
+        <td class="px-4 py-2.5 text-right whitespace-nowrap">{% if m.status == 'done' %}<a href="/meet/{{ m.id }}/minutes" class="text-indigo-600 hover:underline mr-3">📝 議事録</a>{% endif %}<a href="/meet/{{ m.id }}" class="text-indigo-600 hover:underline">{% if m.status == 'recording' %}参加{% else %}開く{% endif %} →</a>
+          <form method="post" action="/meet/{{ m.id }}/delete" class="inline ml-2" onsubmit="return confirm('この会議（録音・議事録・メモ）を削除しますか？')"><button class="text-gray-300 hover:text-red-600" title="削除">🗑</button></form></td>
       </tr>
       {% endfor %}
       {% for m in fixtures %}
@@ -28,12 +55,13 @@
         <td class="px-4 py-2.5 font-medium"><a href="/meet/{{ m.id }}" class="hover:underline">{{ m.title }}</a> <span class="text-[10px] text-gray-400 border rounded px-1">取込済</span></td>
         <td class="px-4 py-2.5"><span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">議事録あり</span></td>
         <td class="px-4 py-2.5 text-gray-600">—</td>
+        <td class="px-4 py-2.5 text-right text-gray-600 text-xs">—</td>
         <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_lines }}</td>
         <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_decisions }}</td>
         <td class="px-4 py-2.5 text-right"><a href="/meet/{{ m.id }}/minutes" class="text-indigo-600 hover:underline mr-3">📝 議事録</a><a href="/meet/{{ m.id }}" class="text-gray-500 hover:underline">全文 →</a></td>
       </tr>
       {% endfor %}
-      {% if not meetings and not fixtures %}<tr><td colspan="7" class="px-4 py-8 text-center text-gray-400">まだ会議はありません。</td></tr>{% endif %}
+      {% if not meetings and not fixtures %}<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">{% if q or status %}該当する会議はありません{% else %}まだ会議はありません。{% endif %}</td></tr>{% endif %}
       </tbody>
     </table>
   </div>
