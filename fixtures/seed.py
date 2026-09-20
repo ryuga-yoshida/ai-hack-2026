@@ -51,7 +51,7 @@ CHAT = [
     ("2026-09-18 13:50", "general", "佐藤", "山田さん、商品Aの件、大手から増量の話が来てるので、例の数字は早めに反映してもらえると助かります"),
     ("2026-09-18 13:52", "general", "山田", "分かりました、今やってます"),
     ("2026-09-18 14:02", "general", "山田", "見込み上方修正しておきました"),
-    ("2026-09-18 14:04", "general", "山田", "更新版はこちらです https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/売上見込.xlsx"),
+    ("2026-09-18 14:04", "general", "山田", "更新版はこちらです https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/売上見込.xlsx"),
     ("2026-09-18 14:03", "general", "佐藤", "ありがとうございます！"),
     ("2026-09-18 14:06", "general", "山田", "あと商品Cの行は先に外しておきました。終了はほぼ確定と聞いていたので"),
     ("2026-09-18 14:10", "general", "高橋", "新しい版が上がったんですね。資料に流し込みます"),
@@ -69,8 +69,9 @@ CHAT = [
     ("2026-09-19 13:42", "general", "鈴木", "お願いします"),
     ("2026-09-19 14:30", "random",  "高橋", "来週の月曜、全社の避難訓練です"),
     ("2026-09-19 14:31", "random",  "佐藤", "また階段か"),
-    ("2026-09-19 16:00", "general", "田中", "在庫表を更新しました。商品Fの安全在庫を上げてあります https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/在庫表.xlsx"),
-    ("2026-09-19 16:05", "general", "山田", "見込み表 v3 上げました https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/売上見込.xlsx"),
+    ("2026-09-19 16:00", "general", "田中", "在庫表を更新しました。商品Fの安全在庫を上げてあります https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/管理部/在庫表.xlsx"),
+    ("2026-09-19 16:05", "general", "山田", "見込み表 v3 上げました https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/売上見込.xlsx"),
+    ("2026-09-19 16:35", "general", "田中", "商品Dの企画書、初回ロット350とパッケージの件を反映しました https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/商品D_企画書.docx"),
 ]
 
 

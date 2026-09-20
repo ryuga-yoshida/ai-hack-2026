@@ -122,11 +122,12 @@ def bake(path: Path):
 
 
 if __name__ == "__main__":
-    v1, v2, v3 = HERE / "売上見込_v1.xlsx", HERE / "売上見込_v2.xlsx", HERE / "売上見込_v3.xlsx"
+    (HERE / "商品企画").mkdir(exist_ok=True); (HERE / "管理部").mkdir(exist_ok=True)
+    v1, v2, v3 = HERE / "商品企画" / "売上見込_v1.xlsx", HERE / "商品企画" / "売上見込_v2.xlsx", HERE / "商品企画" / "売上見込_v3.xlsx"
     build(V1, sum_last_row=10, path=v1)   # 末尾（商品K, 11行目）が漏れている
     build(V2, sum_last_row=11, path=v2)   # 修正済み
     build(V3, sum_last_row=11, path=v3, q1_formula="=B2+B3+B4+B5+B6+B7+B8+B9+B10+B11")  # 数式のみ変更
-    s1, s2 = HERE / "在庫表_v1.xlsx", HERE / "在庫表_v2.xlsx"
+    s1, s2 = HERE / "管理部" / "在庫表_v1.xlsx", HERE / "管理部" / "在庫表_v2.xlsx"
     build_stock(STOCK_V1, s1)
     build_stock(STOCK_V2, s2)
     for p in (v1, v2, v3, s1, s2):

@@ -137,9 +137,14 @@ def dashboard(request: Request):
 # ---------- 検知結果 ----------
 
 @app.get("/findings", response_class=HTMLResponse)
-def findings_page(request: Request, status: str = "open", kind: str = ""):
+def findings_page(request: Request, status: str = "open", kind: str = "", file: str = ""):
     conn = get_conn()
     cond, params = [], []
+    if file:
+        # その版（ファイル名）の変更を根拠に含む Finding だけ
+        cond.append("EXISTS (SELECT 1 FROM events e WHERE e.kind='artifact_change' AND json_extract(e.meta,'$.file')=? "
+                    "AND findings.evidence LIKE '%' || e.id || '%')")
+        params.append(file)
     if status == "open":
         cond.append("status IN ('notified','pending')")
     elif status in FINDING_STATUS_LABEL:
@@ -152,7 +157,7 @@ def findings_page(request: Request, status: str = "open", kind: str = ""):
     for k in FINDING_STATUS_LABEL:
         counts[k] = conn.execute("SELECT COUNT(*) FROM findings WHERE status=?", (k,)).fetchone()[0]
     return render("findings.html", request, conn, cards=finding_cards(conn, where, tuple(params)),
-                  status=status, kind=kind, counts=counts)
+                  status=status, kind=kind, counts=counts, file=file)
 
 
 @app.post("/findings/{finding_id}/ack")
@@ -742,82 +747,149 @@ def manual_tick(request: Request, background: BackgroundTasks):
     return RedirectResponse(request.headers.get("referer") or "/agent", status_code=303)
 
 
-# ---------- 成果物（SharePoint 代替のフォルダ） ----------
+# ---------- 成果物（SharePoint のドキュメントライブラリ代替） ----------
 
-def artifact_rows(conn: sqlite3.Connection) -> list[dict]:
+LIB = lambda: config.FIXTURES_DIR / "excel"
+FILE_ICON = {".xlsx": ("X", "bg-emerald-100 text-emerald-700"), ".docx": ("W", "bg-sky-100 text-sky-700"),
+             ".pptx": ("P", "bg-orange-100 text-orange-700"), ".pdf": ("PDF", "bg-red-100 text-red-700"),
+             ".md": ("MD", "bg-gray-200 text-gray-700"), ".txt": ("TXT", "bg-gray-200 text-gray-700"),
+             ".png": ("IMG", "bg-violet-100 text-violet-700"), ".jpg": ("IMG", "bg-violet-100 text-violet-700"),
+             ".jpeg": ("IMG", "bg-violet-100 text-violet-700"), ".csv": ("CSV", "bg-emerald-50 text-emerald-700")}
+
+
+def _safe_rel(path: str) -> Path:
+    rel = Path(path.strip("/")) if path else Path(".")
+    if any(part in ("..", "") for part in rel.parts if part != "."):
+        raise HTTPException(400, "invalid path")
+    return rel
+
+
+def library_rows(conn: sqlite3.Connection, folder: str = "", tag: str = "") -> dict:
+    """folder 直下のサブフォルダとファイル（版をまとめたもの）"""
     from app.connectors.excel import version_series
-    d = config.FIXTURES_DIR / "excel"
-    versions = json.loads((d / "versions.json").read_text(encoding="utf-8")) if (d / "versions.json").exists() else {}
-    out = []
-    for base, series in version_series(d).items():
+    root = LIB()
+    rel = _safe_rel(folder)
+    cur = (root / rel) if str(rel) != "." else root
+    versions = json.loads((root / "versions.json").read_text(encoding="utf-8")) if (root / "versions.json").exists() else {}
+    tagged = set(tagmod.targets_for(conn, tag)["artifact"]) if tag else None
+    folders = []
+    if cur.exists():
+        for d in sorted(x for x in cur.iterdir() if x.is_dir() and not x.name.startswith(".")):
+            n_files = len({k for k in version_series(root, ext=None) if k.startswith(str(d.relative_to(root)) + "/")})
+            folders.append({"name": d.name, "path": str(d.relative_to(root)), "n_files": n_files})
+    files = []
+    for key, series in version_series(root, ext=None).items():
+        k = Path(key)
+        # タグで絞り込むときはフォルダをまたいで全ファイルから探す
+        if tagged is None and (str(k.parent) if str(k.parent) != "." else "") != (str(rel) if str(rel) != "." else ""):
+            continue
+        display = key                      # タグの対象 id はライブラリ相対パス（例: 商品企画/売上見込.xlsx）
+        legacy = k.name                    # 旧来の id（ファイル名のみ）
+        tags = tagmod.tags_for(conn, "artifact", display) or tagmod.tags_for(conn, "artifact", legacy)
+        if tagged is not None and display not in tagged and legacy not in tagged:
+            continue
         vs = []
         for n, path in series:
-            info = versions.get(path.name, {})
+            info = versions.get(str(path.relative_to(root))) or versions.get(path.name, {})
             changes = conn.execute("SELECT COUNT(*) FROM events WHERE kind='artifact_change' AND json_extract(meta,'$.file')=?", (path.name,)).fetchone()[0]
             findings = conn.execute(
                 "SELECT COUNT(*) FROM findings f WHERE f.status != 'dismissed' AND EXISTS ("
                 "SELECT 1 FROM events e WHERE e.kind='artifact_change' AND json_extract(e.meta,'$.file')=? AND f.evidence LIKE '%' || e.id || '%')",
                 (path.name,)).fetchone()[0]
-            vs.append({"n": n, "file": path.name, "actor": info.get("actor"), "at": info.get("at") or datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
+            vs.append({"n": n, "file": path.name, "rel": str(path.relative_to(root)), "actor": info.get("actor"),
+                       "at": info.get("at") or datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
                        "url": info.get("url"), "size": path.stat().st_size, "changes": changes, "findings": findings})
-        tasks = [t for t in db.list_tasks(conn) if any(a.rsplit(".", 1)[0] == base or a == f"{base}.xlsx" for a in t.artifacts)]
-        out.append({"base": base, "name": f"{base}.xlsx", "versions": vs, "latest": vs[-1], "tasks": tasks,
-                    "tags": tagmod.tags_for(conn, "artifact", f"{base}.xlsx")})
-    return sorted(out, key=lambda a: a["latest"]["at"], reverse=True)
+        ext = k.suffix.lower()
+        stem = k.stem
+        tasks = [t for t in db.list_tasks(conn) if any(a in (k.name, display) or a.rsplit(".", 1)[0] == stem for a in t.artifacts)]
+        icon, color = FILE_ICON.get(ext, ("FILE", "bg-gray-200 text-gray-700"))
+        files.append({"key": key, "name": k.name, "stem": stem, "ext": ext, "icon": icon, "color": color, "versions": vs,
+                      "folder": str(k.parent) if str(k.parent) != "." else "",
+                      "latest": vs[-1], "tasks": tasks, "tags": tags, "editable": ext == ".xlsx",
+                      "textual": ext in (".docx", ".pptx", ".md", ".txt", ".csv")})
+    files.sort(key=lambda a: a["latest"]["at"], reverse=True)
+    crumbs = []
+    acc = Path(".")
+    for part in ([] if str(rel) == "." else rel.parts):
+        acc = acc / part
+        crumbs.append({"name": part, "path": str(acc)})
+    return {"folders": folders, "files": files, "crumbs": crumbs, "folder": "" if str(rel) == "." else str(rel)}
 
 
 @app.get("/artifacts", response_class=HTMLResponse)
-def artifacts_page(request: Request):
+def artifacts_page(request: Request, path: str = "", tag: str = ""):
     conn = get_conn()
-    return render("artifacts.html", request, conn, artifacts=artifact_rows(conn), me=get_me(request))
+    return render("artifacts.html", request, conn, **library_rows(conn, path, tag), tag=tag,
+                  all_tags=tagmod.all_tags(conn), me=get_me(request), channels=chat.list_channels(conn))
 
 
-@app.get("/artifacts/file/{filename}")
-def artifact_file(filename: str):
-    d = config.FIXTURES_DIR / "excel"
-    path = d / Path(filename).name
-    if not path.exists() or path.suffix != ".xlsx":
+@app.post("/artifacts/folder")
+def artifacts_new_folder(path: str = Form(""), name: str = Form(...)):
+    rel = _safe_rel(path)
+    name = re.sub(r"[\\/:*?\"<>|]", "", name.strip())[:60]
+    if not name:
+        raise HTTPException(422, "フォルダ名が必要")
+    (LIB() / rel / name).mkdir(parents=True, exist_ok=True)
+    return RedirectResponse(f"/artifacts?path={(rel / name) if str(rel) != '.' else name}", status_code=303)
+
+
+@app.get("/artifacts/file/{rel:path}")
+def artifact_file(rel: str):
+    root = LIB()
+    path = (root / _safe_rel(rel)).resolve()
+    if not path.is_file() or root.resolve() not in path.parents:
         raise HTTPException(404)
-    return FileResponse(path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=path.name)
+    return FileResponse(path, filename=path.name)
 
 
-@app.get("/artifacts/{base}/edit", response_class=HTMLResponse)
-def artifact_edit(request: Request, base: str):
+@app.get("/artifacts/edit/{key:path}", response_class=HTMLResponse)
+def artifact_edit(request: Request, key: str):
     """ブラウザ上で編集（Excel Online の代わり）。保存すると新しい版として取り込まれる"""
     from app.connectors.excel import version_series
-    series = version_series(config.FIXTURES_DIR / "excel").get(base)
+    series = version_series(LIB()).get(key)
     if not series:
         raise HTTPException(404)
-    return render("artifact_edit.html", request, get_conn(), base=base, latest=series[-1][1].name,
-                  version=series[-1][0], me=get_me(request))
+    latest = series[-1][1]
+    conn = get_conn()
+    return render("artifact_edit.html", request, conn, base=key, fname=Path(key).name,
+                  latest=str(latest.relative_to(LIB())), version=series[-1][0], me=get_me(request),
+                  channels=chat.list_channels(conn))
 
 
-def _register_version(conn: sqlite3.Connection, base: str, data: bytes | None, actor: str, note: str,
+@app.get("/artifacts/text/{rel:path}")
+def artifact_text(rel: str):
+    """docx / pptx / md などの本文（プレビュー用）"""
+    from app.connectors.docs import extract_paragraphs
+    root = LIB()
+    path = (root / _safe_rel(rel)).resolve()
+    if not path.is_file() or root.resolve() not in path.parents:
+        raise HTTPException(404)
+    return {"paragraphs": extract_paragraphs(path) or []}
+
+
+def _register_version(conn: sqlite3.Connection, rel_path: str, data: bytes | None, actor: str, note: str,
                       channel: str, sheets: list[dict] | None = None) -> Path:
-    """新しい版を <base>_vN.xlsx として保存し versions.json に記録 → チャット共有 → 即時巡回"""
-    from app.connectors.excel import version_series
+    """新しい版を保存し versions.json に記録 → 監視フォルダへ書き戻し → チャット共有 → 即時巡回"""
+    from app.connectors.excel import register_version
     from app import sheet_export
-    d = config.FIXTURES_DIR / "excel"
-    series = version_series(d).get(base, [])
-    n = (series[-1][0] + 1) if series else 1
-    dest = d / f"{base}_v{n}.xlsx"
     if sheets is not None:
-        sheet_export.save_xlsx(sheets, dest)
-    else:
-        dest.write_bytes(data or b"")
-    vp = d / "versions.json"
-    versions = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else {}
-    prev = next((versions[s[1].name] for s in reversed(series) if s[1].name in versions), {})
-    versions[dest.name] = {"actor": actor.strip(), "at": datetime.now().replace(microsecond=0).isoformat(),
-                           "url": prev.get("url") or f"https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/{base}.xlsx"}
-    vp.write_text(json.dumps(versions, ensure_ascii=False, indent=2), encoding="utf-8")
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td) / Path(rel_path).name
+            sheet_export.save_xlsx(sheets, tmp)
+            data = tmp.read_bytes()
+    dest = register_version(data or b"", rel_path, actor.strip())
+    if dest is None:
+        raise HTTPException(409, "内容が最新の版と同じです")
+    root = LIB()
+    versions = json.loads((root / "versions.json").read_text(encoding="utf-8"))
+    url = versions[str(dest.relative_to(root))]["url"]
     if channel.strip():
-        chat.post_message(conn, channel.strip(), actor.strip(),
-                          f"{note.strip() or base + ' を更新しました'} {versions[dest.name]['url']}")
+        chat.post_message(conn, channel.strip(), actor.strip(), f"{note.strip() or Path(rel_path).name + ' を更新しました'} {url}")
         _ingest_chat(conn)
     from app import agent
     agent.mirror_to_watch_dir(dest)
-    agent.request_tick(f"成果物の保存（{dest.name}）")
+    agent.request_tick(f"成果物の保存（{dest.relative_to(root)}）")
     return dest
 
 
@@ -828,28 +900,26 @@ class SheetSave(BaseModel):
     note: str = ""
 
 
-@app.post("/artifacts/{base}/save")
-def artifact_save(base: str, body: SheetSave):
+@app.post("/artifacts/save/{key:path}")
+def artifact_save(key: str, body: SheetSave):
     """ブラウザ編集（Luckysheet）の保存。JSON → xlsx → 新しい版"""
     conn = get_conn()
     if not body.actor.strip():
         raise HTTPException(422, "更新者が必要")
-    dest = _register_version(conn, base, None, body.actor, body.note, body.channel, sheets=body.sheets)
+    dest = _register_version(conn, key + ".xlsx", None, body.actor, body.note, body.channel, sheets=body.sheets)
     return {"ok": True, "file": dest.name}
 
 
 @app.post("/artifacts/upload")
 async def upload_artifact(request: Request, file: UploadFile = File(...), actor: str = Form(...), note: str = Form(""),
-                          channel: str = Form("")):
-    """新しい版をアップロードする（SharePoint にファイルを上げる操作の代わり）。
-    <base>_vN.xlsx として保存し versions.json に更新者・日時を記録 → 自動巡回が数秒で拾う"""
-    name = Path(file.filename or "upload.xlsx").name
-    if not name.lower().endswith(".xlsx"):
-        raise HTTPException(422, ".xlsx のみ")
-    base = re.sub(r"_v\d+(?=\.xlsx$)", "", name)[:-5]
+                          channel: str = Form(""), path: str = Form("")):
+    """任意の種類のファイルを新しい版としてアップロード（フォルダ指定可）"""
+    name = Path(file.filename or "upload.bin").name
+    rel = _safe_rel(path)
+    rel_path = str(rel / name) if str(rel) != "." else name
     conn = get_conn()
-    _register_version(conn, base, await file.read(), actor, note, channel)
-    resp = RedirectResponse("/artifacts", status_code=303)
+    _register_version(conn, rel_path, await file.read(), actor, note, channel)
+    resp = RedirectResponse(f"/artifacts?path={path}", status_code=303)
     return set_me(resp, actor)
 
 

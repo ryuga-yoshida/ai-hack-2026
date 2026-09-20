@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ base }}.xlsx を編集{% endblock %}
+{% block title %}{{ fname }}.xlsx を編集{% endblock %}
 {% block heading %}<a href="/artifacts" class="text-gray-400 hover:text-gray-600 mr-2">成果物</a><span class="text-gray-300 mr-2">/</span>{{ base }}.xlsx <span class="text-xs text-gray-400 font-normal ml-2">v{{ version }} を編集中 → 保存すると v{{ version + 1 }}</span><span id="loading" class="text-xs text-gray-400 font-normal ml-3">読み込み中…</span>{% endblock %}
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/luckysheet@2.1.13/dist/plugins/css/pluginsCss.css">
@@ -14,7 +14,7 @@
 {% block actions %}
 <input id="actor" value="{{ me }}" placeholder="更新者" list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-28">
 <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
-<select id="channel" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option><option value="general">#general に共有</option><option value="sales">#sales に共有</option></select>
+<select id="channel" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
 <input id="note" placeholder="共有メッセージ（任意）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-56">
 <button id="saveBtn" onclick="save()" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">保存して新しい版にする</button>
 {% endblock %}
@@ -27,11 +27,11 @@
 async function load() {
   const r = await fetch('/artifacts/file/{{ latest }}');
   const blob = await r.blob();
-  const file = new File([blob], '{{ latest }}', { type: blob.type });
+  const file = new File([blob], '{{ fname }}.xlsx', { type: blob.type });
   LuckyExcel.transformExcelToLucky(file, (exportJson) => {
     if (!exportJson.sheets || !exportJson.sheets.length) { document.getElementById('loading').textContent = '読み込みに失敗しました'; return; }
     luckysheet.create({
-      container: 'sheet', lang: 'en', title: '{{ base }}', data: exportJson.sheets,
+      container: 'sheet', lang: 'en', title: '{{ fname }}', data: exportJson.sheets,
       showinfobar: false, showsheetbar: true, showstatisticBar: true, enableAddRow: true, enableAddBackTop: false,
       showtoolbar: true, allowEdit: true,
       hook: { workbookCreateAfter: () => { document.getElementById('loading').textContent = ''; } },
@@ -44,7 +44,7 @@ async function save() {
   const btn = document.getElementById('saveBtn'); btn.disabled = true; btn.textContent = '保存中…';
   try { luckysheet.exitEditMode(); } catch (e) {}
   const sheets = luckysheet.getAllSheets();
-  const r = await fetch('/artifacts/{{ base }}/save', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  const r = await fetch('/artifacts/save/{{ base }}', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sheets, actor, channel: document.getElementById('channel').value, note: document.getElementById('note').value }) });
   if (r.ok) { Alpine.$data(document.body).toast('新しい版として保存しました。数秒後に検知結果に反映されます'); setTimeout(() => location.href = '/artifacts', 1200); }
   else { alert('保存に失敗しました: ' + (await r.text()).slice(0, 200)); btn.disabled = false; btn.textContent = '保存して新しい版にする'; }

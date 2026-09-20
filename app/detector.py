@@ -46,7 +46,7 @@ def _artifact_names(ref: str | None) -> set[str]:
     if not ref:
         return set()
     fname = ref.split(":", 1)[0]
-    stem = re.sub(r"_v\d+(?=\.xlsx$)", "", fname)
+    stem = re.sub(r"_v\d+(?=\.[A-Za-z0-9]+$)", "", fname)
     return {fname, stem, stem.rsplit(".", 1)[0]}
 
 
@@ -112,8 +112,15 @@ def find_candidates(conn: sqlite3.Connection, change: Event) -> list[Event]:
 def _subject_keywords(change: Event) -> set[str]:
     """変更が何についてのものかを表す語。Excel なら行ラベル・列ラベル・シート名"""
     m = change.meta
-    words = {str(m.get(k) or "") for k in ("row_key", "column_label", "sheet", "base")}
-    return {w for w in words if len(w) >= 2 and not w.startswith("__")}
+    words = {str(m.get(k) or "") for k in ("row_key", "column_label", "sheet")}
+    base = str(m.get("base") or "")
+    words.add(base.rsplit("/", 1)[-1].rsplit(".", 1)[0])     # ファイル名（フォルダ・拡張子なし）
+    if str(m.get("diff_kind", "")).startswith("text_"):
+        # 文書の差分は本文の内容語（商品名など）を手がかりにする
+        for w in re.findall(r"[一-龥ァ-ヶA-Za-z0-9ー]{2,}", (m.get("new") or m.get("old") or "")):
+            if len(w) <= 8:
+                words.add(w)
+    return {w for w in words if len(w) >= 2 and not w.startswith("__") and w != "本文"}
 
 
 # ---------- 機械的ガード ----------

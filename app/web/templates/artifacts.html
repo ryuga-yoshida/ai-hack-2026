@@ -1,36 +1,71 @@
 {% extends "base.html" %}
 {% block title %}成果物{% endblock %}
-{% block actions %}<button @click="$dispatch('open-upload')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">↑ 新しい版をアップロード</button>{% endblock %}
+{% block heading %}<a href="/artifacts" class="{% if crumbs %}text-gray-400 hover:text-gray-600{% endif %}">成果物</a>
+  {% for c in crumbs %}<span class="text-gray-300 mx-2">/</span><a href="/artifacts?path={{ c.path }}" class="{% if not loop.last %}text-gray-400 hover:text-gray-600{% endif %}">{{ c.name }}</a>{% endfor %}{% endblock %}
+{% block actions %}
+<form method="get" action="/artifacts" class="flex items-center gap-2">
+  <input type="hidden" name="path" value="{{ folder }}">
+  <select name="tag" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+    <option value="">全タグ</option>{% for t in all_tags %}<option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>#{{ t.name }}</option>{% endfor %}
+  </select>
+</form>
+<button @click="$dispatch('open-folder')" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">＋ フォルダ</button>
+<button @click="$dispatch('open-upload')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">↑ アップロード</button>
+{% endblock %}
 {% block content %}
-<div class="max-w-5xl space-y-4">
+<div class="max-w-6xl space-y-4">
+  {% if not crumbs and not tag %}
   <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
-    ここは SharePoint の共有フォルダの代わりです。<b>ブラウザで編集</b>・<b>アップロード</b>・<b>監視フォルダ（OneDrive やデスクトップ）で Excel を保存</b>のどれでも、新しい版としてエージェントが<b>自動で差分を取り</b>（行の挿入・削除があってもセル単位で追跡）、決定と突き合わせます。自動巡回が ON なら数秒で検知結果に反映されます。
+    SharePoint のドキュメントライブラリの代わり。どんな種類のファイルも置け、版が自動で管理されます。<b>xlsx はセル差分</b>、<b>docx / pptx / md / txt は本文の段落差分</b>をエージェントが取り、決定事項と突き合わせます。ブラウザ編集・アップロード・監視フォルダ（OneDrive やデスクトップ）での保存のどれでも同じ。
   </div>
-  {% for a in artifacts %}
-  <div class="bg-white border border-gray-200 rounded-xl p-5">
+  {% endif %}
+  {% if tag %}<div class="text-sm text-gray-600">タグ <a href="/tags/{{ tag }}" class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">#{{ tag }}</a> で絞り込み中 <a href="/artifacts?path={{ folder }}" class="text-indigo-600 ml-2">解除</a></div>{% endif %}
+
+  {% if folders %}
+  <div class="grid grid-cols-4 gap-3">
+    {% for f in folders %}
+    <a href="/artifacts?path={{ f.path }}&tag={{ tag }}" class="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-3 hover:border-indigo-300 hover:shadow-sm">
+      <span class="text-2xl">📁</span><div><div class="font-medium text-sm">{{ f.name }}</div><div class="text-xs text-gray-500">{{ f.n_files }} ファイル</div></div></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% for a in files %}
+  <div class="bg-white border border-gray-200 rounded-xl p-5" x-data="{ open: false }">
     <div class="flex items-center gap-3">
-      <span class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-700 grid place-items-center font-bold">X</span>
+      <span class="w-9 h-9 rounded-lg grid place-items-center font-bold text-xs {{ a.color }}">{{ a.icon }}</span>
       <div class="min-w-0">
-        <div class="font-semibold">{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · {{ a.latest.actor or '—' }} · {{ a.latest.at|dt }}</span></div>
+        <div class="font-semibold flex items-center gap-2 flex-wrap">{% if tag and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-xs text-gray-400 font-normal">📁 {{ a.folder }} /</a>{% endif %}{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · {{ a.latest.actor or '—' }} · {{ a.latest.at|dt }}</span>
+          {% for t in a.tags %}<form method="post" action="/tags/{{ t.name }}/unlink" class="inline"><input type="hidden" name="target_type" value="artifact"><input type="hidden" name="target_id" value="{{ a.key }}">
+            <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800 font-normal"><a href="/artifacts?tag={{ t.name }}">#{{ t.name }}</a><button class="opacity-50 hover:opacity-100" title="タグを外す">×</button></span></form>{% endfor %}
+          <form method="post" action="/tags/_/link" onsubmit="this.action='/tags/'+encodeURIComponent(this.tagname.value.replace(/^#/,''))+'/link'" class="inline-flex">
+            <input type="hidden" name="target_type" value="artifact"><input type="hidden" name="target_id" value="{{ a.key }}">
+            <input name="tagname" list="taglist" placeholder="#タグを追加" class="text-[11px] border border-dashed border-gray-300 rounded px-1.5 py-0.5 w-24 font-normal"></form>
+        </div>
         <div class="text-xs text-gray-500 truncate">{{ a.latest.url }}</div>
       </div>
-      <div class="ml-auto flex items-center gap-2 text-xs">
-        <a href="/artifacts/{{ a.base }}/edit" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ ブラウザで編集</a>
-        <a href="/artifacts/file/{{ a.latest.file }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">↓ ダウンロード</a>
-        {% for t in a.tags %}<a href="/tags/{{ t.name }}" class="px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
-        {% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[220px]">⇢ {{ t.title }}</a>{% endfor %}
+      <div class="ml-auto flex items-center gap-2 text-xs shrink-0">
+        {% if a.editable %}<a href="/artifacts/edit/{{ a.key[:-5] }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ ブラウザで編集</a>{% endif %}
+        {% if a.textual %}<button @click="open = !open; if (open && !$refs.pv.dataset.loaded) { fetch('/artifacts/text/{{ a.latest.rel }}').then(r => r.json()).then(j => { $refs.pv.innerHTML = j.paragraphs.map(p => '<p>' + p.replace(/</g,'&lt;') + '</p>').join('') || '<p class=\'text-gray-400\'>本文なし</p>'; $refs.pv.dataset.loaded = 1; }); }" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">👁 本文</button>{% endif %}
+        <a href="/artifacts/file/{{ a.latest.rel }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">↓ ダウンロード</a>
+        {% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[200px]">⇢ {{ t.title }}</a>{% endfor %}
       </div>
     </div>
+    <div x-show="open" x-cloak x-ref="pv" class="mt-3 text-sm bg-gray-50 rounded-lg p-3 space-y-1 max-h-64 overflow-y-auto"></div>
+    <datalist id="taglist">{% for t in all_tags %}<option value="{{ t.name }}">{% endfor %}</datalist>
     <table class="w-full text-sm mt-3">
-      <thead class="text-xs text-gray-500 text-left"><tr><th class="py-1">版</th><th>更新者</th><th>日時</th><th class="text-right">サイズ</th><th class="text-right">差分</th><th class="text-right">検知</th></tr></thead>
+      <thead class="text-xs text-gray-500 text-left"><tr><th class="py-1">版</th><th>更新者</th><th>日時</th><th class="text-right">サイズ</th><th class="text-right">差分</th><th class="text-right">検知</th><th></th></tr></thead>
       <tbody>{% for v in a.versions|reverse %}
         <tr class="border-t border-gray-100"><td class="py-1.5">v{{ v.n }} <span class="text-gray-400">{{ v.file }}</span></td><td>{{ v.actor or '—' }}</td><td>{{ v.at|dt }}</td>
           <td class="text-right text-gray-500">{{ (v.size / 1024)|round(1) }} KB</td>
           <td class="text-right">{% if v.changes %}{{ v.changes }} 件{% else %}<span class="text-gray-400">{{ '初版' if v.n == 1 else '未処理' }}</span>{% endif %}</td>
-          <td class="text-right">{% if v.findings %}<a href="/findings?status=all" class="text-red-600 font-semibold">⚠ {{ v.findings }}</a>{% else %}<span class="text-gray-400">—</span>{% endif %}</td></tr>
+          <td class="text-right">{% if v.findings %}<a href="/findings?status=all&file={{ v.file }}" class="text-red-600 font-semibold hover:underline" title="この版の検知だけを見る">⚠ {{ v.findings }}</a>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
+          <td class="text-right"><a href="/artifacts/file/{{ v.rel }}" class="text-gray-400 hover:text-gray-700" title="この版をダウンロード">↓</a></td></tr>
       {% endfor %}</tbody>
     </table>
   </div>
+  {% else %}
+  {% if not folders %}<div class="bg-white border border-dashed border-gray-300 rounded-xl p-10 text-center text-sm text-gray-500">このフォルダにはファイルがありません。</div>{% endif %}
   {% endfor %}
 </div>
 
@@ -38,14 +73,26 @@
   <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
   <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
     <form method="post" action="/artifacts/upload" enctype="multipart/form-data" class="bg-white rounded-xl shadow-xl p-6 w-[460px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
-      <h3 class="font-semibold">新しい版をアップロード</h3>
-      <input type="file" name="file" accept=".xlsx" required class="w-full text-sm">
-      <p class="text-xs text-gray-500">ファイル名が同じなら次の版（v{{ '{N}' }}）として扱います（例: 売上見込.xlsx → 売上見込_v4.xlsx）。</p>
+      <h3 class="font-semibold">アップロード <span class="text-xs text-gray-400 font-normal">→ /{{ folder or '（ルート）' }}</span></h3>
+      <input type="hidden" name="path" value="{{ folder }}">
+      <input type="file" name="file" required class="w-full text-sm">
+      <p class="text-xs text-gray-500">同じ名前のファイルがあれば次の版（vN）になります。xlsx / docx / pptx / pdf / 画像 / md / txt など何でも可。</p>
       <input name="actor" value="{{ me }}" required list="people" placeholder="更新者" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
-      <select name="channel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">チャットに共有しない</option><option value="general">#general にリンクを共有</option><option value="sales">#sales にリンクを共有</option></select>
-      <input name="note" placeholder="共有メッセージ（任意）例: 見込み表を更新しました" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <select name="channel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} にリンクを共有</option>{% endfor %}</select>
+      <input name="note" placeholder="共有メッセージ（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">アップロード</button></div>
+    </form>
+  </div>
+</div>
+<div x-data="{ open: false }" @open-folder.window="open = true" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/artifacts/folder" class="bg-white rounded-xl shadow-xl p-6 w-[360px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">新しいフォルダ <span class="text-xs text-gray-400 font-normal">→ /{{ folder or '（ルート）' }}</span></h3>
+      <input type="hidden" name="path" value="{{ folder }}">
+      <input name="name" required placeholder="フォルダ名" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">作成</button></div>
     </form>
   </div>
 </div>

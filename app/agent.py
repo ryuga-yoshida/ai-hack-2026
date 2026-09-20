@@ -10,6 +10,7 @@ from datetime import datetime
 
 from app import config, db, detector, extract, linker, vec
 from app.connectors.chat import ChatAdapter
+from app.connectors.docs import DocsAdapter
 from app.connectors.excel import ExcelAdapter
 from app.connectors.meet import MeetAdapter
 from app.llm import router
@@ -58,7 +59,8 @@ def request_tick(reason: str) -> bool:
 
 def _excel_signature() -> dict[str, float]:
     d = config.FIXTURES_DIR / "excel"
-    return {p.name: p.stat().st_mtime for p in d.glob("*.xlsx")} if d.exists() else {}
+    return {str(p.relative_to(d)): p.stat().st_mtime for p in d.rglob("*")
+            if p.is_file() and p.name != "versions.json" and not p.name.startswith(".")} if d.exists() else {}
 
 
 _watch_sig: dict[str, float] = {}
@@ -84,7 +86,8 @@ def _poll_watch_dir() -> list[str]:
             continue   # まだ書き込み中かもしれない
         _watch_sig[name] = mtime
         try:
-            dest = snapshot_new_version(d / name, config.ARTIFACT_WATCH_ACTOR)
+            rel_dir = str(Path(name).parent) if str(Path(name).parent) != "." else ""
+            dest = snapshot_new_version(d / name, config.ARTIFACT_WATCH_ACTOR, rel_dir=rel_dir)
         except Exception as e:
             log.warning("watch snapshot failed %s: %s", name, e)
             continue
@@ -191,7 +194,7 @@ class TickResult:
 
 
 def adapters(conn: sqlite3.Connection):
-    return [MeetAdapter(conn=conn), ChatAdapter(conn), ExcelAdapter()]
+    return [MeetAdapter(conn=conn), ChatAdapter(conn), ExcelAdapter(), DocsAdapter()]
 
 
 # ---------- アクション決定（エージェントが自分で決める部分） ----------
@@ -431,7 +434,11 @@ def mirror_to_watch_dir(version_path) -> None:
     d = Path(config.ARTIFACT_WATCH_DIR).expanduser()
     if not d.exists():
         return
-    base = _re.sub(r"_v\d+(?=\.xlsx$)", "", Path(version_path).name)
-    dest = d / base
+    vp = Path(version_path)
+    root = config.FIXTURES_DIR / "excel"
+    rel_dir = vp.parent.relative_to(root) if vp.is_relative_to(root) else Path(".")
+    base = _re.sub(r"_v\d+(?=\.[A-Za-z0-9]+$)", "", vp.name)
+    dest = d / rel_dir / base
+    dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(version_path, dest)
-    _watch_sig[dest.name] = dest.stat().st_mtime
+    _watch_sig[str(dest.relative_to(d))] = dest.stat().st_mtime
