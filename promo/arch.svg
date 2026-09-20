@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" font-family="Hiragino Sans, Noto Sans JP, sans-serif">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6366f1"/></marker>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#dc2626"/></marker>
+  </defs>
+  <!-- sources -->
+  <g font-size="20" fill="#111827">
+    <rect x="20" y="40" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="77" text-anchor="middle">📹 会議（文字起こし）</text>
+    <rect x="20" y="130" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="167" text-anchor="middle">💬 チャット</text>
+    <rect x="20" y="220" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="257" text-anchor="middle">✉ メール</text>
+    <rect x="20" y="310" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="347" text-anchor="middle">📄 Wiki</text>
+    <rect x="20" y="400" width="200" height="60" rx="12" fill="#fff7ed" stroke="#fed7aa"/><text x="120" y="437" text-anchor="middle">📎 成果物（版管理）</text>
+  </g>
+  <!-- normalize -->
+  <g>
+    <path d="M220 70 H300 V250 M220 160 H300 M220 250 H300 M220 340 H300 V250 M220 430 H300 V250" fill="none" stroke="#a5b4fc" stroke-width="3"/>
+    <line x1="300" y1="250" x2="360" y2="250" stroke="#6366f1" stroke-width="3" marker-end="url(#ar)"/>
+    <rect x="365" y="190" width="190" height="120" rx="14" fill="#4f46e5"/><text x="460" y="240" text-anchor="middle" fill="#fff" font-size="22" font-weight="700">正規化</text><text x="460" y="272" text-anchor="middle" fill="#e0e7ff" font-size="16">全ソースを Event に</text>
+    <line x1="555" y1="250" x2="615" y2="250" stroke="#6366f1" stroke-width="3" marker-end="url(#ar)"/>
+    <rect x="620" y="150" width="230" height="200" rx="14" fill="#fff" stroke="#6366f1" stroke-width="3"/>
+    <text x="735" y="190" text-anchor="middle" font-size="22" font-weight="700" fill="#312e81">統合グラフ</text>
+    <text x="735" y="225" text-anchor="middle" font-size="17" fill="#374151">決定 ─ タスク ─ 発言</text>
+    <text x="735" y="255" text-anchor="middle" font-size="17" fill="#374151">─ 成果物の変更</text>
+    <text x="735" y="295" text-anchor="middle" font-size="15" fill="#6b7280">SQLite 1ファイル</text>
+    <text x="735" y="320" text-anchor="middle" font-size="15" fill="#6b7280">増分処理・埋め込み</text>
+  </g>
+  <!-- judge -->
+  <g>
+    <line x1="850" y1="250" x2="910" y2="250" stroke="#dc2626" stroke-width="3" marker-end="url(#arr)"/>
+    <rect x="915" y="120" width="265" height="260" rx="14" fill="#fef2f2" stroke="#fecaca" stroke-width="2"/>
+    <text x="1047" y="160" text-anchor="middle" font-size="22" font-weight="700" fill="#991b1b">矛盾検知</text>
+    <g font-size="16" fill="#374151">
+      <text x="935" y="200">① 候補絞り込み（コード）</text>
+      <text x="935" y="228">② 時系列ガード（コード）</text>
+      <text x="935" y="256">③ 判定だけ LLM（high）</text>
+      <text x="935" y="284">④ confidence で自動振り分け</text>
+      <text x="935" y="325" fill="#991b1b" font-weight="700">≥0.8 通知 / ≥0.5 確認 / 無視</text>
+      <text x="935" y="355" fill="#6b7280">人が承認して初めて書き込み</text>
+    </g>
+  </g>
+  <!-- bottom: trigger -->
+  <g font-size="16" fill="#4b5563">
+    <rect x="365" y="420" width="815" height="100" rx="12" fill="#f9fafb" stroke="#e5e7eb"/>
+    <text x="385" y="452" font-weight="700" fill="#111827">自律的に動く: </text>
+    <text x="510" y="452">60秒の定期巡回 ＋ 投稿・保存・会議終了のイベントで即時起動（保存 → 約8秒で検知）</text>
+    <text x="385" y="490">OrcaRouter で3段階に振り分け: 抽出＝mid ／ 埋め込み＝embed ／ 判定＝high → 全処理 $0.71（全 high なら $1.94）</text>
+  </g>
+</svg>

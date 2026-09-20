@@ -283,6 +283,15 @@ def notifications_count(request: Request):
 
 # ---------- サインイン / プロフィール ----------
 
+@app.get("/login/as/{name}")
+def login_as(name: str, next: str = "/"):
+    """デモ用の即時サインイン（展示で端末を切り替えるとき用）。SSO 導入時は削除する"""
+    conn = get_conn()
+    if name not in people_list(conn):
+        raise HTTPException(404)
+    return set_me(RedirectResponse(next or "/", status_code=303), name)
+
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request, next: str = "/"):
     conn = get_conn()

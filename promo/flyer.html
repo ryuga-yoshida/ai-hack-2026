@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>進行管理エージェント チラシ</title>
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #111827; }
+  .page { width: 210mm; height: 297mm; overflow: hidden; position: relative; page-break-after: always; background: #fff; }
+  .page:last-child { page-break-after: auto; }
+  .hero { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #4f46e5 100%); color: #fff; padding: 10mm 14mm 8mm; }
+  .hero .kicker { font-size: 9pt; letter-spacing: .25em; color: #c7d2fe; font-weight: 600; }
+  .hero h1 { font-size: 30pt; line-height: 1.15; margin: 3mm 0 3mm; font-weight: 800; }
+  .hero h1 em { font-style: normal; color: #fde68a; }
+  .hero .sub { font-size: 11pt; color: #e0e7ff; line-height: 1.5; }
+  .content { padding: 6mm 14mm 0; }
+  h2 { font-size: 13pt; margin: 0 0 3mm; padding-left: 8px; border-left: 5px solid #4f46e5; line-height: 1.2; }
+  .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 4mm 5mm; margin-bottom: 5mm; font-size: 9.5pt; line-height: 1.55; }
+  .card ul { margin: 0; padding-left: 1.2em; }
+  .quote { background: #fff7ed; border: 1.5px solid #fdba74; border-radius: 10px; padding: 4mm 5mm; font-size: 10.5pt; line-height: 1.55; margin-bottom: 5mm; }
+  .quote .lab { font-size: 7.5pt; color: #9a3412; font-weight: 700; letter-spacing: .15em; margin-bottom: 1.5mm; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin: 0 0 5mm; }
+  .num { background: #111827; color: #fff; border-radius: 10px; padding: 3.5mm 2mm; text-align: center; }
+  .num b { display: block; font-size: 20pt; line-height: 1; margin-bottom: 1.5mm; white-space: nowrap; }
+  .num span { font-size: 7pt; color: #9ca3af; line-height: 1.3; display: block; }
+  .num.green b { color: #34d399; } .num.amber b { color: #fbbf24; }
+  .shot { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; margin-bottom: 2mm; }
+  .shot img { width: 100%; display: block; }
+  .cap { font-size: 7.5pt; color: #6b7280; margin-bottom: 5mm; }
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  th, td { text-align: left; padding: 1.6mm 2mm; border-bottom: 1px solid #e5e7eb; vertical-align: top; line-height: 1.45; }
+  th { color: #6b7280; font-weight: 600; width: 32%; }
+  .foot { position: absolute; left: 0; right: 0; bottom: 0; background: #111827; color: #fff; padding: 5mm 14mm; display: flex; align-items: center; gap: 6mm; }
+  .foot .qr { background: #fff; padding: 1.5mm; border-radius: 6px; } .foot .qr img { width: 20mm; height: 20mm; display: block; }
+  .foot .txt { font-size: 9pt; line-height: 1.5; color: #d1d5db; } .foot .txt b { color: #fff; display: block; font-size: 10.5pt; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin-bottom: 5mm; }
+  .step { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 3mm; font-size: 8.5pt; line-height: 1.45; }
+  .step b { display: block; font-size: 10pt; color: #4f46e5; margin-bottom: 1mm; }
+  .qa .q { break-inside: avoid; } .qa { columns: 2; column-gap: 6mm; margin-top: 0; } .qa dt { font-weight: 700; font-size: 8.5pt; margin-top: 2mm; break-after: avoid; } .qa dd { margin: .3mm 0 0; font-size: 8pt; color: #374151; line-height: 1.45; }
+</style></head>
+<body>
+<!-- 表 -->
+<div class="page">
+  <div class="hero">
+    <div class="kicker">AI HACK 2026 ｜ 自律型エージェント ｜ 吉田 龍河</div>
+    <h1>決めたことと、作られているものは、<em>食い違う。</em></h1>
+    <div class="sub">進行管理エージェントは、議事録・チャット・メール・Wiki・成果物を横断して「決定」と「成果物」の矛盾を<b>人が指示する前に</b>見つけて知らせます。</div>
+  </div>
+  <div class="content">
+    <div class="quote"><div class="lab">エージェントからの通知（架空企業・実際の出力）</div>「9/15 の定例で『それ以外の数字は変更しない』と決まっていますが、山田さんが 9/18 に更新した見込み表では商品Aの第4四半期が 1200 → 1500 に変わっています。」</div>
+    <div class="two">
+      <div>
+        <h2>なぜ誰も気づけないのか</h2>
+        <div class="card"><ul>
+          <li>決定は会議・チャット・メールに散らばり、成果物は Excel / Word / Wiki にある</li>
+          <li>「突き合わせ」は誰の仕事でもない。気づくのは資料が出回った後</li>
+          <li>既存ツールは1つの中の検索はできても、横断で矛盾を探しに行かない</li>
+        </ul></div>
+        <h2>ブースで見られること</h2>
+        <div class="steps" style="grid-template-columns: 1fr">
+          <div class="step"><b>1. 会議で決める</b>自作の会議室で話す → 話者別に文字起こし → 決定とタスクを自動抽出</div>
+          <div class="step"><b>2. Excel を保存する</b>ブラウザ編集でも、監視フォルダに保存しても、版として取り込まれる</div>
+          <div class="step"><b>3. 数秒後に通知</b>「この変更、9/15 の決定と食い違っています」と根拠つきで担当者へ</div>
+        </div>
+      </div>
+      <div>
+        <h2>画面</h2>
+        <div class="shot"><img src="screenshots/findings_card.png" alt="検知カード"></div>
+        <div class="cap">検知カード：決定 → 発言 → 変更の根拠が時系列で並び、判定理由と対応ボタン（タスク化・通知・確認・却下）</div>
+        <h2>見つけるもの</h2>
+        <div class="card"><ul>
+          <li><b>矛盾</b> — 決定と成果物の変更が食い違う（根拠と判定理由つき）</li>
+          <li><b>根拠のない変更</b> — どの決定にも紐付かない変更</li>
+          <li><b>停滞</b> — 7日以上動きのないタスク</li>
+          <li><b>状態更新の提案</b> — 「終わりました」の発言から状態更新を提案</li>
+        </ul></div>
+      </div>
+    </div>
+    <div class="nums">
+      <div class="num green"><b>9/10</b><span>評価セットの検知率<br>誤検知 0</span></div>
+      <div class="num"><b>8秒</b><span>保存 → 検知<br>（イベント起動）</span></div>
+      <div class="num amber"><b>-63%</b><span>LLM コスト $0.71<br>vs 全て high $1.94</span></div>
+      <div class="num"><b>100%</b><span>人の指示なしで<br>完結した判断</span></div>
+    </div>
+  </div>
+  <div class="foot">
+    <div class="qr"><img src="qr_github.png" alt="GitHub"></div>
+    <div class="txt"><b>GitHub — git clone して3コマンドで動きます</b>github.com/ryuga-yoshida/ai-hack-2026 ／ API キー不要の replay モードで検知までを追体験。裏面に仕組みと設計。</div>
+  </div>
+</div>
+
+<!-- 裏 -->
+<div class="page">
+  <div class="content" style="padding-top: 8mm">
+    <h2>仕組み</h2>
+    <div class="shot" style="padding:2mm 6mm"><img src="arch.svg" alt="アーキテクチャ" style="max-height:50mm;margin:0 auto"></div>
+    <div class="cap">5つの情報源を1種類の「出来事」に正規化 → 統合グラフ（SQLite 1ファイル）→ 成果物が変わるたびに関連する決定を引き当てて判定。60秒の定期巡回に加え、投稿・保存・会議終了で即時起動。</div>
+    <div class="two">
+      <div>
+        <h2>OrcaRouter の使い分けと実測</h2>
+        <div class="card" style="padding:2mm 3mm"><table>
+          <tr><th>high（Claude Opus）</th><td>矛盾の判定だけ。根拠と文脈を渡して1件ずつ。$0.50</td></tr>
+          <tr><th>mid（Gemini Flash）</th><td>決定・タスクの抽出、紐付けの最終段、議事録要約。$0.21</td></tr>
+          <tr><th>embed</th><td>候補絞り込み・重複統合・紐付け。$0.001</td></tr>
+          <tr><th>コード</th><td>時系列ガード・語彙ゲート・引用検証・閾値。LLM を呼ぶ前に絞る</td></tr>
+          <tr><th>合計</th><td><b>$0.71</b>（全て high なら $1.94、削減 63%）</td></tr>
+        </table></div>
+        <h2>評価</h2>
+        <div class="card" style="font-size:9pt">評価セット 10 ケース（矛盾あり 6・許容 4）を毎回再生。<b>9/10 検知・誤検知 0・見逃し 1</b>（数式だけの変更）。判定を変えるたびに走らせ、悪化したら戻す。</div>
+      </div>
+      <div>
+        <h2>セキュリティ設計</h2>
+        <div class="card" style="padding:2mm 3mm"><table>
+          <tr><th>送るデータ</th><td>判定に必要な最小限。人名・メール・電話はマスクして送信し応答で復元</td></tr>
+          <tr><th>指示の混入</th><td>議事録は「データ」として囲う。指示文を混入させた実演で抽出に漏れないことを画面で確認できる</td></tr>
+          <tr><th>書き込み</th><td>エージェントは通知と提案まで。状態変更・成果物の書き換えは人が承認</td></tr>
+          <tr><th>幻覚</th><td>抽出結果の引用が原文に無ければ機械的に破棄</td></tr>
+          <tr><th>権限</th><td>コネクタは読み取り専用スコープのみ</td></tr>
+          <tr><th>実運用</th><td>Teams / Outlook / SharePoint / Confluence はアダプタ差し替え（Graph 形式で空実装済）</td></tr>
+        </table></div>
+      </div>
+    </div>
+    <h2>よくある質問</h2>
+    <dl class="qa">
+      <div class="q"><dt>Q. 誤検知したら？</dt><dd>confidence 0.8 以上だけ通知、0.5〜0.8 は確認キュー。却下理由を残し、同種の抑制に使う。判定の内訳（なぜ疑ったか）も画面で見られる。</dd></div>
+      <div class="q"><dt>Q. チャットや Wiki が自作なのは？</dt><dd>本物の Teams / Confluence は接続に社内承認が要るため。アダプタは実 API（Microsoft Graph 等）の形式で作ってあり、fetch を差し替えれば判定ロジックは変わらない。</dd></div>
+      <div class="q"><dt>Q. 既存ツールとの違いは？</dt><dd>1ツール内の検索や要約ではなく、<b>横断して矛盾を能動的に探しに行く</b>。人が「確認して」と言う前に動く。</dd></div>
+      <div class="q"><dt>Q. スケールするか？</dt><dd>増分処理と候補絞り込み（埋め込み＋語彙ゲート）で、LLM を呼ぶのは絞った後だけ。全件走査はしない。</dd></div>
+    </dl>
+  </div>
+  <div class="foot">
+    <div class="qr"><img src="qr_github.png" alt="GitHub"></div>
+    <div class="txt"><b>吉田 龍河 ／ AI HACK 2026</b>github.com/ryuga-yoshida/ai-hack-2026 — 設計書・評価セット・LLM キャッシュ同梱。Zenn 記事は QR の README から。</div>
+  </div>
+</div>
+</body></html>

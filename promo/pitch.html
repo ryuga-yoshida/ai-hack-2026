@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>進行管理エージェント — 最終ピッチ</title>
+<style>
+  @page { size: 1280px 720px; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #111827; }
+  body { font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #111827; }
+  .slide { width: 1280px; height: 720px; position: relative; overflow: hidden; background: #fff; page-break-after: always; padding: 56px 72px; }
+  .slide:last-child { page-break-after: auto; }
+  .n { position: absolute; right: 28px; bottom: 20px; font-size: 14px; color: #9ca3af; }
+  .t { position: absolute; left: 72px; bottom: 20px; font-size: 14px; color: #9ca3af; letter-spacing: .1em; }
+  h1 { font-size: 64px; line-height: 1.2; margin: 0 0 20px; font-weight: 800; }
+  h2 { font-size: 40px; margin: 0 0 28px; font-weight: 800; }
+  h2 small { display: block; font-size: 18px; color: #6b7280; font-weight: 500; margin-top: 6px; letter-spacing: .05em; }
+  p, li { font-size: 24px; line-height: 1.55; }
+  .dark { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4f46e5 100%); color: #fff; }
+  .dark h1 em { font-style: normal; color: #fde68a; }
+  .dark .sub { font-size: 26px; color: #e0e7ff; }
+  .big { font-size: 120px; font-weight: 800; line-height: 1; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .box { background: #f9fafb; border: 2px solid #e5e7eb; border-radius: 16px; padding: 22px 26px; }
+  .box b.h { display: block; font-size: 26px; color: #4f46e5; margin-bottom: 8px; }
+  .num { background: #111827; color: #fff; border-radius: 16px; padding: 22px; text-align: center; }
+  .num b { display: block; font-size: 64px; line-height: 1; margin-bottom: 8px; }
+  .num span { font-size: 16px; color: #9ca3af; }
+  .num.g b { color: #34d399; } .num.a b { color: #fbbf24; }
+  table { width: 100%; border-collapse: collapse; font-size: 22px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 2px solid #e5e7eb; vertical-align: top; }
+  th { color: #6b7280; font-weight: 600; width: 30%; }
+  .shot { border: 2px solid #e5e7eb; border-radius: 12px; overflow: hidden; } .shot img { width: 100%; display: block; }
+  .quote { background: #fff7ed; border: 3px solid #fdba74; border-radius: 16px; padding: 26px 30px; font-size: 30px; line-height: 1.5; }
+  .code { font-family: ui-monospace, Menlo, monospace; background: #111827; color: #e5e7eb; border-radius: 12px; padding: 20px 24px; font-size: 20px; line-height: 1.6; white-space: pre; }
+  .tag { display: inline-block; background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 4px 14px; font-size: 18px; font-weight: 600; margin-right: 8px; }
+</style></head>
+<body>
+
+<div class="slide dark">
+  <div style="font-size:20px;letter-spacing:.3em;color:#c7d2fe;font-weight:600">AI HACK 2026 ｜ 最終ピッチ</div>
+  <h1 style="margin-top:120px">決めたことと、<br>作られているものは、<em>食い違う。</em></h1>
+  <div class="sub">進行管理エージェント — 議事録・チャット・メール・Wiki・成果物を横断して、矛盾を自律的に見つける</div>
+  <div style="position:absolute;right:72px;bottom:56px;text-align:right;color:#c7d2fe;font-size:22px">吉田 龍河<br><span style="font-size:16px">個人開発 ／ OrcaRouter</span></div>
+</div>
+
+<div class="slide">
+  <h2>先週「据え置き」と決めた数字が、今週の資料で変わっている<small>0:00 – 0:30 ｜ 課題</small></h2>
+  <div class="grid2">
+    <div>
+      <ul style="padding-left:1.2em;margin:0">
+        <li>決定は <b>会議・チャット・メール</b> に散らばる</li>
+        <li>成果物は <b>Excel / Word / Wiki</b> にある</li>
+        <li>両者を突き合わせるのは <b>誰の仕事でもない</b></li>
+        <li>だから気づくのは、資料が出回った後</li>
+      </ul>
+      <p style="margin-top:28px;color:#6b7280;font-size:20px">既存ツールは「1つの中の検索・要約」は得意。<br>「横断して矛盾を探しに行く」ことはしない。</p>
+    </div>
+    <div class="quote">「見込み表の更新は商品Dの追加と商品Bの修正のみ。<b>それ以外の数字は変更しない</b>」<br><span style="font-size:18px;color:#9a3412">— 9/15 定例会議</span><br><br>→ 9/18、商品Aの第4四半期が <b>1200 → 1500</b> に</div>
+  </div>
+  <div class="t">課題</div><div class="n">2</div>
+</div>
+
+<div class="slide">
+  <h2>デモ — 人間は一度も「確認して」と言わない<small>0:30 – 2:00 ｜ ライブ</small></h2>
+  <div class="grid3">
+    <div class="box"><b class="h">1. 会議で決める</b>会議室で話す → 話者別に文字起こし → 決定とタスクを自動抽出<br><span class="tag">mid</span></div>
+    <div class="box"><b class="h">2. Excel を保存する</b>ブラウザ編集 / 監視フォルダ。保存した瞬間に版として取り込み<br><span class="tag">イベント起動</span></div>
+    <div class="box"><b class="h">3. 8秒後に通知</b>「9/15 の決定と食い違っています」— 根拠（決定・発言・変更）と判定理由つき<br><span class="tag">high</span></div>
+  </div>
+  <div class="shot" style="margin-top:28px"><img src="screenshots/findings_card.png" alt=""></div>
+  <div class="t">デモ</div><div class="n">3</div>
+</div>
+
+<div class="slide">
+  <h2>アーキテクチャ — 全部を1種類の「出来事」にする<small>2:00 – 2:40 ｜ 正規化と統合グラフ</small></h2>
+  <div class="grid2" style="grid-template-columns: 3fr 2fr">
+    <div class="shot" style="padding:10px"><img src="arch.svg" alt=""></div>
+    <div>
+      <div class="code">Event {
+  source:  meet|chat|mail|wiki|excel
+  kind:    utterance|decision
+           |task_hint|artifact_change
+  actor, occurred_at
+  ref:     出典の座標
+  quote:   原文（幻覚チェック）
+}</div>
+      <p style="font-size:20px;margin-top:18px">情報源が増えてもアダプタを足すだけ。<br>判定ロジックは情報源を知らない。<br>Teams / Outlook / SharePoint は Graph 形式の空実装で差し替え可。</p>
+    </div>
+  </div>
+  <div class="t">アーキテクチャ</div><div class="n">4</div>
+</div>
+
+<div class="slide">
+  <h2>矛盾検知 — LLM を呼ぶのは最後だけ<small>判定の前にコードで絞る</small></h2>
+  <div class="grid2">
+    <div>
+      <table>
+        <tr><th>① 候補</th><td>タスク直結の決定 ＋ 埋め込み上位 × <b>語彙ゲート</b>（対象語を含む決定だけ）</td></tr>
+        <tr><th>② ガード</th><td>時系列（決定が先）・30日以内・数式セルの値変化は除外</td></tr>
+        <tr><th>③ 判定</th><td>決定・変更・関連発言・その後の決定を渡して <b>high</b> が判定。<code>same_subject</code> が false なら矛盾扱いしない</td></tr>
+        <tr><th>④ 行動</th><td>confidence ≥ 0.8 通知 ／ ≥ 0.5 確認キュー ／ それ未満は無視</td></tr>
+      </table>
+    </div>
+    <div>
+      <div class="grid2" style="gap:16px">
+        <div class="num g"><b>9/10</b><span>評価セット検知率</span></div>
+        <div class="num"><b>0</b><span>誤検知</span></div>
+        <div class="num"><b>8秒</b><span>保存 → 通知</span></div>
+        <div class="num"><b>100%</b><span>人の指示なしで完結</span></div>
+      </div>
+      <p style="font-size:18px;color:#6b7280;margin-top:16px">評価セット 10 ケース（矛盾あり 6・許容 4）を判定を変えるたびに再生。悪化したら戻す。</p>
+    </div>
+  </div>
+  <div class="t">検知</div><div class="n">5</div>
+</div>
+
+<div class="slide">
+  <h2>OrcaRouter の振り分けとコスト実測<small>2:40 – 3:20</small></h2>
+  <div class="grid2" style="grid-template-columns: 3fr 2fr">
+    <table>
+      <tr><th>high<br><span style="font-size:16px">claude-opus-5</span></th><td>矛盾の判定だけ。1件ずつ根拠と文脈を渡す</td><td style="text-align:right;white-space:nowrap"><b>$0.50</b></td></tr>
+      <tr><th>mid<br><span style="font-size:16px">gemini-3.6-flash</span></th><td>抽出・紐付け最終段・議事録要約</td><td style="text-align:right"><b>$0.21</b></td></tr>
+      <tr><th>embed<br><span style="font-size:16px">gemini-embedding</span></th><td>候補絞り込み・重複統合・紐付け</td><td style="text-align:right"><b>$0.001</b></td></tr>
+      <tr><th>コード</th><td>時系列ガード・語彙ゲート・引用検証・閾値判定</td><td style="text-align:right"><b>$0</b></td></tr>
+    </table>
+    <div>
+      <div class="num a"><b>$0.71</b><span>全処理の実測（キャッシュ再生で誰でも再現）</span></div>
+      <div class="num" style="margin-top:16px"><b>-63%</b><span>全て high で回すと $1.94</span></div>
+      <p style="font-size:18px;color:#6b7280;margin-top:14px">料金表は /v1/models から取得。ダッシュボードに常時表示。</p>
+    </div>
+  </div>
+  <div class="t">OrcaRouter</div><div class="n">6</div>
+</div>
+
+<div class="slide">
+  <h2>セキュリティ設計 — やらないことを先に決める<small>3:20 – 3:50</small></h2>
+  <table style="font-size:21px">
+    <tr><th>送るデータ</th><td>判定に必要な最小限。人名・メール・電話はマスクして送信、応答で復元</td></tr>
+    <tr><th>指示の混入</th><td>議事録は「データ」として囲う。指示文を混入させた実演で、抽出に漏れないことを画面で示す</td></tr>
+    <tr><th>幻覚</th><td>抽出結果の引用が原文に無ければ機械的に破棄</td></tr>
+    <tr><th>書き込み</th><td>エージェントは通知と提案まで。状態変更・成果物の書き換えは人が承認して初めて行う</td></tr>
+    <tr><th>権限</th><td>コネクタは読み取り専用スコープのみ（Graph: Mail.Read / Calendars.Read）</td></tr>
+    <tr><th>置き場所</th><td>SQLite 1ファイル。社内サーバーで完結。鍵は .env のみ</td></tr>
+  </table>
+  <div class="t">セキュリティ</div><div class="n">7</div>
+</div>
+
+<div class="slide dark">
+  <h1 style="margin-top:80px;font-size:54px">人が「確認して」と言う前に、<br>矛盾は見つかっている。</h1>
+  <div class="sub" style="margin-top:20px">git clone → 3コマンド。API キー不要の replay で追体験できます。</div>
+  <div style="display:flex;align-items:center;gap:28px;margin-top:60px">
+    <div style="background:#fff;padding:10px;border-radius:12px"><img src="qr_github.png" style="width:150px;height:150px;display:block"></div>
+    <div style="font-size:22px;color:#e0e7ff;line-height:1.7">github.com/ryuga-yoshida/ai-hack-2026<br>設計書・評価セット・LLM キャッシュ同梱<br><span style="color:#fde68a">ブースで触れます</span></div>
+  </div>
+  <div style="position:absolute;right:72px;bottom:56px;text-align:right;color:#c7d2fe;font-size:22px">吉田 龍河</div>
+</div>
+
+</body></html>
