@@ -20,6 +20,10 @@ python promo/shoot.py     # スクショを撮り直す（サーバー起動中�
   --print-to-pdf=promo/poster_A1.pdf file://$PWD/promo/poster.html
 ```
 
+## デプロイ
+
+本番: https://agent.leadus-nova.com/（Cloud Run `shinko-agent` @ leadus-nova-dev、GCS `aihack-agent-state-leadus` にバックアップ）。再デプロイは `gcloud run deploy shinko-agent --source . --project leadus-nova-dev --region asia-northeast1`（環境変数・シークレットは初回設定を引き継ぐ）。
+
 ## まだ決めていないこと（吉田さんの判断待ち）
 
 - **Zenn 記事の URL** — 公開後に `qr_zenn.png` を作ってポスター・チラシに追加（`python -c "import qrcode; qrcode.make(URL).save('promo/qr_zenn.png')"`）
