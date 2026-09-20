@@ -33,6 +33,13 @@ async def require_signin(request: Request, call_next):
 
 STATUSES = [("todo", "未着手"), ("in_progress", "進行中"), ("blocked", "ブロック"), ("done", "完了")]
 STATUS_LABEL = dict(STATUSES)
+PRIORITIES = [("urgent", "緊急"), ("high", "高"), ("normal", "中"), ("low", "低")]
+PRIORITY_LABEL = dict(PRIORITIES)
+PRIORITY_ORDER = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
+ACTIVITY_LABEL = {"created": "作成", "status": "状態", "assignee": "担当者", "due_date": "期限", "title": "タイトル",
+                  "priority": "優先度", "artifacts": "成果物", "description": "説明", "checklist": "チェックリスト",
+                  "delete": "削除", "due": "期限", "tag": "タグ", "team": "チーム"}
+
 KIND_LABEL = {"contradiction": "矛盾", "stalled": "停滞", "orphan_change": "根拠なし変更", "status_suggestion": "状態更新の提案"}
 EVENT_LABEL = {"decision": "決定", "task_hint": "タスク候補", "utterance": "発言", "artifact_change": "変更"}
 FINDING_STATUS_LABEL = {"notified": "通知済", "pending": "確認待ち", "acknowledged": "確認済", "dismissed": "却下"}
@@ -123,7 +130,7 @@ def fmt_rel(v) -> str:
 templates.env.filters["dt"] = fmt_dt
 templates.env.filters["rel"] = fmt_rel
 templates.env.filters["tag_colors"] = lambda tags: {t["name"]: t["color"] for t in tags}
-templates.env.globals.update(STATUSES=STATUSES, STATUS_LABEL=STATUS_LABEL, KIND_LABEL=KIND_LABEL,
+templates.env.globals.update(STATUSES=STATUSES, STATUS_LABEL=STATUS_LABEL, KIND_LABEL=KIND_LABEL, PRIORITIES=PRIORITIES, PRIORITY_LABEL=PRIORITY_LABEL, ACTIVITY_LABEL=ACTIVITY_LABEL,
                              EVENT_LABEL=EVENT_LABEL, FINDING_STATUS_LABEL=FINDING_STATUS_LABEL, PEOPLE=PEOPLE)
 
 
@@ -474,7 +481,9 @@ def task_meta(conn: sqlite3.Connection, t: Task) -> dict:
     origin = db.get_event(conn, t.created_from) if t.created_from else None
     tags_all = tagmod.tags_for(conn, "task", t.id)
     updated = conn.execute("SELECT updated_at FROM tasks WHERE id=?", (t.id,)).fetchone()["updated_at"]
-    return {"task": t, "n_msgs": n_msgs, "n_findings": n_findings,
+    ck = conn.execute("SELECT COUNT(*) n, COALESCE(SUM(done),0) d FROM task_checklist WHERE task_id=?", (t.id,)).fetchone()
+    return {"task": t, "n_msgs": n_msgs, "n_findings": n_findings, "check_total": ck["n"], "check_done": ck["d"],
+            "watchers": [r["user"] for r in conn.execute("SELECT user FROM task_watchers WHERE task_id=?", (t.id,))],
             "tags": [x for x in tags_all if x["kind"] != "team"], "teams": [x for x in tags_all if x["kind"] == "team"],
             "updated_at": updated,
             "origin": origin, "overdue": bool(t.due_date and t.due_date < date.today() and t.status != "done")}
@@ -482,10 +491,29 @@ def task_meta(conn: sqlite3.Connection, t: Task) -> dict:
 
 @app.get("/tasks", response_class=HTMLResponse)
 def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = "", team: str = "",
-               view: str = "", sort: str = "updated"):
+               view: str = "", sort: str = "updated", quick: str = "", priority: str = ""):
+    from datetime import timedelta
     conn = get_conn()
+    me = get_me(request)
     view = view or request.cookies.get("tasks_view", "board")
     tasks = db.list_tasks(conn)
+    today = date.today()
+    if quick == "mine":
+        watching = {r["task_id"] for r in conn.execute("SELECT task_id FROM task_watchers WHERE user=?", (me,))}
+        tasks = [t for t in tasks if t.assignee == me or t.id in watching]
+    elif quick == "overdue":
+        tasks = [t for t in tasks if t.due_date and t.due_date < today and t.status != "done"]
+    elif quick == "week":
+        tasks = [t for t in tasks if t.due_date and today <= t.due_date <= today + timedelta(days=7) and t.status != "done"]
+    elif quick == "unassigned":
+        tasks = [t for t in tasks if not t.assignee and t.status != "done"]
+    elif quick == "findings":
+        ids = {r["task_id"] for r in conn.execute("SELECT task_id FROM findings WHERE status IN ('notified','pending')")}
+        tasks = [t for t in tasks if t.id in ids]
+    elif quick == "nodue":
+        tasks = [t for t in tasks if not t.due_date and t.status != "done"]
+    if priority:
+        tasks = [t for t in tasks if t.priority == priority]
     if assignee:
         tasks = [t for t in tasks if (t.assignee or "") == assignee]
     if tag:
@@ -504,11 +532,15 @@ def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = "",
     order = {"todo": 0, "in_progress": 1, "blocked": 2, "done": 3}
     keyf = {"updated": lambda m: m["updated_at"], "due": lambda m: (m["task"].due_date is None, str(m["task"].due_date or "")),
             "status": lambda m: order[m["task"].status], "assignee": lambda m: m["task"].assignee or "～",
-            "title": lambda m: m["task"].title, "findings": lambda m: -m["n_findings"]}.get(sort, lambda m: m["updated_at"])
+            "title": lambda m: m["task"].title, "findings": lambda m: -m["n_findings"],
+            "priority": lambda m: PRIORITY_ORDER.get(m["task"].priority, 1)}.get(sort, lambda m: m["updated_at"])
     rows = sorted(metas, key=keyf, reverse=(sort == "updated"))
     assignees = sorted({t.assignee for t in db.list_tasks(conn) if t.assignee})
     all_tags = tagmod.all_tags(conn)
-    resp = render("tasks.html", request, conn, by_status=by_status, rows=rows, assignees=assignees,
+    counts = {"all": len(db.list_tasks(conn)), "overdue": sum(1 for t in db.list_tasks(conn) if t.due_date and t.due_date < today and t.status != "done"),
+              "mine": sum(1 for t in db.list_tasks(conn) if t.assignee == me and t.status != "done")}
+    resp = render("tasks.html", request, conn, by_status=by_status, rows=rows, assignees=assignees, quick=quick, priority=priority,
+                  counts=counts, me=me, PRIORITIES=PRIORITIES,
                   assignee=assignee, q=q, tag=tag, team=team, view=view, sort=sort, today=date.today().isoformat(),
                   all_tags=[t for t in all_tags if t["kind"] != "team"], teams=[t for t in all_tags if t["kind"] == "team"])
     resp.set_cookie("tasks_view", view, max_age=86400 * 365)
@@ -532,18 +564,146 @@ def set_task_teams(request: Request, task_id: str, teams: list[str] = Form([]), 
 
 
 @app.post("/tasks")
-def create_task(title: str = Form(...), assignee: str = Form(""), due_date: str = Form(""),
-                artifacts: str = Form(""), description: str = Form(""), status: str = Form("todo")):
+def create_task(request: Request, title: str = Form(...), assignee: str = Form(""), due_date: str = Form(""),
+                artifacts: str = Form(""), description: str = Form(""), status: str = Form("todo"), priority: str = Form("normal"),
+                back: str = Form("")):
     conn = get_conn()
+    me = get_me(request)
     task = Task(
         id=new_id(), title=title.strip(), assignee=assignee.strip() or None,
         description=description.strip() or None, status=status if status in STATUS_LABEL else "todo",
         due_date=date.fromisoformat(due_date) if due_date else None,
         artifacts=[a.strip() for a in artifacts.split(",") if a.strip()],
+        priority=priority if priority in PRIORITY_ORDER else "normal",
     )
     db.save_task(conn, task)
+    db.task_activity(conn, task.id, me, "created", "手動で作成")
+    if me:
+        conn.execute("INSERT OR IGNORE INTO task_watchers (task_id, user) VALUES (?,?)", (task.id, me)); conn.commit()
     tagmod.apply_hashtags(conn, f"{title} {description}", "task", task.id)
+    if back:
+        return RedirectResponse(back, status_code=303)
     return RedirectResponse(f"/tasks/{task.id}", status_code=303)
+
+
+@app.post("/tasks/bulk")
+def tasks_bulk(request: Request, ids: list[str] = Form([]), action: str = Form(...), value: str = Form("")):
+    """一覧の一括操作: status / assignee / due / priority / delete / team / tag"""
+    conn = get_conn()
+    me = get_me(request)
+    for tid in ids:
+        t = db.get_task(conn, tid)
+        if not t:
+            continue
+        if action == "delete":
+            _delete_task(conn, tid)
+            continue
+        if action == "status" and value in STATUS_LABEL:
+            t.status = value
+        elif action == "assignee":
+            t.assignee = value or None
+        elif action == "due":
+            t.due_date = date.fromisoformat(value) if value else None
+        elif action == "priority" and value in PRIORITY_ORDER:
+            t.priority = value
+        elif action == "tag" and value:
+            tagmod.link(conn, value, "task", tid); continue
+        elif action == "team" and value:
+            tagmod.link(conn, value, "task", tid); continue
+        else:
+            continue
+        db.save_task(conn, t)
+        db.task_activity(conn, tid, me, action, f"一括操作: {value}")
+    ref = request.headers.get("referer") or "/tasks?view=list"
+    return RedirectResponse(ref, status_code=303)
+
+
+def _delete_task(conn: sqlite3.Connection, task_id: str) -> None:
+    for tbl, col in (("links", "to_id"), ("findings", "task_id"), ("task_checklist", "task_id"),
+                     ("task_watchers", "task_id"), ("task_activity", "task_id"), ("tag_links", "target_id")):
+        conn.execute(f"DELETE FROM {tbl} WHERE {col}=?", (task_id,))
+    conn.execute("DELETE FROM chat_messages WHERE channel=?", (f"task:{task_id}",))
+    conn.execute("DELETE FROM tasks WHERE id=?", (task_id,))
+    conn.commit()
+
+
+@app.post("/tasks/{task_id}/delete")
+def delete_task(task_id: str):
+    conn = get_conn()
+    if not db.get_task(conn, task_id):
+        raise HTTPException(404)
+    _delete_task(conn, task_id)
+    return RedirectResponse("/tasks", status_code=303)
+
+
+@app.post("/tasks/{task_id}/duplicate")
+def duplicate_task(request: Request, task_id: str):
+    conn = get_conn()
+    t = db.get_task(conn, task_id)
+    if not t:
+        raise HTTPException(404)
+    n = Task(id=new_id(), title=f"{t.title}（コピー）", description=t.description, assignee=t.assignee, status="todo",
+             due_date=t.due_date, artifacts=list(t.artifacts), priority=t.priority)
+    db.save_task(conn, n)
+    for r in conn.execute("SELECT text, pos FROM task_checklist WHERE task_id=? ORDER BY pos", (task_id,)).fetchall():
+        conn.execute("INSERT INTO task_checklist (id, task_id, text, done, pos) VALUES (?,?,?,0,?)", (new_id(), n.id, r["text"], r["pos"]))
+    for tg in tagmod.tags_for(conn, "task", task_id):
+        tagmod.link(conn, tg["name"], "task", n.id)
+    conn.commit()
+    db.task_activity(conn, n.id, get_me(request), "created", f"「{t.title}」を複製")
+    return RedirectResponse(f"/tasks/{n.id}", status_code=303)
+
+
+@app.post("/tasks/{task_id}/checklist")
+def checklist_add(request: Request, task_id: str, text: str = Form(...)):
+    conn = get_conn()
+    if not db.get_task(conn, task_id):
+        raise HTTPException(404)
+    pos = conn.execute("SELECT COALESCE(MAX(pos),0)+1 FROM task_checklist WHERE task_id=?", (task_id,)).fetchone()[0]
+    for line in [x.strip() for x in text.splitlines() if x.strip()]:
+        conn.execute("INSERT INTO task_checklist (id, task_id, text, done, pos) VALUES (?,?,?,0,?)", (new_id(), task_id, line, pos)); pos += 1
+    conn.commit()
+    db.task_activity(conn, task_id, get_me(request), "checklist", f"項目を追加: {text.strip()[:40]}")
+    return RedirectResponse(f"/tasks/{task_id}#checklist", status_code=303)
+
+
+@app.post("/tasks/{task_id}/checklist/{item_id}/{action}")
+def checklist_action(request: Request, task_id: str, item_id: str, action: str, text: str = Form("")):
+    conn = get_conn()
+    if action == "toggle":
+        conn.execute("UPDATE task_checklist SET done = 1 - done WHERE id=? AND task_id=?", (item_id, task_id))
+    elif action == "delete":
+        conn.execute("DELETE FROM task_checklist WHERE id=? AND task_id=?", (item_id, task_id))
+    elif action == "edit" and text.strip():
+        conn.execute("UPDATE task_checklist SET text=? WHERE id=? AND task_id=?", (text.strip(), item_id, task_id))
+    elif action == "to_task":
+        r = conn.execute("SELECT text FROM task_checklist WHERE id=?", (item_id,)).fetchone()
+        if r:
+            parent = db.get_task(conn, task_id)
+            n = Task(id=new_id(), title=r["text"], assignee=parent.assignee if parent else None, status="todo",
+                     description=f"「{parent.title if parent else task_id}」のチェック項目から作成")
+            db.save_task(conn, n)
+            db.task_activity(conn, n.id, get_me(request), "created", "チェック項目から作成")
+            conn.execute("DELETE FROM task_checklist WHERE id=?", (item_id,)); conn.commit()
+            return RedirectResponse(f"/tasks/{n.id}", status_code=303)
+    conn.commit()
+    if action == "toggle":
+        t = db.get_task(conn, task_id)
+        if t:
+            db.save_task(conn, t)   # 動きがあった
+    return RedirectResponse(f"/tasks/{task_id}#checklist", status_code=303)
+
+
+@app.post("/tasks/{task_id}/watch")
+def task_watch(request: Request, task_id: str, user: str = Form("")):
+    conn = get_conn()
+    user = user.strip() or get_me(request)
+    if conn.execute("SELECT 1 FROM task_watchers WHERE task_id=? AND user=?", (task_id, user)).fetchone():
+        conn.execute("DELETE FROM task_watchers WHERE task_id=? AND user=?", (task_id, user))
+    else:
+        conn.execute("INSERT INTO task_watchers (task_id, user) VALUES (?,?)", (task_id, user))
+    conn.commit()
+    return RedirectResponse(f"/tasks/{task_id}", status_code=303)
 
 
 LABELS = {"decision": ("決定", "bg-rose-500"), "task_hint": ("タスク候補", "bg-gray-400"),
@@ -595,7 +755,10 @@ def task_detail(request: Request, task_id: str):
     if not task:
         raise HTTPException(404)
     all_tags = tagmod.all_tags(conn)
-    return render("task_detail.html", request, conn, task=task, meta=task_meta(conn, task),
+    checklist = [dict(r) for r in conn.execute("SELECT * FROM task_checklist WHERE task_id=? ORDER BY pos", (task_id,))]
+    activity = [dict(r) for r in conn.execute("SELECT * FROM task_activity WHERE task_id=? ORDER BY at DESC LIMIT 50", (task_id,))]
+    return render("task_detail.html", request, conn, task=task, meta=task_meta(conn, task), checklist=checklist, activity=activity,
+                  PRIORITIES=PRIORITIES, open_tasks=[t for t in db.list_tasks(conn) if t.id != task_id],
                   timeline=task_timeline(conn, task), me=get_me(request), comments=task_comments(conn, task_id),
                   all_tags=[t for t in all_tags if t["kind"] != "team"], teams=[t for t in all_tags if t["kind"] == "team"])
 
@@ -607,20 +770,30 @@ class TaskPatch(BaseModel):
     description: str | None = None
     due_date: date | None = None
     artifacts: list[str] | None = None
+    priority: str | None = None
 
 
 @app.patch("/tasks/{task_id}")
-def patch_task(task_id: str, patch: TaskPatch):
+def patch_task(request: Request, task_id: str, patch: TaskPatch):
     conn = get_conn()
     task = db.get_task(conn, task_id)
     if not task:
         raise HTTPException(404)
     if patch.status is not None and patch.status not in STATUS_LABEL:
         raise HTTPException(422, "invalid status")
+    if patch.priority is not None and patch.priority not in PRIORITY_ORDER:
+        raise HTTPException(422, "invalid priority")
+    me = get_me(request)
     for k, v in patch.model_dump(exclude_unset=True).items():
         if k in ("assignee", "description", "title") and isinstance(v, str):
             v = v.strip() or None
+        old = getattr(task, k)
         setattr(task, k, v)
+        if old != v and k != "description":
+            fmt = lambda x: (STATUS_LABEL.get(x, x) if k == "status" else (PRIORITY_LABEL.get(x, x) if k == "priority" else x))
+            db.task_activity(conn, task_id, me, k, f"{fmt(old) or '（なし）'} → {fmt(v) or '（なし）'}")
+        elif old != v:
+            db.task_activity(conn, task_id, me, k, "説明を更新")
     db.save_task(conn, task)   # updated_at を更新（stalled 検知の起点）
     return {"ok": True, "task": task}
 

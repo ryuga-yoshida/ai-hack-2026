@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block title %}{{ task.title }}{% endblock %}
 {% block heading %}<a href="/tasks" class="text-gray-400 hover:text-gray-600 mr-2">タスク</a><span class="text-gray-300 mr-2">/</span>{{ task.title|truncate(40) }}{% endblock %}
+{% block actions %}
+<form method="post" action="/tasks/{{ task.id }}/watch"><button class="text-sm border rounded-lg px-3 py-1.5 {% if me in meta.watchers %}bg-indigo-50 border-indigo-300 text-indigo-700{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}">{{ '👁 ウォッチ中' if me in meta.watchers else '👁 ウォッチ' }}</button></form>
+<button onclick="navigator.clipboard.writeText(location.href).then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">🔗</button>
+<div class="relative" x-data="{ open: false }" @click.outside="open = false">
+  <button @click="open = !open" class="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white hover:bg-gray-50">⋯</button>
+  <div x-show="open" x-cloak class="absolute right-0 top-10 z-30 w-48 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1">
+    <form method="post" action="/tasks/{{ task.id }}/duplicate"><button class="w-full text-left px-3 py-1.5 hover:bg-gray-50">複製</button></form>
+    <a href="/chat?channel=general" class="block px-3 py-1.5 hover:bg-gray-50">チャットで共有</a>
+    <div class="border-t my-1"></div>
+    <form method="post" action="/tasks/{{ task.id }}/delete" onsubmit="return confirm('このタスクを削除しますか？（紐付け・検知・コメントも消えます）')"><button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50">削除</button></form>
+  </div>
+</div>
+{% endblock %}
 {% block content %}
 <div class="grid grid-cols-3 gap-6" x-data="detail()">
   <div class="col-span-2 space-y-6">
@@ -14,6 +27,23 @@
         <code class="text-[11px]">{{ meta.origin.ref }}</code>
       </div>
       {% endif %}
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5" id="checklist">
+      <h2 class="font-semibold mb-3 flex items-center gap-2">チェックリスト
+        {% if checklist %}<span class="text-xs text-gray-400 font-normal">{{ meta.check_done }}/{{ meta.check_total }}</span>
+        <span class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[160px]"><span class="block h-full bg-emerald-500" style="width: {{ (100 * meta.check_done / meta.check_total)|round }}%"></span></span>{% endif %}</h2>
+      <ul class="space-y-1 mb-3">
+        {% for c in checklist %}
+        <li class="group flex items-center gap-2 text-sm">
+          <form method="post" action="/tasks/{{ task.id }}/checklist/{{ c.id }}/toggle"><button class="w-4 h-4 rounded border {% if c.done %}bg-emerald-500 border-emerald-500 text-white{% else %}border-gray-300 bg-white{% endif %} grid place-items-center text-[10px]">{{ '✓' if c.done else '' }}</button></form>
+          <form method="post" action="/tasks/{{ task.id }}/checklist/{{ c.id }}/edit" class="flex-1"><input name="text" value="{{ c.text }}" onchange="this.form.submit()" class="w-full border-0 bg-transparent px-1 py-0.5 rounded hover:bg-gray-50 focus:bg-white focus:ring-1 focus:ring-gray-300 {% if c.done %}line-through text-gray-400{% endif %}"></form>
+          <form method="post" action="/tasks/{{ task.id }}/checklist/{{ c.id }}/to_task" class="hidden group-hover:block"><button class="text-[11px] text-gray-400 hover:text-indigo-600" title="独立したタスクにする">⇢ タスク化</button></form>
+          <form method="post" action="/tasks/{{ task.id }}/checklist/{{ c.id }}/delete" class="hidden group-hover:block"><button class="text-gray-300 hover:text-red-600 text-xs">✕</button></form>
+        </li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="/tasks/{{ task.id }}/checklist" class="flex gap-2"><input name="text" placeholder="項目を追加（Enter）" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-1.5"><button class="text-sm border border-gray-300 rounded-lg px-3 bg-white hover:bg-gray-50">追加</button></form>
     </div>
 
     <div class="bg-white border border-gray-200 rounded-xl p-5">
@@ -72,6 +102,12 @@
         </select>
       </div>
       <div>
+        <label class="text-xs text-gray-500">優先度</label>
+        <select x-model="t.priority" @change="save({priority: t.priority}, '優先度を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+          {% for k, l in PRIORITIES %}<option value="{{ k }}">{{ {'urgent':'🔴','high':'🟠','normal':'🟢','low':'⚪'}[k] }} {{ l }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
         <label class="text-xs text-gray-500">担当者</label>
         <select x-model="t.assignee" @change="save({assignee: t.assignee}, '担当者を更新しました')" class="mt-1 w-full border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
           <option value="">未割当</option>{% for p in PEOPLE %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
@@ -112,7 +148,23 @@
         </div>
         <div class="mt-1">{% with tp_type='task', tp_id=task.id %}{% include "_tag_picker.html" %}{% endwith %}</div>
       </div>
+      <div>
+        <label class="text-xs text-gray-500">ウォッチャー <span class="text-gray-400">（更新通知の宛先）</span></label>
+        <div class="mt-1 flex flex-wrap gap-1 items-center">
+          {% for w in meta.watchers %}<form method="post" action="/tasks/{{ task.id }}/watch" class="inline"><input type="hidden" name="user" value="{{ w }}"><span data-person="{{ w }}" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-gray-100">{{ w }}<button class="opacity-50 hover:opacity-100">×</button></span></form>{% endfor %}
+          <form method="post" action="/tasks/{{ task.id }}/watch" class="inline"><select name="user" onchange="this.form.submit()" class="text-xs border border-gray-300 rounded-full px-2 py-0.5 bg-white"><option value="">＋ 追加</option>{% for p in PEOPLE if p not in meta.watchers %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></form>
+        </div>
+      </div>
       <div class="text-xs text-gray-400 pt-2 border-t">ID {{ task.id }}</div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm" x-data="{ more: false }">
+      <div class="font-semibold text-xs text-gray-500 mb-2">活動ログ</div>
+      <ol class="space-y-1.5 text-xs">
+        {% for a in activity %}
+        <li x-show="more || {{ 'true' if loop.index <= 6 else 'false' }}" class="flex gap-2"><span class="text-gray-400 shrink-0 w-20">{{ a.at|rel }}</span><span><b data-person="{{ a.actor }}">{{ a.actor or 'エージェント' }}</b> · {{ ACTIVITY_LABEL.get(a.action, a.action) }}{% if a.detail %} <span class="text-gray-500">{{ a.detail }}</span>{% endif %}</span></li>
+        {% else %}<li class="text-gray-400">まだ記録はありません</li>{% endfor %}
+      </ol>
+      {% if activity|length > 6 %}<button @click="more = !more" class="text-xs text-indigo-600 mt-2" x-text="more ? '閉じる' : 'すべて表示（{{ activity|length }}）'"></button>{% endif %}
     </div>
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
       <div class="flex justify-between"><span class="text-gray-500">紐付いた発言</span><b>{{ meta.n_msgs }}</b></div>
@@ -127,7 +179,7 @@ function detail() {
   return {
     t: { title: {{ task.title|tojson }}, description: {{ (task.description or '')|tojson }}, status: {{ task.status|tojson }},
          assignee: {{ (task.assignee or '')|tojson }}, due_date: {{ (task.due_date.isoformat() if task.due_date else '')|tojson }},
-         artifacts: {{ task.artifacts|tojson }} },
+         artifacts: {{ task.artifacts|tojson }}, priority: {{ task.priority|tojson }} },
     newArt: '',
     async save(body, msg) { await Alpine.$data(document.body).patch('/tasks/{{ task.id }}', body, msg); },
   };

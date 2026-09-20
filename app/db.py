@@ -1,5 +1,6 @@
 """SQLite 接続と DDL 適用。dataclass と行の相互変換もここに置く。"""
 import json
+import uuid
 import sqlite3
 from dataclasses import asdict
 from datetime import datetime, date, timezone
@@ -44,6 +45,29 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
+
+-- タスクの付属物（仕様外の UI 用。判定ロジックは参照しない）
+CREATE TABLE IF NOT EXISTS task_checklist (
+    id       TEXT PRIMARY KEY,
+    task_id  TEXT NOT NULL,
+    text     TEXT NOT NULL,
+    done     INTEGER NOT NULL DEFAULT 0,
+    pos      INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS task_watchers (
+    task_id  TEXT NOT NULL,
+    user     TEXT NOT NULL,
+    PRIMARY KEY (task_id, user)
+);
+CREATE TABLE IF NOT EXISTS task_activity (
+    id       TEXT PRIMARY KEY,
+    task_id  TEXT NOT NULL,
+    actor    TEXT,
+    action   TEXT NOT NULL,
+    detail   TEXT,
+    at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_activity ON task_activity(task_id, at);
 
 -- 関連（Event↔Event, Event↔Task を同一表で扱う）
 CREATE TABLE IF NOT EXISTS links (
@@ -148,6 +172,8 @@ def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(DDL)
     if "payload" not in {r[1] for r in conn.execute("PRAGMA table_info(findings)")}:
         conn.execute("ALTER TABLE findings ADD COLUMN payload TEXT")
+    if "priority" not in {r[1] for r in conn.execute("PRAGMA table_info(tasks)")}:
+        conn.execute("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal'")
     conn.commit()
     from app.connectors import calendar, chat, mail, meet, wiki  # 自作ツールのテーブル（循環importを避けて遅延）
     from app import minutes, tags
@@ -241,15 +267,15 @@ def save_task(conn: sqlite3.Connection, t: Task, at: datetime | None = None) -> 
     ts = to_iso(at) if at else now_iso()
     conn.execute(
         """INSERT INTO tasks
-           (id, title, description, assignee, status, due_date, created_from, artifacts, created_at, updated_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?)
+           (id, title, description, assignee, status, due_date, created_from, artifacts, priority, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET
              title=excluded.title, description=excluded.description,
              assignee=excluded.assignee, status=excluded.status,
              due_date=excluded.due_date, created_from=excluded.created_from,
-             artifacts=excluded.artifacts, updated_at=excluded.updated_at""",
+             artifacts=excluded.artifacts, priority=excluded.priority, updated_at=excluded.updated_at""",
         (t.id, t.title, t.description, t.assignee, t.status, to_iso(t.due_date),
-         t.created_from, json.dumps(t.artifacts, ensure_ascii=False), ts, ts),
+         t.created_from, json.dumps(t.artifacts, ensure_ascii=False), t.priority or "normal", ts, ts),
     )
     conn.commit()
 
@@ -260,7 +286,14 @@ def row_to_task(r: sqlite3.Row) -> Task:
         description=r["description"], assignee=r["assignee"],
         due_date=date_from_iso(r["due_date"]), created_from=r["created_from"],
         artifacts=json.loads(r["artifacts"]) if r["artifacts"] else [],
+        priority=(r["priority"] if "priority" in r.keys() else None) or "normal",
     )
+
+
+def task_activity(conn: sqlite3.Connection, task_id: str, actor: str | None, action: str, detail: str = "") -> None:
+    conn.execute("INSERT INTO task_activity (id, task_id, actor, action, detail, at) VALUES (?,?,?,?,?,?)",
+                 (uuid.uuid4().hex[:12], task_id, actor, action, detail, now_iso()))
+    conn.commit()
 
 
 def get_task(conn: sqlite3.Connection, task_id: str) -> Task | None:

@@ -40,6 +40,7 @@ class Task:
     due_date: date | None = None
     created_from: str | None = None
     artifacts: list[str] = field(default_factory=list)
+    priority: str = "normal"     # low|normal|high|urgent（仕様外の追加。UI 用）
 
 
 @dataclass
