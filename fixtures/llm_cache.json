@@ -15797,5 +15797,147 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "judge"
+ },
+ "d993baa5b55b97c3cc798738": {
+  "tier": "high",
+  "content": "{\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定事項は商品Aの第3四半期を1200に戻すことであり、変更対象は商品Jの第3四半期（D10）で別項目です。推測で結び付ける根拠はありません。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1248,
+   "completion_tokens": 124,
+   "total_tokens": 1372,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1246,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1248,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1246,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "0276a5b6769fb761786dca24": {
+  "tier": "high",
+  "content": "{\n  \"contradicts\": true,\n  \"confidence\": 0.8,\n  \"reason\": \"商品Jの第3四半期の変更は、商品Dの追加と商品Bの修正のみに限る決定の範囲外であり、その後の決定（商品Dを350、商品Aを1200に戻す）でも許可されていない。会話でも商品Jの変更理由や合意は見られない。\",\n  \"severity\": \"high\"\n}",
+  "usage": {
+   "prompt_tokens": 1375,
+   "completion_tokens": 139,
+   "total_tokens": 1514,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1373,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1375,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1373,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "deb9721307fe33708f696d7c": {
+  "tier": "mid",
+  "content": "{\"items\": []}",
+  "usage": {
+   "prompt_tokens": 307,
+   "completion_tokens": 163,
+   "total_tokens": 470,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 307,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 5,
+    "audio_tokens": 0,
+    "reasoning_tokens": 158
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "4395b11099d88eb9cf62527f": {
+  "tier": "high",
+  "content": "{\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定事項は商品Aの第3四半期を1200に戻すことに限定されており、変更対象は商品Jの第3四半期（100→180）で別の行を指している。決定の対象と変更の対象が異なるため矛盾しない。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1293,
+   "completion_tokens": 123,
+   "total_tokens": 1416,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1291,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1293,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1291,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "316ae06e661cdbb50ac395d0": {
+  "tier": "high",
+  "content": "{\n  \"contradicts\": true,\n  \"confidence\": 0.82,\n  \"reason\": \"決定は商品Dの追加と商品Bの修正以外の数字を変更しないと定めており、商品Jの第3四半期の変更はこれに該当せず、会話でも商品Jの変更理由や合意は示されていない（後続決定は商品Dと商品Aのみを対象）。\",\n  \"severity\": \"medium\"\n}",
+  "usage": {
+   "prompt_tokens": 1420,
+   "completion_tokens": 139,
+   "total_tokens": 1559,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1418,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1420,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1418,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
  }
 }

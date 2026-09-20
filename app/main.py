@@ -6,7 +6,7 @@ from datetime import date, datetime
 from html import escape
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
@@ -605,6 +605,12 @@ def meet_room(request: Request, meeting_id: str, me: str = ""):
                   participants=participants, lines=lines, extracted=meeting_extracted(conn, meeting_id))
 
 
+@app.websocket("/ws/meet/{meeting_id}")
+async def meet_ws(websocket: WebSocket, meeting_id: str, name: str = "参加者"):
+    from app import rtc
+    await rtc.handle(websocket, meeting_id, name.strip() or "参加者")
+
+
 @app.get("/meet/{meeting_id}/status")
 def meet_status(meeting_id: str):
     conn = get_conn()
@@ -614,7 +620,9 @@ def meet_status(meeting_id: str):
     ps = [p[0] for p in conn.execute(
         "SELECT name FROM meeting_participants WHERE meeting_id=? ORDER BY joined_at", (meeting_id,))]
     tracks = conn.execute("SELECT COUNT(*) FROM meeting_tracks WHERE meeting_id=?", (meeting_id,)).fetchone()[0]
-    return {"status": m["status"], "error": m["error"], "participants": ps, "tracks": tracks}
+    from app import rtc
+    return {"status": m["status"], "error": m["error"], "participants": ps, "tracks": tracks,
+            "online": rtc.room_members(meeting_id)}
 
 
 @app.post("/meet/{meeting_id}/audio")
