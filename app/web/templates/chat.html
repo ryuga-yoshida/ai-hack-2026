@@ -64,7 +64,7 @@
     {% endif %}
     {% if ch.kind != 'channel' %}
     <div class="px-4 py-2 border-b border-gray-100 text-xs text-gray-500 flex items-center gap-2">
-      {{ 'ダイレクトメッセージ' if ch.kind == 'dm' else ('チームのチャット' if ch.kind == 'team' else 'グループチャット') }} · メンバー: {{ ch.members|join('・') }}
+      {{ 'ダイレクトメッセージ' if ch.kind == 'dm' else ('チームのチャット' if ch.kind == 'team' else 'グループチャット') }} · メンバー: {% for m_ in ch.members %}<span data-person="{{ m_ }}" class="hover:underline">{{ m_ }}</span>{% if not loop.last %}・{% endif %}{% endfor %}
       {% if ch.kind == 'team' %}<a href="/tags/{{ ch.title|replace('@', '') }}" class="ml-auto text-indigo-600 hover:underline">チームの設定・タグ →</a>{% endif %}
     </div>
     {% endif %}

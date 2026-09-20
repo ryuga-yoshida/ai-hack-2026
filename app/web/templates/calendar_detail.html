@@ -14,7 +14,7 @@
     <div class="bg-white border border-gray-200 rounded-xl p-5 text-sm space-y-2">
       <div class="text-lg font-semibold">{{ e.title }}</div>
       <div class="text-gray-600">🗓 {{ e.start.strftime('%Y/%m/%d (%a) %H:%M') }} 〜 {{ e.end.strftime('%H:%M') }}{% if e.location %} · 📍 {{ e.location }}{% endif %}</div>
-      <div class="text-gray-600">👥 {{ e.attendees|join('・') or '—' }}{% if e.organizer %} <span class="text-gray-400">（主催: {{ e.organizer }}）</span>{% endif %}</div>
+      <div class="text-gray-600">👥 {% for a in e.attendees %}<span data-person="{{ a }}" class="hover:underline">{{ a }}</span>{% if not loop.last %}・{% endif %}{% else %}—{% endfor %}{% if e.organizer %} <span class="text-gray-400">（主催: {{ e.organizer }}）</span>{% endif %}</div>
       {% if e.channel %}<div class="text-gray-600">💬 <a href="/chat?channel={{ e.channel }}" class="text-indigo-600 hover:underline">#{{ e.channel }}</a></div>{% endif %}
       {% if e.description %}<div class="pt-2 border-t text-gray-700">{{ e.description }}</div>{% endif %}
       {% if e.reminded_at %}<div class="text-xs text-gray-400">エージェントが {{ e.reminded_at|dt }} にリマインド済み</div>{% endif %}

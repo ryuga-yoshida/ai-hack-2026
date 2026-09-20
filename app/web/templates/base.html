@@ -166,7 +166,7 @@ function personCard() {
 function mentionInput() {
   return {
     open: false, items: [], q: '', idx: 0, start: -1,
-    all: [...({{ people|tojson|forceescape if people is defined else '[]' }}), ...({{ teams_all|tojson|forceescape if teams_all is defined else '[]' }})],
+    all: [...({{ people|tojson if people is defined else '[]' }}), ...({{ teams_all|tojson if teams_all is defined else '[]' }})],
     onInput(e) {
       const el = e.target, pos = el.selectionStart, text = el.value.slice(0, pos);
       const m = text.match(/(?:^|\s)@([^\s@]*)$/);

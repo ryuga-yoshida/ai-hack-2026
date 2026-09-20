@@ -222,7 +222,7 @@ def profile_page(request: Request):
     if me:
         stats = {
             "tasks": conn.execute("SELECT COUNT(*) FROM tasks WHERE assignee=? AND status != 'done'", (me,)).fetchone()[0],
-            "msgs": conn.execute("SELECT COUNT(*) FROM chat_messages WHERE actor=? AND deleted=0", (me,)).fetchone()[0],
+            "notifs": len(notifications_for(conn, me)),
             "teams": [t["name"] for t in tagmod.teams(conn) if me in t["members"]],
         }
     return render("profile.html", request, conn, me=me, stats=stats, info=config.PERSON_INFO.get(me, {}))

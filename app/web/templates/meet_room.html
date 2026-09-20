@@ -80,7 +80,7 @@
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
       <div class="text-xs text-gray-500">開始</div><div>{{ m.started_at|dt }}</div>
       <div class="text-xs text-gray-500 mt-2">参加者</div>
-      <div class="flex flex-wrap gap-1 mt-1">{% for p in participants %}<span class="px-2 py-0.5 rounded-full bg-gray-100 text-xs">{{ p }}</span>{% endfor %}</div>
+      <div class="flex flex-wrap gap-1 mt-1">{% for p in participants %}<span data-person="{{ p }}" class="px-2 py-0.5 rounded-full bg-gray-100 text-xs">{{ p }}</span>{% endfor %}</div>
     </div>
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
       <h2 class="font-semibold text-sm mb-2">抽出された決定・タスク</h2>

@@ -10,17 +10,12 @@
     </div>
     {% if stats %}
     <div class="grid grid-cols-3 gap-3 text-sm">
-      <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">未完了タスク</div><div class="text-2xl font-semibold">{{ stats.tasks }}</div></div>
-      <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">発言数</div><div class="text-2xl font-semibold">{{ stats.msgs }}</div></div>
+      <a href="/tasks?view=list&assignee={{ me }}" class="bg-gray-50 rounded-lg p-3 hover:bg-gray-100"><div class="text-xs text-gray-500">未完了タスク</div><div class="text-2xl font-semibold">{{ stats.tasks }}</div></a>
+      <a href="/notifications" class="bg-gray-50 rounded-lg p-3 hover:bg-gray-100"><div class="text-xs text-gray-500">自分宛の通知</div><div class="text-2xl font-semibold">{{ stats.notifs }}</div></a>
       <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">チーム</div><div class="mt-1">{% for t in stats.teams %}<a href="/tags/{{ t }}" class="text-xs px-1.5 rounded bg-violet-100 text-violet-800 mr-1">@{{ t }}</a>{% else %}<span class="text-gray-400 text-xs">—</span>{% endfor %}</div></div>
     </div>
     {% endif %}
-    <form method="post" action="/profile" class="border-t pt-4 space-y-2 text-sm">
-      <div class="font-medium">アカウントを切り替える</div>
-      <p class="text-xs text-gray-500">デモで複数人の操作を1台で行うとき用。本番では SSO のためこの操作はありません。</p>
-      <div class="grid grid-cols-3 gap-1">{% for p in people %}<button name="name" value="{{ p }}" class="border rounded-lg px-2 py-2 flex items-center gap-2 {% if p == me %}border-indigo-500 bg-indigo-50{% else %}border-gray-200 hover:bg-gray-50{% endif %}"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ p|initials }}</span>{{ p }}</button>{% endfor %}</div>
-      <div class="flex gap-2"><input name="name" placeholder="新しい名前" class="flex-1 border border-gray-300 rounded-lg px-3 py-2"><button class="bg-indigo-600 text-white rounded-lg px-4">設定</button></div>
-    </form>
+    <div class="border-t pt-4 text-xs text-gray-500">別のアカウントで使うには「サインアウト」してからサインインし直してください。</div>
   </div>
   <aside class="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-600 space-y-2">
     <div class="font-semibold text-gray-800">この名前で行われる操作</div>
