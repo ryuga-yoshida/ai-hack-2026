@@ -46,7 +46,8 @@
         <td class="px-4 py-2 {% if m.overdue %}text-red-600 font-medium{% endif %}">{{ t.due_date.strftime('%m/%d') if t.due_date else '—' }}</td>
         <td class="px-4 py-2">{% if m.n_findings %}<a href="/findings?status=open" class="text-red-600 font-semibold">⚠ {{ m.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
         <td class="px-4 py-2 text-gray-500 text-xs">{{ m.updated_at|dt }}</td>
-        <td class="px-4 py-2"><div class="flex flex-wrap gap-1">{% for tm in m.teams %}<a href="/tasks?view=list&team={{ tm.name }}" class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</a>{% endfor %}{% for tg in m.tags %}<a href="/tasks?view=list&tag={{ tg.name }}" class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</a>{% endfor %}</div></td>
+        <td class="px-4 py-2"><div class="flex flex-wrap gap-1 items-center">{% for tm in m.teams %}<a href="/tasks?view=list&team={{ tm.name }}" class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</a>{% endfor %}{% for tg in m.tags %}<a href="/tasks?view=list&tag={{ tg.name }}" class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</a>{% endfor %}
+          {% with tp_task_id=t.id, tp_mine=m.teams|map(attribute='name')|list %}{% include "_team_picker.html" %}{% endwith %}</div></td>
         <td class="px-4 py-2 text-right text-gray-500">{{ m.n_msgs or '' }}</td>
       </tr>
     {% else %}<tr><td colspan="8" class="px-4 py-8 text-center text-gray-400">該当するタスクはありません。</td></tr>{% endfor %}
@@ -67,10 +68,10 @@
     </div>
     <div class="space-y-2">
     {% for m in by_status[status] %}{% set t = m.task %}
-      <a href="/tasks/{{ t.id }}" draggable="true" @dragstart="drag('{{ t.id }}')" @dragend="dragging = null"
+      <div draggable="true" @dragstart="drag('{{ t.id }}')" @dragend="dragging = null"
          class="block bg-white border border-gray-200 rounded-lg p-3 hover:shadow-md hover:border-indigo-300 transition cursor-grab {% if t.status == 'done' %}opacity-70{% endif %}"
          id="task-{{ t.id }}">
-        <div class="text-sm font-medium leading-snug">{{ t.title }}</div>
+        <a href="/tasks/{{ t.id }}" class="text-sm font-medium leading-snug hover:underline block">{{ t.title }}</a>
         {% if m.tags or m.teams %}<div class="flex flex-wrap gap-1 mt-1">{% for tm in m.teams %}<span class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</span>{% endfor %}{% for tg in m.tags %}<span class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</span>{% endfor %}</div>{% endif %}
         <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
           <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>
@@ -82,8 +83,11 @@
             {% if t.artifacts %}<span title="成果物">📎 {{ t.artifacts|length }}</span>{% endif %}
           </span>
         </div>
-        {% if m.origin %}<div class="mt-1.5 text-[11px] text-gray-400 truncate">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成 · {{ m.origin.occurred_at|dt }}</div>{% endif %}
-      </a>
+        <div class="mt-1.5 flex items-center gap-2">
+          {% if m.origin %}<span class="text-[11px] text-gray-400 truncate">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成 · {{ m.origin.occurred_at|dt }}</span>{% endif %}
+          <span class="ml-auto">{% with tp_task_id=t.id, tp_mine=m.teams|map(attribute='name')|list %}{% include "_team_picker.html" %}{% endwith %}</span>
+        </div>
+      </div>
     {% endfor %}
     </div>
   </div>

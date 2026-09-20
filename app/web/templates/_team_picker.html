@@ -1,0 +1,11 @@
+{# チーム付けのプルダウン。tp_task_id / tp_mine（付いているチーム名のリスト）/ teams を渡す #}
+<div class="relative inline-block" x-data="{ open: false }" @click.outside="open = false">
+  <button type="button" @click.stop.prevent="open = !open" class="text-[10px] px-1.5 py-0.5 rounded border border-dashed border-gray-300 text-gray-500 hover:border-violet-400 hover:text-violet-700" title="チームを付ける">＋ チーム</button>
+  <form x-show="open" x-cloak method="post" action="/tasks/{{ tp_task_id }}/teams" @click.stop class="absolute left-0 top-6 z-30 w-52 bg-white border border-gray-200 rounded-lg shadow-lg p-2 text-sm font-normal space-y-1">
+    <input type="hidden" name="back" value="1">
+    {% for tm in teams %}
+    <label class="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-gray-50 cursor-pointer"><input type="checkbox" name="teams" value="{{ tm.name }}" {% if tm.name in tp_mine %}checked{% endif %}><span class="px-1.5 rounded bg-violet-100 text-violet-800 text-xs">@{{ tm.name }}</span><span class="text-[10px] text-gray-400 truncate">{{ tm.members|join('・') }}</span></label>
+    {% else %}<div class="text-xs text-gray-400 px-1">チーム未作成（<a href="/tags" class="underline">作る</a>）</div>{% endfor %}
+    {% if teams %}<button class="w-full mt-1 text-xs bg-violet-600 text-white rounded py-1">適用</button>{% endif %}
+  </form>
+</div>

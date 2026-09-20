@@ -238,7 +238,7 @@ def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = "",
 
 
 @app.post("/tasks/{task_id}/teams")
-def set_task_teams(task_id: str, teams: list[str] = Form([])):
+def set_task_teams(request: Request, task_id: str, teams: list[str] = Form([]), back: str = Form("")):
     """タスクをチームに紐付ける（複数可）。チームはタグ(kind=team)として保持"""
     conn = get_conn()
     if not db.get_task(conn, task_id):
@@ -248,6 +248,8 @@ def set_task_teams(task_id: str, teams: list[str] = Form([])):
             tagmod.link(conn, t["name"], "task", task_id)
         else:
             tagmod.unlink(conn, t["name"], "task", task_id)
+    if back and request.headers.get("referer"):
+        return RedirectResponse(request.headers["referer"], status_code=303)
     return RedirectResponse(f"/tasks/{task_id}", status_code=303)
 
 
