@@ -120,7 +120,7 @@
             <button type="button" @mousedown.prevent @click="cmd('bold')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-bold" data-tip="太字（⌘B）">B</button>
             <button type="button" @mousedown.prevent @click="cmd('strikeThrough')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs line-through" data-tip="取り消し線">S</button>
             <button type="button" @mousedown.prevent @click="code()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-mono" data-tip="コード">&lt;/&gt;</button>
-            <button type="button" @mousedown.prevent @click="cmd('formatBlock', 'blockquote')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="引用">❝</button>
+            <button type="button" @mousedown.prevent @click="quote()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="引用">❝</button>
             <button type="button" @mousedown.prevent @click="cmd('insertUnorderedList')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="箇条書き">•</button>
             <span class="w-px h-4 bg-gray-200 mx-1"></span>
             <div class="relative"><button type="button" @mousedown.prevent @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="絵文字">😊</button>
@@ -303,13 +303,13 @@ function chatPage() {
 function toMarkdown(node) {
   let out = '';
   for (const n of node.childNodes) {
-    if (n.nodeType === 3) { out += n.textContent.replace(/\u00a0/g, ' '); continue; }
+    if (n.nodeType === 3) { out += n.textContent.replace(/\u00a0/g, ' ').replace(/\u200b/g, ''); continue; }
     if (n.nodeType !== 1) continue;
     const tag = n.tagName.toLowerCase(); const inner = toMarkdown(n);
     if (tag === 'br') out += '\n';
     else if (tag === 'b' || tag === 'strong') out += inner.trim() ? '**' + inner.trim() + '**' + (inner.endsWith(' ') ? ' ' : '') : inner;
     else if (tag === 's' || tag === 'strike' || tag === 'del') out += inner.trim() ? '~~' + inner.trim() + '~~' + (inner.endsWith(' ') ? ' ' : '') : inner;
-    else if (tag === 'code') out += '`' + inner + '`';
+    else if (tag === 'code') out += inner.trim() ? '`' + inner + '`' : inner;
     else if (tag === 'blockquote') out += (out && !out.endsWith('\n') ? '\n' : '') + inner.replace(/\n+$/, '').split('\n').map(l => '> ' + l).join('\n') + '\n';
     else if (tag === 'ul' || tag === 'ol') out += (out && !out.endsWith('\n') ? '\n' : '') + [...n.children].map(li => '- ' + toMarkdown(li).trim()).join('\n') + '\n';
     else if (tag === 'div' || tag === 'p') out += (out && !out.endsWith('\n') ? '\n' : '') + inner + (inner.endsWith('\n') ? '' : '\n');
@@ -331,11 +331,31 @@ function composer(channel) {
     ed() { return this.$root.querySelector('[contenteditable]'); },
     focus() { const e = this.ed(); e.focus(); },
     cmd(name, arg) { this.focus(); document.execCommand(name, false, arg || null); this.syncHidden(); },
+    inside(tag) { const sel = window.getSelection(); if (!sel.rangeCount) return null; const n = sel.anchorNode; const el = n.nodeType === 3 ? n.parentElement : n; return el && el.closest ? el.closest(tag) : null; },
+    quote() {
+      this.focus();
+      if (this.inside('blockquote')) document.execCommand('outdent'); else document.execCommand('formatBlock', false, 'blockquote');
+      this.syncHidden();
+    },
     code() {
       this.focus(); const sel = window.getSelection(); if (!sel.rangeCount) return;
-      const r = sel.getRangeAt(0); const inCode = r.startContainer.parentElement && r.startContainer.parentElement.closest('code');
-      if (inCode) { const c = inCode; const t = document.createTextNode(c.textContent); c.replaceWith(t); return; }
-      const text = r.toString() || 'code'; document.execCommand('insertHTML', false, '<code>' + text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</code>&nbsp;');
+      const c = this.inside('code');
+      if (c) {
+        if (sel.isCollapsed) {   // コードの中にカーソル → コードの外に出る（以降は通常の文字）
+          let t = c.nextSibling;
+          if (!t || t.nodeType !== 3) { t = document.createTextNode('\u00a0'); c.after(t); }
+          else if (!t.textContent.startsWith(' ') && !t.textContent.startsWith('\u00a0')) { t.textContent = '\u00a0' + t.textContent; }
+          const r = document.createRange(); r.setStart(t, 1); r.collapse(true); sel.removeAllRanges(); sel.addRange(r);
+        } else {                 // 範囲選択 → コード解除
+          const t = document.createTextNode(c.textContent); c.replaceWith(t);
+          const r = document.createRange(); r.selectNodeContents(t); sel.removeAllRanges(); sel.addRange(r);
+        }
+        this.syncHidden(); return;
+      }
+      const r = sel.getRangeAt(0); const text = r.toString();
+      const el = document.createElement('code'); el.textContent = text || '\u200b';
+      r.deleteContents(); r.insertNode(el);
+      const nr = document.createRange(); nr.selectNodeContents(el); if (!text) nr.collapse(false); sel.removeAllRanges(); sel.addRange(nr);
       this.syncHidden();
     },
     insert(t) { this.focus(); document.execCommand('insertText', false, t); this.syncHidden(); },
