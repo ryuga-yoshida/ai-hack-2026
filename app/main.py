@@ -68,12 +68,16 @@ def who(request: Request, actor: str = "") -> str:
 
 
 _overrides_loaded = False
+_db_initialized = False
 
 
 def get_conn() -> sqlite3.Connection:
-    global _overrides_loaded
+    """リクエストごとの接続。DDL の適用（書き込み）はプロセスで1回だけ"""
+    global _overrides_loaded, _db_initialized
     conn = db.connect()
-    db.init_db(conn)
+    if not _db_initialized:
+        db.init_db(conn)
+        _db_initialized = True
     if not _overrides_loaded:
         config.apply_overrides(db.get_settings(conn))
         _overrides_loaded = True
@@ -1208,13 +1212,14 @@ async def chat_upload(request: Request, channel: str = Form("general"), file: Up
     """ファイルをそのまま投稿。成果物ライブラリの「チャット添付/<チャンネル>」に版として保存し、リンク付きで発言する"""
     actor = who(request)
     name = Path(file.filename or "upload.bin").name
+    data = await _read_upload(file)
     conn = get_conn()
     ch = chat.get_channel(conn, channel)
     folder = "チャット添付/" + re.sub(r"[^\w\-ぁ-んァ-ン一-龥ー@]", "_", ch["title"] if ch["kind"] != "channel" else channel)
     rel_path = f"{folder}/{name}"
     root = LIB()
     try:
-        dest = _register_version(conn, rel_path, await file.read(), actor, "", "")
+        dest = _register_version(conn, rel_path, data, actor, "", "")
         versions = json.loads((root / "versions.json").read_text(encoding="utf-8"))
         url = versions[str(dest.relative_to(root))]["url"]
     except HTTPException:   # 同じ内容 → 既存の最新版のリンクを使う
@@ -2565,6 +2570,15 @@ def artifact_save(request: Request, key: str, body: SheetSave):
     return {"ok": True, "file": dest.name}
 
 
+async def _read_upload(file: UploadFile) -> bytes:
+    """上限つきで読む（巨大ファイルがライブラリと git に入るのを防ぐ）"""
+    limit = config.MAX_UPLOAD_MB * 1024 * 1024
+    data = await file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(413, f"ファイルが大きすぎます（上限 {config.MAX_UPLOAD_MB} MB）")
+    return data
+
+
 @app.post("/artifacts/upload")
 async def upload_artifact(request: Request, file: UploadFile = File(...), actor: str = Form(""), note: str = Form(""),
                           channel: str = Form(""), path: str = Form("")):
@@ -2573,8 +2587,9 @@ async def upload_artifact(request: Request, file: UploadFile = File(...), actor:
     name = Path(file.filename or "upload.bin").name
     rel = _safe_rel(path)
     rel_path = str(rel / name) if str(rel) != "." else name
+    data = await _read_upload(file)
     conn = get_conn()
-    _register_version(conn, rel_path, await file.read(), actor, note, channel)
+    _register_version(conn, rel_path, data, actor, note, channel)
     resp = RedirectResponse(f"/artifacts?path={path}", status_code=303)
     return set_me(resp, actor)
 

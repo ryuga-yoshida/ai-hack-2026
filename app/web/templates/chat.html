@@ -107,24 +107,25 @@
     </div>
     <div class="border-t border-gray-200 px-3 pt-1 pb-3" x-data="composer('{{ channel }}')">
       <div class="h-4 text-[11px] text-gray-400 px-1" x-text="typingText"></div>
-      <form method="post" action="/chat" @submit="stopTyping()">
+      <form method="post" action="/chat" @submit="if (!syncHidden()) { $event.preventDefault(); return; } stopTyping()">
         <input type="hidden" name="channel" value="{{ channel }}">
         <div class="border border-gray-300 rounded-xl focus-within:ring-2 focus-within:ring-indigo-200 bg-white">
           <div class="relative" x-data="mentionInput()">
-            <textarea name="text" x-ref="ta" rows="1" placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（Enter で送信・Shift+Enter で改行・@ メンション・#タグ）" required autocomplete="off"
-              class="w-full text-sm border-0 focus:ring-0 rounded-t-xl px-3 py-2 resize-none max-h-40" @input="onInput; grow($event.target); typing()" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
+            <div contenteditable="true" x-ref="ed" data-placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（Enter で送信・Shift+Enter で改行・@ メンション・#タグ）"
+              class="rich w-full text-sm px-3 py-2 min-h-[38px] max-h-40 overflow-y-auto outline-none rounded-t-xl" @input="onInput($event); typing(); syncHidden()" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); if (syncHidden()) $event.target.closest('form').requestSubmit(); }" @blur="setTimeout(() => open = false, 150)" @paste.prevent="document.execCommand('insertText', false, ($event.clipboardData || window.clipboardData).getData('text/plain'))"></div>
+            <input type="hidden" name="text" x-ref="hidden">
             {% include "_mention_menu.html" %}
           </div>
           <div class="flex items-center gap-0.5 px-2 pb-1.5 text-gray-500">
-            <button type="button" @click="wrap('**')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-bold" data-tip="太字 (**text**)">B</button>
-            <button type="button" @click="wrap('~~')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs line-through" data-tip="取り消し線">S</button>
-            <button type="button" @click="wrap('`')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-mono" data-tip="コード">&lt;/&gt;</button>
-            <button type="button" @click="prefix('> ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="引用">❝</button>
-            <button type="button" @click="prefix('- ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="箇条書き">•</button>
+            <button type="button" @mousedown.prevent @click="cmd('bold')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-bold" data-tip="太字（⌘B）">B</button>
+            <button type="button" @mousedown.prevent @click="cmd('strikeThrough')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs line-through" data-tip="取り消し線">S</button>
+            <button type="button" @mousedown.prevent @click="code()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-mono" data-tip="コード">&lt;/&gt;</button>
+            <button type="button" @mousedown.prevent @click="cmd('formatBlock', 'blockquote')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="引用">❝</button>
+            <button type="button" @mousedown.prevent @click="cmd('insertUnorderedList')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="箇条書き">•</button>
             <span class="w-px h-4 bg-gray-200 mx-1"></span>
-            <div class="relative"><button type="button" @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="絵文字">😊</button>
+            <div class="relative"><button type="button" @mousedown.prevent @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="絵文字">😊</button>
               <div x-show="emo" x-cloak @click.outside="emo = false" class="absolute left-0 bottom-8 bg-white border border-gray-200 rounded-lg shadow-lg p-2 grid grid-cols-8 gap-0.5 z-20 w-64">
-                <template x-for="e in emojis" :key="e"><button type="button" @click="insert(e); emo = false" class="text-lg hover:bg-gray-100 rounded" x-text="e"></button></template></div></div>
+                <template x-for="e in emojis" :key="e"><button type="button" @mousedown.prevent @click="insert(e); emo = false" class="text-lg hover:bg-gray-100 rounded" x-text="e"></button></template></div></div>
             <button type="button" @click="$refs.file.click()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="ファイルを添付（成果物ライブラリに保存され、版管理と検知の対象になります）">📎</button>
             <button type="button" @click="attach = !attach" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" :class="attach && 'bg-gray-100'" data-tip="リンクを添付">🔗</button>
             <span class="flex-1"></span>
@@ -138,7 +139,7 @@
         </div>
       </form>
       <form method="post" action="/chat/upload" enctype="multipart/form-data" class="hidden" x-ref="upform">
-        <input type="hidden" name="channel" value="{{ channel }}"><input type="file" name="file" x-ref="file" @change="if ($refs.file.files.length) { $refs.uptext.value = ta().value; $refs.upform.submit(); Alpine.$data(document.body).toast('アップロード中…'); }">
+        <input type="hidden" name="channel" value="{{ channel }}"><input type="file" name="file" x-ref="file" @change="if ($refs.file.files.length) { $refs.uptext.value = toMarkdown(ed()); $refs.upform.submit(); Alpine.$data(document.body).toast('アップロード中…'); }">
         <input type="hidden" name="text" x-ref="uptext">
       </form>
     </div>
@@ -208,7 +209,7 @@
     <form method="post" action="/chat" class="border-t border-gray-200 p-3 flex gap-2">
       <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="reply_to" value="{{ thread.root.id }}">
       <div class="flex-1 relative" x-data="mentionInput()">
-        <textarea name="text" rows="1" placeholder="返信…（@ でメンション、Shift+Enter で改行）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-none" @input="onInput; $event.target.style.height = 'auto'; $event.target.style.height = Math.min($event.target.scrollHeight, 160) + 'px'" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
+        <textarea name="text" rows="1" placeholder="返信…（@ でメンション、Shift+Enter で改行）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-none" @input="onInput($event); $event.target.style.height = 'auto'; $event.target.style.height = Math.min($event.target.scrollHeight, 160) + 'px'" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
         {% include "_mention_menu.html" %}
       </div>
       <button class="text-sm bg-indigo-600 text-white rounded-lg px-3">送信</button>
@@ -298,6 +299,24 @@ function chatPage() {
     },
   };
 }
+// contenteditable → 投稿用の軽量 Markdown（描画側の _markdown_lite と対）
+function toMarkdown(node) {
+  let out = '';
+  for (const n of node.childNodes) {
+    if (n.nodeType === 3) { out += n.textContent.replace(/\u00a0/g, ' '); continue; }
+    if (n.nodeType !== 1) continue;
+    const tag = n.tagName.toLowerCase(); const inner = toMarkdown(n);
+    if (tag === 'br') out += '\n';
+    else if (tag === 'b' || tag === 'strong') out += inner.trim() ? '**' + inner.trim() + '**' + (inner.endsWith(' ') ? ' ' : '') : inner;
+    else if (tag === 's' || tag === 'strike' || tag === 'del') out += inner.trim() ? '~~' + inner.trim() + '~~' + (inner.endsWith(' ') ? ' ' : '') : inner;
+    else if (tag === 'code') out += '`' + inner + '`';
+    else if (tag === 'blockquote') out += (out && !out.endsWith('\n') ? '\n' : '') + inner.replace(/\n+$/, '').split('\n').map(l => '> ' + l).join('\n') + '\n';
+    else if (tag === 'ul' || tag === 'ol') out += (out && !out.endsWith('\n') ? '\n' : '') + [...n.children].map(li => '- ' + toMarkdown(li).trim()).join('\n') + '\n';
+    else if (tag === 'div' || tag === 'p') out += (out && !out.endsWith('\n') ? '\n' : '') + inner + (inner.endsWith('\n') ? '' : '\n');
+    else out += inner;
+  }
+  return out.replace(/\n{3,}/g, '\n\n');
+}
 function composer(channel) {
   return {
     attach: false, emo: false, typers: {}, lastSent: 0,
@@ -309,11 +328,18 @@ function composer(channel) {
     },
     typing() { const ws = window.chatWs && window.chatWs(); if (ws && ws.readyState === 1 && Date.now() - this.lastSent > 2000) { this.lastSent = Date.now(); ws.send(JSON.stringify({ type: 'typing', channel, actor: ME })); } },
     stopTyping() { this.lastSent = 0; },
-    ta() { return this.$root.querySelector('textarea[name=text]'); },
-    grow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; },
-    insert(t) { const ta = this.ta(); const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + t + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + t.length; ta.focus(); this.grow(ta); },
-    wrap(mark) { const ta = this.ta(); const s = ta.selectionStart, e = ta.selectionEnd; const sel = ta.value.slice(s, e) || 'テキスト'; ta.value = ta.value.slice(0, s) + mark + sel + mark + ta.value.slice(e); ta.selectionStart = s + mark.length; ta.selectionEnd = s + mark.length + sel.length; ta.focus(); },
-    prefix(p) { const ta = this.ta(); const s = ta.selectionStart; const ls = ta.value.lastIndexOf('\n', s - 1) + 1; ta.value = ta.value.slice(0, ls) + p + ta.value.slice(ls); ta.selectionStart = ta.selectionEnd = s + p.length; ta.focus(); this.grow(ta); },
+    ed() { return this.$root.querySelector('[contenteditable]'); },
+    focus() { const e = this.ed(); e.focus(); },
+    cmd(name, arg) { this.focus(); document.execCommand(name, false, arg || null); this.syncHidden(); },
+    code() {
+      this.focus(); const sel = window.getSelection(); if (!sel.rangeCount) return;
+      const r = sel.getRangeAt(0); const inCode = r.startContainer.parentElement && r.startContainer.parentElement.closest('code');
+      if (inCode) { const c = inCode; const t = document.createTextNode(c.textContent); c.replaceWith(t); return; }
+      const text = r.toString() || 'code'; document.execCommand('insertHTML', false, '<code>' + text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</code>&nbsp;');
+      this.syncHidden();
+    },
+    insert(t) { this.focus(); document.execCommand('insertText', false, t); this.syncHidden(); },
+    syncHidden() { const md = toMarkdown(this.ed()); this.$root.querySelector('input[name=text]').value = md; return md.trim().length > 0; },
   };
 }
 async function toTask(id) {

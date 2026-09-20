@@ -100,3 +100,4 @@ def apply_overrides(values: dict) -> None:
                 setattr(mod, key, TUNABLE[key][1](raw))
             except (TypeError, ValueError):
                 pass
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "50"))   # 成果物/チャット添付のアップロード上限
