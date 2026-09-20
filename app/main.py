@@ -991,24 +991,89 @@ def _mail_meta(conn: sqlite3.Connection, m: dict) -> dict:
 
 
 @app.get("/mail", response_class=HTMLResponse)
-def mail_page(request: Request, folder: str = "inbox", thread: str = ""):
+def mail_page(request: Request, folder: str = "inbox", thread: str = "", q: str = "", draft: str = ""):
     conn = get_conn()
     me = get_me(request)
-    threads = mailmod.inbox(conn, me or None, folder)
-    msgs = []
+    threads = [] if folder == "drafts" else mailmod.inbox(conn, me or None, folder, q=q.strip())
+    msgs, state, thread_tasks = [], {}, []
     if thread:
-        mailmod.mark_read(conn, thread)
+        mailmod.mark_read(conn, thread, me)
         msgs = [_mail_meta(conn, m) for m in mailmod.thread(conn, thread)]
-    return render("mail.html", request, conn, folder=folder, threads=threads, thread=thread, msgs=msgs, me=me,
+        state = mailmod.states(conn, me).get(thread, {})
+        thread_tasks = [dict(r) for r in conn.execute(
+            "SELECT DISTINCT t.id, t.title, t.status FROM links l JOIN tasks t ON t.id = l.to_id "
+            "WHERE l.from_type='event' AND l.to_type='task' AND l.from_id IN (SELECT id FROM mails WHERE thread_id=?)", (thread,))]
+    draft_obj = next((d for d in mailmod.drafts(conn, me) if d["id"] == draft), None) if draft else None
+    return render("mail.html", request, conn, folder=folder, threads=threads, thread=thread, msgs=msgs, me=me, q=q,
+                  state=state, thread_tasks=thread_tasks, folders=mailmod.FOLDERS, counts=mailmod.folder_counts(conn, me or None),
+                  drafts=mailmod.drafts(conn, me) if folder == "drafts" else [], draft_obj=draft_obj,
+                  open_tasks=[dict(r) for r in conn.execute("SELECT id, title FROM tasks WHERE status != 'done' ORDER BY created_at DESC")],
                   unread=sum(t["unread"] for t in mailmod.inbox(conn, me or None, "inbox")))
+
+
+@app.post("/mail/thread/{thread_id}/link_task")
+def mail_link_task(request: Request, thread_id: str, task_id: str = Form(""), title: str = Form("")):
+    """スレッドをタスクに紐付け（既存タスク or 新規作成）。手動リンク=manual"""
+    from app import linker
+    conn = get_conn()
+    me = get_me(request)
+    msgs = mailmod.thread(conn, thread_id)
+    if not msgs:
+        return RedirectResponse("/mail", status_code=303)
+    if not task_id and title.strip():
+        t = Task(id=new_id(), title=title.strip(), assignee=me or None, status="todo", created_from=msgs[0]["id"],
+                 description=f"メール「{msgs[0]['subject']}」から作成")
+        db.save_task(conn, t)
+        task_id = t.id
+    if task_id:
+        for m in msgs:
+            ev = db.get_event(conn, m["id"])
+            if ev and not conn.execute("SELECT 1 FROM links WHERE from_id=? AND to_id=?", (m["id"], task_id)).fetchone():
+                db.save_link(conn, Link(id=new_id(), from_type="event", from_id=m["id"], to_type="task", to_id=task_id,
+                                        relation="discusses", confidence=1.0, method="manual"))
+                linker.register_artifacts(conn, task_id, ev)
+    return RedirectResponse(f"/mail?thread={thread_id}", status_code=303)
+
+
+@app.post("/mail/thread/{thread_id}/{action}")
+def mail_thread_action(request: Request, thread_id: str, action: str, folder: str = Form("inbox")):
+    conn = get_conn()
+    me = get_me(request)
+    if action in ("flag", "archive", "trash"):
+        key = {"flag": "flagged", "archive": "archived", "trash": "trashed"}[action]
+        mailmod.toggle_state(conn, thread_id, me, key)
+    elif action == "unread":
+        mailmod.set_state(conn, thread_id, me, unread=True)
+        return RedirectResponse(f"/mail?folder={folder}", status_code=303)
+    elif action == "restore":
+        mailmod.set_state(conn, thread_id, me, trashed=False, archived=False)
+        return RedirectResponse(f"/mail?folder=inbox&thread={thread_id}", status_code=303)
+    return RedirectResponse(f"/mail?folder={folder}&thread={thread_id}", status_code=303)
+
+
+@app.post("/mail/draft")
+def mail_draft(request: Request, recipients: list[str] = Form([]), cc: list[str] = Form([]), subject: str = Form(""),
+               body: str = Form(""), thread_id: str = Form(""), draft_id: str = Form("")):
+    conn = get_conn()
+    me = get_me(request)
+    did = mailmod.save_draft(conn, me, list(recipients), list(cc), subject.strip(), body, thread_id.strip(), draft_id.strip())
+    return RedirectResponse(f"/mail?folder=drafts&draft={did}", status_code=303)
+
+
+@app.post("/mail/draft/{draft_id}/delete")
+def mail_draft_delete(draft_id: str):
+    mailmod.delete_draft(get_conn(), draft_id)
+    return RedirectResponse("/mail?folder=drafts", status_code=303)
 
 
 @app.post("/mail/send")
 def mail_send(request: Request, sender: str = Form(""), recipients: list[str] = Form(...), cc: list[str] = Form([]),
               subject: str = Form(...), body: str = Form(...), thread_id: str = Form(""),
-              attachment_url: str = Form(""), attachment_name: str = Form("")):
+              attachment_url: str = Form(""), attachment_name: str = Form(""), draft_id: str = Form("")):
     conn = get_conn()
     sender = who(request, sender)
+    if draft_id.strip():
+        mailmod.delete_draft(conn, draft_id.strip())
     att = None
     if attachment_url.strip():
         att = [{"url": attachment_url.strip(), "name": attachment_name.strip() or attachment_url.strip().rsplit("/", 1)[-1]}]

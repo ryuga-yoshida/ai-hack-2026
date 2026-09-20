@@ -25,7 +25,29 @@ CREATE TABLE IF NOT EXISTS mails (
     read        INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_mails_thread ON mails(thread_id, sent_at);
+CREATE TABLE IF NOT EXISTS mail_state (
+    thread_id   TEXT NOT NULL,
+    user        TEXT NOT NULL,
+    flagged     INTEGER NOT NULL DEFAULT 0,
+    archived    INTEGER NOT NULL DEFAULT 0,
+    trashed     INTEGER NOT NULL DEFAULT 0,
+    unread      INTEGER NOT NULL DEFAULT 0,   -- 1 = 手動で未読に戻した
+    PRIMARY KEY (thread_id, user)
+);
+CREATE TABLE IF NOT EXISTS mail_drafts (
+    id          TEXT PRIMARY KEY,
+    user        TEXT NOT NULL,
+    recipients  TEXT NOT NULL,
+    cc          TEXT,
+    subject     TEXT NOT NULL,
+    body        TEXT NOT NULL,
+    thread_id   TEXT,
+    updated_at  TEXT NOT NULL
+);
 """
+
+FOLDERS = [("inbox", "受信トレイ", "📥"), ("flagged", "フラグ付き", "🚩"), ("sent", "送信済み", "📤"),
+           ("drafts", "下書き", "📝"), ("archive", "アーカイブ", "📦"), ("trash", "ごみ箱", "🗑")]
 
 
 def init(conn: sqlite3.Connection) -> None:
@@ -55,32 +77,103 @@ def _row(r: sqlite3.Row) -> dict:
     return d
 
 
-def inbox(conn: sqlite3.Connection, me: str | None, folder: str = "inbox") -> list[dict]:
-    """スレッド単位（最新メール順）。me が空なら全員分"""
+def states(conn: sqlite3.Connection, me: str) -> dict[str, dict]:
+    return {r["thread_id"]: dict(r) for r in conn.execute("SELECT * FROM mail_state WHERE user=?", (me,))}
+
+
+def set_state(conn: sqlite3.Connection, thread_id: str, me: str, **kw) -> None:
+    conn.execute("INSERT OR IGNORE INTO mail_state (thread_id, user) VALUES (?,?)", (thread_id, me))
+    for k, v in kw.items():
+        if k in ("flagged", "archived", "trashed", "unread"):
+            conn.execute(f"UPDATE mail_state SET {k}=? WHERE thread_id=? AND user=?", (1 if v else 0, thread_id, me))
+    conn.commit()
+
+
+def toggle_state(conn: sqlite3.Connection, thread_id: str, me: str, key: str) -> bool:
+    cur = states(conn, me).get(thread_id, {}).get(key, 0)
+    set_state(conn, thread_id, me, **{key: not cur})
+    return not cur
+
+
+def inbox(conn: sqlite3.Connection, me: str | None, folder: str = "inbox", q: str = "") -> list[dict]:
+    """スレッド単位（最新メール順）。me が空なら全員分。folder: inbox/flagged/sent/archive/trash/all"""
     rows = [_row(r) for r in conn.execute("SELECT * FROM mails ORDER BY sent_at DESC, rowid DESC")]
+    st = states(conn, me) if me else {}
     if me:
         if folder == "sent":
             rows = [m for m in rows if m["sender"] == me]
+        elif folder == "all":
+            rows = [m for m in rows if me in (m["sender"], *m["recipients"], *m["cc"])]
         else:
-            rows = [m for m in rows if me in m["recipients"] or me in m["cc"]]
+            rows = [m for m in rows if me in m["recipients"] or me in m["cc"] or m["sender"] == me]
+    if q:
+        ql = q.lower()
+        rows = [m for m in rows if ql in m["subject"].lower() or ql in m["body"].lower() or ql in m["sender"].lower()]
     threads: dict[str, dict] = {}
     for m in rows:
         t = threads.setdefault(m["thread_id"], {"thread_id": m["thread_id"], "subject": m["subject"], "latest": m,
-                                                "count": 0, "unread": 0, "participants": []})
+                                                "count": 0, "unread": 0, "participants": [], "has_attachment": False,
+                                                **{k: st.get(m["thread_id"], {}).get(k, 0) for k in ("flagged", "archived", "trashed")}})
         t["count"] += 1
         t["unread"] += 0 if m["read"] else 1
+        t["has_attachment"] = t["has_attachment"] or bool(m["attachments"])
         for p in [m["sender"], *m["recipients"]]:
             if p not in t["participants"]:
                 t["participants"].append(p)
-    return list(threads.values())
+    out = []
+    for t in threads.values():
+        if st.get(t["thread_id"], {}).get("unread"):
+            t["unread"] = max(t["unread"], 1)
+        f = folder
+        if f == "trash":
+            keep = t["trashed"]
+        elif f == "archive":
+            keep = t["archived"] and not t["trashed"]
+        elif f == "flagged":
+            keep = t["flagged"] and not t["trashed"]
+        elif f in ("sent", "all"):
+            keep = not t["trashed"]
+        else:  # inbox: 自分宛（自分だけの送信スレッドは送信済みへ）
+            keep = not t["trashed"] and not t["archived"] and any(m for m in rows if m["thread_id"] == t["thread_id"] and m["sender"] != me)
+        if keep:
+            out.append(t)
+    return out
+
+
+def folder_counts(conn: sqlite3.Connection, me: str | None) -> dict[str, int]:
+    return {f: sum(1 for t in inbox(conn, me, f) if t["unread"]) if f in ("inbox", "flagged") else len(inbox(conn, me, f))
+            for f in ("inbox", "flagged", "sent", "archive", "trash")} | {"drafts": len(drafts(conn, me or ""))}
+
+
+def drafts(conn: sqlite3.Connection, me: str) -> list[dict]:
+    out = []
+    for r in conn.execute("SELECT * FROM mail_drafts WHERE user=? ORDER BY updated_at DESC", (me,)):
+        d = dict(r); d["recipients"] = json.loads(d["recipients"]); d["cc"] = json.loads(d["cc"] or "[]"); out.append(d)
+    return out
+
+
+def save_draft(conn: sqlite3.Connection, me: str, recipients: list[str], cc: list[str], subject: str, body: str,
+               thread_id: str = "", draft_id: str = "") -> str:
+    draft_id = draft_id or new_id()
+    conn.execute("INSERT OR REPLACE INTO mail_drafts (id, user, recipients, cc, subject, body, thread_id, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                 (draft_id, me, json.dumps(recipients, ensure_ascii=False), json.dumps(cc, ensure_ascii=False), subject, body,
+                  thread_id or None, db.to_iso(datetime.now().replace(microsecond=0))))
+    conn.commit()
+    return draft_id
+
+
+def delete_draft(conn: sqlite3.Connection, draft_id: str) -> None:
+    conn.execute("DELETE FROM mail_drafts WHERE id=?", (draft_id,)); conn.commit()
 
 
 def thread(conn: sqlite3.Connection, thread_id: str) -> list[dict]:
     return [_row(r) for r in conn.execute("SELECT * FROM mails WHERE thread_id=? ORDER BY sent_at, rowid", (thread_id,))]
 
 
-def mark_read(conn: sqlite3.Connection, thread_id: str) -> None:
+def mark_read(conn: sqlite3.Connection, thread_id: str, me: str = "") -> None:
     conn.execute("UPDATE mails SET read=1 WHERE thread_id=?", (thread_id,))
+    if me:
+        conn.execute("UPDATE mail_state SET unread=0 WHERE thread_id=? AND user=?", (thread_id, me))
     conn.commit()
 
 

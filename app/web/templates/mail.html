@@ -2,64 +2,133 @@
 {% block title %}メール{% endblock %}
 {% block heading %}メール {% if unread %}<span class="ml-2 text-xs bg-red-100 text-red-700 rounded-full px-2 py-0.5 font-normal">未読 {{ unread }}</span>{% endif %}{% endblock %}
 {% block actions %}
+<form method="get" action="/mail" class="flex items-center gap-1"><input type="hidden" name="folder" value="{{ folder }}"><input name="q" value="{{ q }}" placeholder="メールを検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-48">{% if q %}<a href="/mail?folder={{ folder }}" class="text-xs text-gray-400 hover:text-gray-700">✕</a>{% endif %}</form>
 <button @click="$dispatch('open-compose', {})" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">✉ 新規作成</button>
 {% endblock %}
 {% block main_class %}p-0{% endblock %}
 {% block content %}
 <div class="flex h-[calc(100vh-3.5rem)]">
-  <aside class="w-44 shrink-0 bg-gray-100 border-r border-gray-200 p-3 text-sm space-y-1">
-    <a href="/mail?folder=inbox" class="block px-2 py-1.5 rounded-lg {% if folder == 'inbox' %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">📥 受信トレイ</a>
-    <a href="/mail?folder=sent" class="block px-2 py-1.5 rounded-lg {% if folder == 'sent' %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">📤 送信済み</a>
-    <div class="pt-4 text-xs text-gray-500 leading-relaxed"><b>{{ me }}</b> のメールボックス</div>
-    <div class="pt-2 text-[11px] text-gray-400 leading-relaxed">メールも情報源。決定・タスクの抽出とタスク紐付けの対象になります。</div>
+  <aside class="w-48 shrink-0 bg-gray-100 border-r border-gray-200 p-3 text-sm space-y-0.5">
+    {% for key, label, icon in folders %}
+    <a href="/mail?folder={{ key }}" class="flex items-center px-2 py-1.5 rounded-lg {% if folder == key %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}"><span class="mr-2">{{ icon }}</span>{{ label }}{% if counts.get(key) %}<span class="ml-auto text-[11px] {% if key in ('inbox','flagged') %}bg-indigo-600 text-white{% else %}text-gray-400{% endif %} rounded-full px-1.5">{{ counts[key] }}</span>{% endif %}</a>
+    {% endfor %}
+    <div class="pt-4 text-xs text-gray-500 leading-relaxed"><b>{{ me }}</b><br><span class="text-gray-400">{{ me }}@aoba-beverage.example</span></div>
+    <div class="pt-3 text-[11px] text-gray-400 leading-relaxed">メールも情報源。決定・タスクの抽出と紐付けの対象。Outlook 連携時は Graph の Mail.Read で読み取り専用に同期します。</div>
   </aside>
-  <section class="w-96 shrink-0 border-r border-gray-200 bg-white overflow-y-auto scrollbar-thin">
+  <section class="w-96 shrink-0 border-r border-gray-200 bg-white overflow-y-auto scrollbar-thin" data-keep-scroll>
+    {% if folder == 'drafts' %}
+      {% for d in drafts %}
+      <a href="/mail?folder=drafts&draft={{ d.id }}" class="block px-4 py-3 border-b border-gray-100 hover:bg-gray-50 {% if draft_obj and draft_obj.id == d.id %}bg-indigo-50{% endif %}">
+        <div class="flex items-center gap-2 text-sm"><span class="truncate flex-1 text-gray-500">宛先: {{ d.recipients|join('、') or '（未設定）' }}</span><span class="text-xs text-gray-400 shrink-0">{{ d.updated_at|rel }}</span></div>
+        <div class="text-sm truncate">{{ d.subject or '（件名なし）' }}</div>
+        <div class="text-xs text-gray-500 truncate">{{ d.body|replace('\n', ' ')|truncate(70) }}</div></a>
+      {% else %}<div class="p-8 text-center text-sm text-gray-400">下書きはありません</div>{% endfor %}
+    {% else %}
     {% for t in threads %}
-    <a href="/mail?folder={{ folder }}&thread={{ t.thread_id }}" class="block px-4 py-3 border-b border-gray-100 hover:bg-gray-50 {% if t.thread_id == thread %}bg-indigo-50{% endif %}">
-      <div class="flex items-center gap-2 text-sm"><span class="{% if t.unread %}font-semibold{% endif %} truncate flex-1">{{ t.latest.sender }}{% if t.count > 1 %} <span class="text-gray-400 font-normal">({{ t.count }})</span>{% endif %}</span><span class="text-xs text-gray-400 shrink-0">{{ t.latest.sent_at|dt }}</span></div>
-      <div class="text-sm {% if t.unread %}font-semibold{% endif %} truncate">{{ t.subject }}</div>
-      <div class="text-xs text-gray-500 truncate">{{ t.latest.body|replace('\n', ' ')|truncate(70) }}</div>
-    </a>
-    {% else %}<div class="p-8 text-center text-sm text-gray-400">メールはありません</div>{% endfor %}
+    <div class="group relative border-b border-gray-100 hover:bg-gray-50 {% if t.thread_id == thread %}bg-indigo-50{% endif %}">
+      <a href="/mail?folder={{ folder }}&thread={{ t.thread_id }}{% if q %}&q={{ q }}{% endif %}" class="block px-4 py-3">
+        <div class="flex items-center gap-2 text-sm">{% if t.unread %}<span class="w-2 h-2 rounded-full bg-indigo-600 shrink-0"></span>{% endif %}<span class="{% if t.unread %}font-semibold{% endif %} truncate flex-1">{{ t.latest.sender }}{% if t.count > 1 %} <span class="text-gray-400 font-normal">({{ t.count }})</span>{% endif %}</span>{% if t.flagged %}<span class="text-red-500 text-xs">🚩</span>{% endif %}{% if t.has_attachment %}<span class="text-gray-400 text-xs">📎</span>{% endif %}<span class="text-xs text-gray-400 shrink-0">{{ t.latest.sent_at|rel }}</span></div>
+        <div class="text-sm {% if t.unread %}font-semibold{% endif %} truncate">{{ t.subject }}</div>
+        <div class="text-xs text-gray-500 truncate">{{ t.latest.body|replace('\n', ' ')|truncate(70) }}</div>
+      </a>
+      <div class="absolute right-2 bottom-2 hidden group-hover:flex gap-1 bg-white border border-gray-200 rounded-lg shadow-sm px-1">
+        <form method="post" action="/mail/thread/{{ t.thread_id }}/flag"><input type="hidden" name="folder" value="{{ folder }}"><button class="px-1.5 py-0.5 text-xs hover:bg-gray-100 rounded" title="フラグ">🚩</button></form>
+        <form method="post" action="/mail/thread/{{ t.thread_id }}/archive"><input type="hidden" name="folder" value="{{ folder }}"><button class="px-1.5 py-0.5 text-xs hover:bg-gray-100 rounded" title="アーカイブ">📦</button></form>
+        <form method="post" action="/mail/thread/{{ t.thread_id }}/unread"><input type="hidden" name="folder" value="{{ folder }}"><button class="px-1.5 py-0.5 text-xs hover:bg-gray-100 rounded" title="未読にする">✉</button></form>
+        <form method="post" action="/mail/thread/{{ t.thread_id }}/trash"><input type="hidden" name="folder" value="{{ folder }}"><button class="px-1.5 py-0.5 text-xs hover:bg-gray-100 rounded" title="削除">🗑</button></form>
+      </div>
+    </div>
+    {% else %}<div class="p-8 text-center text-sm text-gray-400">{% if q %}「{{ q }}」に一致するメールはありません{% else %}メールはありません{% endif %}</div>{% endfor %}
+    {% endif %}
   </section>
   <section class="flex-1 min-w-0 overflow-y-auto scrollbar-thin bg-gray-50 p-6">
-    {% if msgs %}
-    <h2 class="text-lg font-semibold mb-4">{{ msgs[0].subject }}</h2>
-    <div class="space-y-4 max-w-3xl">
-      {% for m in msgs %}
-      <div class="bg-white border border-gray-200 rounded-xl p-5">
-        <div class="flex items-start gap-3">
-          <span data-person="{{ m.sender }}" class="w-9 h-9 rounded-full bg-indigo-500 text-white grid place-items-center text-sm font-semibold shrink-0">{{ m.sender|initials }}</span>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-baseline gap-2 flex-wrap"><span class="font-semibold">{{ m.sender }}</span><span class="text-xs text-gray-400">{{ m.sent_at|dt }}</span>
-              {% if m.task %}<a href="/tasks/{{ m.task.id }}" class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">⇢ {{ m.task.title }} <span class="opacity-60">{{ m.task.method }}</span></a>{% endif %}
-              {% for x in m.extracted %}<span class="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700" title="{{ x }}">決定/タスクとして抽出</span>{% endfor %}</div>
-            <div class="text-xs text-gray-500">宛先: {{ m.recipients|join('、') }}{% if m.cc %} · CC: {{ m.cc|join('、') }}{% endif %}</div>
-          </div>
-        </div>
-        <div class="text-sm mt-4 leading-relaxed">{{ m.html|safe }}</div>
-        {% for a in m.attachments %}<a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-2 mt-3 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white hover:bg-gray-50"><span class="w-5 h-5 rounded bg-emerald-100 text-emerald-700 grid place-items-center text-[10px] font-bold">X</span>{{ a.name }}</a>{% endfor %}
-      </div>
-      {% endfor %}
-      <button @click="$dispatch('open-compose', { reply: true, thread: '{{ thread }}', subject: {{ ('Re: ' + msgs[0].subject.replace('Re: ', ''))|tojson|forceescape }}, to: {{ ([msgs[-1].sender] + msgs[-1].recipients)|reject('equalto', me)|list|tojson|forceescape }} })" class="text-sm border border-gray-300 rounded-lg px-4 py-2 bg-white hover:bg-gray-50">↩ 返信</button>
+    {% if draft_obj %}
+    <div class="max-w-3xl bg-white border border-gray-200 rounded-xl p-6 text-sm" x-init="$nextTick(() => $dispatch('open-compose', { draft: {{ draft_obj|tojson|forceescape }} }))">
+      <div class="text-xs text-gray-400 mb-2">下書き · {{ draft_obj.updated_at|rel }}</div>
+      <div class="font-semibold">{{ draft_obj.subject or '（件名なし）' }}</div>
+      <div class="text-xs text-gray-500 mt-1">宛先: {{ draft_obj.recipients|join('、') }}</div>
+      <div class="mt-3 whitespace-pre-wrap">{{ draft_obj.body }}</div>
+      <div class="mt-4 flex gap-2"><button @click="$dispatch('open-compose', { draft: {{ draft_obj|tojson|forceescape }} })" class="border border-gray-300 rounded-lg px-3 py-1.5 bg-white">編集を続ける</button>
+        <form method="post" action="/mail/draft/{{ draft_obj.id }}/delete"><button class="text-red-600 px-3 py-1.5">下書きを削除</button></form></div>
     </div>
-    {% else %}<div class="grid place-items-center h-full text-sm text-gray-400">スレッドを選択してください</div>{% endif %}
+    {% elif msgs %}
+    <div class="max-w-3xl">
+      <div class="flex items-start gap-3 mb-4">
+        <h2 class="text-lg font-semibold flex-1">{{ msgs[0].subject }}</h2>
+        <div class="flex gap-1 shrink-0 no-print">
+          <form method="post" action="/mail/thread/{{ thread }}/flag"><input type="hidden" name="folder" value="{{ folder }}"><button class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50 {% if state.flagged %}text-red-600 border-red-300{% endif %}">🚩 {{ 'フラグ解除' if state.flagged else 'フラグ' }}</button></form>
+          {% if state.trashed or state.archived %}<form method="post" action="/mail/thread/{{ thread }}/restore"><button class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50">受信トレイに戻す</button></form>
+          {% else %}<form method="post" action="/mail/thread/{{ thread }}/archive"><input type="hidden" name="folder" value="{{ folder }}"><button class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50">📦 アーカイブ</button></form>
+          <form method="post" action="/mail/thread/{{ thread }}/trash"><input type="hidden" name="folder" value="{{ folder }}"><button class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50">🗑 削除</button></form>{% endif %}
+          <button onclick="window.print()" class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white hover:bg-gray-50">🖨</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 mb-4 text-xs flex-wrap no-print">
+        <span class="text-gray-500">関連タスク:</span>
+        {% for t in thread_tasks %}<a href="/tasks/{{ t.id }}" class="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100">☑ {{ t.title }}</a>{% else %}<span class="text-gray-400">なし</span>{% endfor %}
+        <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+          <button @click="open = !open" class="border border-gray-300 rounded-lg px-2 py-0.5 bg-white hover:bg-gray-50">＋ タスクに紐付け / タスク化</button>
+          <form x-show="open" x-cloak method="post" action="/mail/thread/{{ thread }}/link_task" class="absolute left-0 top-7 z-30 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-3 space-y-2">
+            <select name="task_id" class="w-full border border-gray-300 rounded px-2 py-1 bg-white"><option value="">（新しいタスクを作る）</option>{% for t in open_tasks %}<option value="{{ t.id }}">{{ t.title|truncate(36) }}</option>{% endfor %}</select>
+            <input name="title" value="{{ msgs[0].subject|replace('Re: ', '') }}" class="w-full border border-gray-300 rounded px-2 py-1" placeholder="新規タスク名">
+            <button class="w-full bg-indigo-600 text-white rounded py-1">紐付ける</button>
+          </form>
+        </div>
+      </div>
+      <div class="space-y-3" x-data="{ expanded: {{ (msgs|length) - 1 }} }">
+        {% for m in msgs %}
+        {% set i = loop.index0 %}
+        <div class="bg-white border border-gray-200 rounded-xl" :class="expanded === {{ i }} || {{ 'true' if msgs|length <= 3 else 'false' }} ? 'p-5' : 'px-5 py-3 cursor-pointer hover:bg-gray-50'" @click="if (expanded !== {{ i }}) expanded = {{ i }}">
+          <div class="flex items-start gap-3">
+            <span data-person="{{ m.sender }}" class="w-9 h-9 rounded-full bg-indigo-500 text-white grid place-items-center text-sm font-semibold shrink-0">{{ m.sender|initials }}</span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-baseline gap-2 flex-wrap"><span class="font-semibold">{{ m.sender }}</span><span class="text-xs text-gray-400" title="{{ m.sent_at|dt }}">{{ m.sent_at|rel }}</span>
+                {% if m.task %}<a href="/tasks/{{ m.task.id }}" class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">⇢ {{ m.task.title }} <span class="opacity-60">{{ m.task.method }}</span></a>{% endif %}
+                {% for x in m.extracted %}<span class="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700" title="{{ x }}">決定/タスクとして抽出</span>{% endfor %}</div>
+              <div class="text-xs text-gray-500">宛先: {{ m.recipients|join('、') }}{% if m.cc %} · CC: {{ m.cc|join('、') }}{% endif %}</div>
+            </div>
+            <div class="shrink-0 flex gap-1 no-print" x-show="expanded === {{ i }} || {{ 'true' if msgs|length <= 3 else 'false' }}">
+              <button @click.stop="$dispatch('open-compose', { reply: true, thread: '{{ thread }}', subject: {{ ('Re: ' + msgs[0].subject.replace('Re: ', ''))|tojson|forceescape }}, to: {{ ([m.sender])|reject('equalto', me)|list|tojson|forceescape }}, quote: {{ (m.sender ~ ' さんの投稿:\n> ' ~ m.body.replace('\n', '\n> '))|tojson|forceescape }} })" class="text-xs text-gray-500 hover:text-indigo-600 px-1" title="返信">↩</button>
+              <button @click.stop="$dispatch('open-compose', { reply: true, thread: '{{ thread }}', subject: {{ ('Re: ' + msgs[0].subject.replace('Re: ', ''))|tojson|forceescape }}, to: {{ ([m.sender] + m.recipients + m.cc)|reject('equalto', me)|unique|list|tojson|forceescape }}, quote: {{ (m.sender ~ ' さんの投稿:\n> ' ~ m.body.replace('\n', '\n> '))|tojson|forceescape }} })" class="text-xs text-gray-500 hover:text-indigo-600 px-1" title="全員に返信">↩↩</button>
+              <button @click.stop="$dispatch('open-compose', { subject: {{ ('Fw: ' + msgs[0].subject.replace('Re: ', '').replace('Fw: ', ''))|tojson|forceescape }}, to: [], quote: {{ ('---------- 転送メッセージ ----------\n差出人: ' ~ m.sender ~ '\n日時: ' ~ m.sent_at ~ '\n件名: ' ~ m.subject ~ '\n\n' ~ m.body)|tojson|forceescape }} })" class="text-xs text-gray-500 hover:text-indigo-600 px-1" title="転送">→</button>
+            </div>
+          </div>
+          <div x-show="expanded === {{ i }} || {{ 'true' if msgs|length <= 3 else 'false' }}">
+            <div class="text-sm mt-4 leading-relaxed">{{ m.html|safe }}</div>
+            {% for a in m.attachments %}<a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-2 mt-3 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white hover:bg-gray-50"><span class="w-5 h-5 rounded bg-emerald-100 text-emerald-700 grid place-items-center text-[10px] font-bold">📎</span>{{ a.name }}</a>{% endfor %}
+          </div>
+          <div x-show="expanded !== {{ i }} && {{ 'false' if msgs|length <= 3 else 'true' }}" class="text-xs text-gray-400 truncate mt-1 pl-12">{{ m.body|replace('\n', ' ')|truncate(90) }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="mt-4 flex gap-2 no-print">
+        <button @click="$dispatch('open-compose', { reply: true, thread: '{{ thread }}', subject: {{ ('Re: ' + msgs[0].subject.replace('Re: ', ''))|tojson|forceescape }}, to: {{ ([msgs[-1].sender] + msgs[-1].recipients)|reject('equalto', me)|unique|list|tojson|forceescape }} })" class="text-sm border border-gray-300 rounded-lg px-4 py-2 bg-white hover:bg-gray-50">↩ 返信</button>
+      </div>
+    </div>
+    {% else %}<div class="grid place-items-center h-full text-sm text-gray-400">{% if folder == 'drafts' %}下書きを選択してください{% else %}スレッドを選択してください{% endif %}</div>{% endif %}
   </section>
 </div>
 
-<div x-data="{ open: false, reply: false, thread: '', subject: '', to: [] }" @open-compose.window="open = true; reply = !!$event.detail.reply; thread = $event.detail.thread || ''; subject = $event.detail.subject || ''; to = $event.detail.to || []" x-cloak>
+<div x-data="{ open: false, reply: false, thread: '', subject: '', to: [], cc: [], body: '', draftId: '' }"
+     @open-compose.window="const d = $event.detail; open = true; reply = !!d.reply; thread = d.thread || ''; draftId = '';
+       if (d.draft) { subject = d.draft.subject; to = d.draft.recipients; cc = d.draft.cc; body = d.draft.body; thread = d.draft.thread_id || ''; draftId = d.draft.id; }
+       else { subject = d.subject || ''; to = d.to || []; cc = []; body = d.quote ? '\n\n' + d.quote : ''; }
+       $nextTick(() => { $el.querySelectorAll('[data-picker]').forEach((el, i) => { const pk = Alpine.$data(el.querySelector('[x-data]')); if (pk) pk.sel = [...(i === 0 ? to : cc)]; }); $el.querySelector('textarea').focus(); })" x-cloak>
   <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
   <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
-    <form method="post" action="/mail/send" class="bg-white rounded-xl shadow-xl p-6 w-[640px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="open = false">
-      <h3 class="font-semibold" x-text="reply ? '返信' : '新しいメール'"></h3>
-      <input type="hidden" name="thread_id" :value="thread">
-      <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">差出人</label><span class="text-sm">{{ me }}</span></div>
-      <div class="flex gap-2"><label class="w-14 text-xs text-gray-500 pt-2">宛先</label><div class="flex-1" x-data x-init="$watch('to', v => { const pk = Alpine.$data($el.querySelector('[x-data]')); if (pk) pk.sel = [...v]; })">{% with pp_name='recipients', pp_selected=[], pp_multi=true, pp_placeholder='宛先を検索' %}{% include "_people_picker.html" %}{% endwith %}</div></div>
-      <div class="flex gap-2"><label class="w-14 text-xs text-gray-500 pt-2">CC</label><div class="flex-1">{% with pp_name='cc', pp_selected=[], pp_multi=true, pp_placeholder='CC を検索' %}{% include "_people_picker.html" %}{% endwith %}</div></div>
-      <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">件名</label><input name="subject" :value="subject" required class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5"></div>
-      <textarea name="body" rows="8" required placeholder="本文" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea>
-      <div class="flex gap-2"><input name="attachment_url" placeholder="添付ファイルのリンク（SharePoint など、任意）" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"><input name="attachment_name" placeholder="表示名" class="w-40 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"></div>
-      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="px-4 py-1.5 rounded-lg bg-indigo-600 text-white">送信</button></div>
+    <form method="post" action="/mail/send" class="bg-white rounded-xl shadow-xl p-6 w-[680px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="open = false" x-ref="form">
+      <div class="flex items-center"><h3 class="font-semibold flex-1" x-text="reply ? '返信' : (draftId ? '下書きを編集' : '新しいメール')"></h3><button type="button" @click="open = false" class="text-gray-400 hover:text-gray-700">✕</button></div>
+      <input type="hidden" name="thread_id" :value="thread"><input type="hidden" name="draft_id" :value="draftId">
+      <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">差出人</label><span class="text-sm">{{ me }} <span class="text-gray-400">&lt;{{ me }}@aoba-beverage.example&gt;</span></span></div>
+      <div class="flex gap-2"><label class="w-14 text-xs text-gray-500 pt-2">宛先</label><div class="flex-1" data-picker>{% with pp_name='recipients', pp_selected=[], pp_multi=true, pp_placeholder='宛先を検索' %}{% include "_people_picker.html" %}{% endwith %}</div></div>
+      <div class="flex gap-2"><label class="w-14 text-xs text-gray-500 pt-2">CC</label><div class="flex-1" data-picker>{% with pp_name='cc', pp_selected=[], pp_multi=true, pp_placeholder='CC を検索' %}{% include "_people_picker.html" %}{% endwith %}</div></div>
+      <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">件名</label><input name="subject" x-model="subject" required class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5"></div>
+      <textarea name="body" x-model="body" rows="10" required placeholder="本文（URL は自動でリンクになり、成果物リンクはタスクに登録されます）" class="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-[13px]"></textarea>
+      <div class="flex gap-2"><input name="attachment_url" placeholder="添付ファイルのリンク（成果物ライブラリのリンクなど、任意）" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"><input name="attachment_name" placeholder="表示名" class="w-40 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"></div>
+      <div class="flex justify-between items-center">
+        <button type="button" @click="$refs.form.action = '/mail/draft'; $refs.form.querySelectorAll('[required]').forEach(e => e.required = false); $refs.form.submit()" class="text-xs text-gray-500 hover:text-gray-800">下書きとして保存</button>
+        <div class="flex gap-2"><button type="button" @click="open = false" class="px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="px-4 py-1.5 rounded-lg bg-indigo-600 text-white">送信</button></div>
+      </div>
     </form>
   </div>
 </div>
