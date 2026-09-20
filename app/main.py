@@ -231,7 +231,7 @@ def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = "",
     assignees = sorted({t.assignee for t in db.list_tasks(conn) if t.assignee})
     all_tags = tagmod.all_tags(conn)
     resp = render("tasks.html", request, conn, by_status=by_status, rows=rows, assignees=assignees,
-                  assignee=assignee, q=q, tag=tag, team=team, view=view, sort=sort,
+                  assignee=assignee, q=q, tag=tag, team=team, view=view, sort=sort, today=date.today().isoformat(),
                   all_tags=[t for t in all_tags if t["kind"] != "team"], teams=[t for t in all_tags if t["kind"] == "team"])
     resp.set_cookie("tasks_view", view, max_age=86400 * 365)
     return resp
