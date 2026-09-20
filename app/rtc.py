@@ -38,7 +38,7 @@ async def handle(ws: WebSocket, room: str, name: str) -> None:
         except Exception:
             pass
     peers[name] = ws
-    states.setdefault(room, {})[name] = {"mic": True, "cam": True}
+    states.setdefault(room, {})[name] = {"mic": True, "cam": True, "screen": False}
     await _send(ws, {"type": "welcome", "peers": [p for p in peers if p != name], "states": states[room]})
     await broadcast(room, {"type": "peer-joined", "name": name, "at": datetime.now().isoformat()}, exclude=name)
     try:
@@ -54,7 +54,8 @@ async def handle(ws: WebSocket, room: str, name: str) -> None:
                 if target:
                     await _send(target, {**msg, "from": name})
             elif t == "state":
-                states[room][name] = {"mic": bool(msg.get("mic", True)), "cam": bool(msg.get("cam", True))}
+                states[room][name] = {"mic": bool(msg.get("mic", True)), "cam": bool(msg.get("cam", True)),
+                                      "screen": bool(msg.get("screen", False))}
                 await broadcast(room, {"type": "state", "name": name, **states[room][name]}, exclude=name)
             elif t == "chat":
                 await broadcast(room, {"type": "chat", "name": name, "text": str(msg.get("text", ""))[:500],

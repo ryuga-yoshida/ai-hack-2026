@@ -28,7 +28,7 @@
     <div class="flex-1 min-w-0 flex flex-col">
       <div id="tiles" class="flex-1 grid gap-2 p-3 auto-rows-fr" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
         <div class="tile relative bg-gray-800 rounded-xl overflow-hidden" id="tile-me">
-          <video id="localVideo" autoplay muted playsinline class="w-full h-full object-cover"></video>
+          <video id="localVideo" autoplay muted playsinline class="w-full h-full object-contain bg-black"></video>
           <div class="absolute bottom-2 left-2 text-xs bg-black/50 rounded px-2 py-0.5">{{ me }}（あなた）<span id="meState"></span></div>
           <div id="localOff" class="absolute inset-0 grid place-items-center text-4xl font-semibold bg-gray-800 hidden">{{ me|initials }}</div>
         </div>
@@ -37,6 +37,7 @@
       <div class="h-16 flex items-center justify-center gap-3 border-t border-gray-800">
         <button id="micBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="マイク">🎤</button>
         <button id="camBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="カメラ">📷</button>
+        <button id="screenBtn" class="h-11 rounded-full bg-gray-700 hover:bg-gray-600 px-4 text-sm flex items-center gap-2" title="画面共有">🖥 画面共有</button>
         <button id="chatBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="会議内チャット">💬</button>
         <button id="leaveBtn" class="h-11 rounded-full bg-red-600 hover:bg-red-700 px-5 text-sm" title="退出（自分の録音は議事録に含まれます）">退出</button>
         <span id="recInfo" class="text-xs text-gray-400 ml-4">● 録音中（自分のマイク）</span>
@@ -120,7 +121,7 @@ function tileFor(name) {
   let el = $('tile-' + name);
   if (el) return el;
   el = document.createElement('div'); el.id = 'tile-' + name; el.className = 'tile relative bg-gray-800 rounded-xl overflow-hidden';
-  el.innerHTML = `<video autoplay playsinline class="w-full h-full object-cover"></video>
+  el.innerHTML = `<video autoplay playsinline class="w-full h-full object-contain bg-black"></video>
     <div class="absolute bottom-2 left-2 text-xs bg-black/50 rounded px-2 py-0.5">${name}<span class="st"></span></div>
     <div class="off absolute inset-0 grid place-items-center text-4xl font-semibold bg-gray-800">${initials(name)}</div>`;
   $('tiles').appendChild(el); return el;
@@ -128,11 +129,20 @@ function tileFor(name) {
 function renderParticipants() {
   const names = [me, ...Object.keys(peers)];
   $('plist').innerHTML = names.map(n => { const s = n === me ? { mic: micOn, cam: camOn } : (pstate[n] || { mic: true, cam: true });
-    return `<li class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-500 grid place-items-center text-[10px]">${initials(n)}</span><span class="flex-1">${n}${n === me ? '（あなた）' : ''}</span><span class="text-xs text-gray-400">${s.mic ? '🎤' : '🔇'} ${s.cam ? '📷' : '🚫'}</span></li>`; }).join('');
-  for (const n of Object.keys(peers)) { const t = $('tile-' + n); if (t) { const s = pstate[n] || {}; t.querySelector('.off').classList.toggle('hidden', s.cam !== false); t.querySelector('.st').textContent = s.mic === false ? ' 🔇' : ''; } }
+    const sc = (n === me ? screenOn : (pstate[n] || {}).screen) ? ' <span class="text-emerald-400">🖥 共有中</span>' : '';
+    return `<li class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-500 grid place-items-center text-[10px]">${initials(n)}</span><span class="flex-1">${n}${n === me ? '（あなた）' : ''}${sc}</span><span class="text-xs text-gray-400">${s.mic ? '🎤' : '🔇'} ${s.cam ? '📷' : '🚫'}</span></li>`; }).join('');
+  for (const n of Object.keys(peers)) { const t = $('tile-' + n); if (t) { const s = pstate[n] || {}; t.querySelector('.off').classList.toggle('hidden', s.cam !== false || s.screen === true); t.querySelector('.st').textContent = (s.mic === false ? ' 🔇' : '') + (s.screen ? ' 🖥 画面共有中' : ''); } }
+  $('meState').textContent = screenOn ? ' 🖥 画面共有中' : '';
+  layout();
 }
-let micOn = true, camOn = true;
-function sendState() { ws && ws.readyState === 1 && ws.send(JSON.stringify({ type: 'state', mic: micOn, cam: camOn })); renderParticipants(); }
+let micOn = true, camOn = true, screenOn = false, screenStream = null, camTrack = null;
+function sendState() { ws && ws.readyState === 1 && ws.send(JSON.stringify({ type: 'state', mic: micOn, cam: camOn, screen: screenOn })); renderParticipants(); }
+function layout() {
+  // 画面共有中の人のタイルを全幅・大きく表示する
+  const sharing = screenOn ? 'me' : Object.keys(pstate).find(n => pstate[n] && pstate[n].screen);
+  document.querySelectorAll('.tile').forEach(t => { t.style.gridColumn = ''; t.style.minHeight = ''; });
+  if (sharing) { const t = $('tile-' + sharing); if (t) { t.style.gridColumn = '1 / -1'; t.style.minHeight = '60vh'; $('tiles').prepend(t); } }
+}
 
 async function start() {
   try {
@@ -172,7 +182,8 @@ function connect() {
 async function makePeer(name, initiator) {
   if (peers[name]) return peers[name];
   const pc = new RTCPeerConnection(ICE); peers[name] = pc; tileFor(name);
-  if (localStream.getTracks().length) localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  if (localStream.getTracks().length) localStream.getTracks().forEach(t => {
+    if (t.kind === 'video' && screenOn && screenStream) pc.addTrack(screenStream.getVideoTracks()[0], localStream); else pc.addTrack(t, localStream); });
   else { pc.addTransceiver('audio', { direction: 'recvonly' }); pc.addTransceiver('video', { direction: 'recvonly' }); }   // 閲覧のみ
   pc.onicecandidate = e => { if (e.candidate) ws.send(JSON.stringify({ type: 'ice', to: name, candidate: e.candidate })); };
   pc.ontrack = e => { const v = tileFor(name).querySelector('video'); if (v.srcObject !== e.streams[0]) v.srcObject = e.streams[0]; };
@@ -205,6 +216,34 @@ $('endBtn').onclick = () => { if (confirm('全員の会議を終了して議事�
 $('leaveBtn').onclick = async () => { ended = true; await uploadTrack(); for (const n of Object.keys(peers)) removePeer(n); if (localStream) localStream.getTracks().forEach(t => t.stop()); if (ws) ws.close(); addToast('退出しました。あなたの録音は議事録に含まれます'); location.href = '/meet'; };
 $('micBtn').onclick = () => { if (!localStream || !localStream.getAudioTracks().length) return; micOn = !micOn; localStream.getAudioTracks().forEach(t => t.enabled = micOn); $('micBtn').textContent = micOn ? '🎤' : '🔇'; $('micBtn').classList.toggle('bg-red-600', !micOn); sendState(); };
 $('camBtn').onclick = () => { if (!localStream || !localStream.getVideoTracks().length) return; camOn = !camOn; localStream.getVideoTracks().forEach(t => t.enabled = camOn); $('camBtn').classList.toggle('bg-red-600', !camOn); $('localOff').classList.toggle('hidden', camOn); sendState(); };
+async function startShare() {
+  if (!navigator.mediaDevices.getDisplayMedia) { addToast('このブラウザは画面共有に対応していません'); return; }
+  try { screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false }); }
+  catch (e) { return; }
+  const track = screenStream.getVideoTracks()[0];
+  camTrack = localStream.getVideoTracks()[0] || null;
+  // 全ピアの映像送信を画面に差し替える（再ネゴシエーション不要）
+  for (const pc of Object.values(peers)) {
+    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video') || pc.getSenders().find(s => !s.track);
+    if (sender) { try { await sender.replaceTrack(track); } catch (e) {} }
+  }
+  $('localVideo').srcObject = new MediaStream([track]); $('localOff').classList.add('hidden');
+  screenOn = true; $('screenBtn').classList.add('bg-emerald-600'); $('screenBtn').textContent = '🖥 共有を停止';
+  track.onended = () => stopShare();
+  sendState();
+}
+async function stopShare() {
+  if (!screenOn) return;
+  if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+  for (const pc of Object.values(peers)) {
+    const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video') || pc.getSenders().find(s => !s.track);
+    if (sender) { try { await sender.replaceTrack(camTrack); } catch (e) {} }
+  }
+  $('localVideo').srcObject = localStream; $('localOff').classList.toggle('hidden', camOn && !!camTrack);
+  screenOn = false; screenStream = null; $('screenBtn').classList.remove('bg-emerald-600'); $('screenBtn').textContent = '🖥 画面共有';
+  sendState();
+}
+$('screenBtn').onclick = () => screenOn ? stopShare() : startShare();
 $('chatBtn').onclick = () => { $('rchatText').focus(); };
 $('rchatForm').onsubmit = e => { e.preventDefault(); const t = $('rchatText').value.trim(); if (t && ws) { ws.send(JSON.stringify({ type: 'chat', text: t })); $('rchatText').value = ''; } };
 $('copyBtn').onclick = async () => { await navigator.clipboard.writeText(location.origin + '/meet/' + meetingId); addToast('招待リンクをコピーしました'); };
