@@ -453,9 +453,17 @@ def dashboard(request: Request):
 # ---------- 検知結果 ----------
 
 @app.get("/findings", response_class=HTMLResponse)
-def findings_page(request: Request, status: str = "open", kind: str = "", file: str = ""):
+def findings_page(request: Request, status: str = "open", kind: str = "", file: str = "", q: str = "", assignee: str = "",
+                  severity: str = "", sort: str = "", mine: str = "", view: str = ""):
     conn = get_conn()
+    me = get_me(request)
     cond, params = [], []
+    if q.strip():
+        cond.append("(summary LIKE ? OR reason LIKE ?)"); params += [f"%{q.strip()}%"] * 2
+    if severity in ("high", "medium", "low"):
+        cond.append("severity = ?"); params.append(severity)
+    if assignee:
+        cond.append("task_id IN (SELECT id FROM tasks WHERE assignee = ?)"); params.append(assignee)
     if file:
         # その版（ファイル名）の変更を根拠に含む Finding だけ
         cond.append("EXISTS (SELECT 1 FROM events e WHERE e.kind='artifact_change' AND json_extract(e.meta,'$.file')=? "
@@ -472,8 +480,51 @@ def findings_page(request: Request, status: str = "open", kind: str = "", file: 
               "open": conn.execute("SELECT COUNT(*) FROM findings WHERE status IN ('notified','pending')").fetchone()[0]}
     for k in FINDING_STATUS_LABEL:
         counts[k] = conn.execute("SELECT COUNT(*) FROM findings WHERE status=?", (k,)).fetchone()[0]
-    return render("findings.html", request, conn, cards=finding_cards(conn, where, tuple(params)),
-                  status=status, kind=kind, counts=counts, file=file)
+    cards = finding_cards(conn, where, tuple(params))
+    if mine and me:
+        from app import agent
+        mine_ids = {n["id"] for n in notifications_for(conn, me, limit=1000) if n["kind"] == "finding"}
+        cards = [c for c in cards if c["finding"].id in mine_ids or (c["task"] and c["task"].assignee == me)]
+    if sort == "newest":
+        cards.sort(key=lambda c: c["created_at"], reverse=True)
+    elif sort == "confidence":
+        cards.sort(key=lambda c: -c["finding"].confidence)
+    elif sort == "task":
+        cards.sort(key=lambda c: (c["task"].title if c["task"] else "～"))
+    assignees = sorted({t.assignee for t in db.list_tasks(conn) if t.assignee})
+    return render("findings.html", request, conn, cards=cards, status=status, kind=kind, counts=counts, file=file, q=q,
+                  assignee=assignee, severity=severity, sort=sort, mine=mine, assignees=assignees, view=view or request.cookies.get("findings_view", "cards"))
+
+
+@app.post("/findings/bulk")
+def findings_bulk(request: Request, ids: list[str] = Form([]), action: str = Form(...), note: str = Form("")):
+    conn = get_conn()
+    for fid in ids:
+        if action == "ack":
+            conn.execute("UPDATE findings SET status='acknowledged' WHERE id=? AND status IN ('notified','pending')", (fid,))
+        elif action == "dismiss":
+            conn.execute("UPDATE findings SET status='dismissed', dismiss_note=? WHERE id=?", (note.strip() or "一括却下", fid))
+        elif action == "reopen":
+            conn.execute("UPDATE findings SET status='pending' WHERE id=?", (fid,))
+    conn.commit()
+    return RedirectResponse(request.headers.get("referer") or "/findings", status_code=303)
+
+
+@app.get("/findings/export.csv")
+def findings_export(status: str = "all"):
+    import csv, io
+    from fastapi.responses import Response
+    conn = get_conn()
+    where = "" if status == "all" else ("WHERE status IN ('notified','pending')" if status == "open" else "WHERE status = ?")
+    params = () if status in ("all", "open") else (status,)
+    buf = io.StringIO(); w = csv.writer(buf)
+    w.writerow(["id", "種別", "重要度", "confidence", "状態", "タスク", "担当", "要約", "理由", "検知日時"])
+    for c in finding_cards(conn, where, params):
+        f = c["finding"]
+        w.writerow([f.id, KIND_LABEL.get(f.kind, f.kind), f.severity, f"{f.confidence:.2f}", FINDING_STATUS_LABEL.get(f.status, f.status),
+                    c["task"].title if c["task"] else "", c["task"].assignee if c["task"] else "", f.summary, f.reason or "", c["created_at"]])
+    return Response(content="\ufeff" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename=findings.csv"})
 
 
 @app.post("/findings/{finding_id}/ack")
