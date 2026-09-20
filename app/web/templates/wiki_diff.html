@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ page.title }} 改訂{{ n }}の差分{% endblock %}
 {% block heading %}<a href="/wiki/{{ page.id }}" class="text-gray-400 hover:text-gray-600 mr-2">{{ page.title|truncate(30) }}</a><span class="text-gray-300 mr-2">/</span>改訂 {{ n }} の差分 <span class="text-gray-400 font-normal text-sm ml-2">{{ cur.actor }} · {{ cur.created_at|dt }}{% if cur.note %} · {{ cur.note }}{% endif %}</span>{% endblock %}
+{% block actions %}
+{% if prev %}<form method="post" action="/wiki/{{ page.id }}/revert/{{ prev.id }}" onsubmit="return confirm('この改訂の変更を取り消して、改訂 {{ n - 1 }} の内容に巻き戻しますか？')"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">↶ この変更を取り消す（改訂 {{ n - 1 }} へ）</button></form>{% endif %}
+<form method="post" action="/wiki/{{ page.id }}/revert/{{ cur.id }}" onsubmit="return confirm('改訂 {{ n }} の内容に巻き戻しますか？')"><button class="text-sm border border-amber-300 text-amber-800 rounded-lg px-3 py-1.5 bg-white hover:bg-amber-50">↶ この版に巻き戻す</button></form>
+{% endblock %}
 {% block main_class %}p-0{% endblock %}
 {% block content %}
 <div class="flex h-[calc(100vh-3.5rem)]">

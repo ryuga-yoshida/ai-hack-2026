@@ -3,21 +3,27 @@
     <input x-model="q" placeholder="ページを絞り込み" class="w-full text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
   </div>
   {% if fav_pages %}
-  <div class="px-4 pt-3 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider">★ お気に入り</div>
+  <div class="px-4 pt-3 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider" title="ページ右上の ☆ で登録">★ お気に入り</div>
   <div class="px-2">{% for p_ in fav_pages %}<a href="/wiki/{{ p_.id }}" class="block px-2 py-1 rounded-lg truncate {% if page and p_.id == page.id %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">📄 {{ p_.title }}</a>{% endfor %}</div>
   {% endif %}
-  <div class="px-4 pt-3 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider flex items-center justify-between">ページ
-    <button @click="newPage = !newPage" class="text-gray-400 hover:text-gray-700 text-base leading-none" title="ページを作成">＋</button></div>
-  <form method="post" action="/wiki" x-show="newPage" x-cloak class="px-3 pb-2 space-y-1">
-    <input name="title" placeholder="ページ名" required class="w-full text-xs border border-gray-300 rounded px-2 py-1">
-    <select name="template" class="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white">{% for k, v in templates.items() %}<option value="{{ k }}">テンプレート: {{ v[0] }}</option>{% endfor %}</select>
-    <input name="space" value="{{ page.space if page else (spaces[0] if spaces else 'general') }}" placeholder="スペース" class="w-full text-xs border border-gray-300 rounded px-2 py-1">
-    <select name="parent_id" class="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"><option value="">（親なし）</option>{% for p_ in pages %}<option value="{{ p_.id }}" {% if page and p_.id == page.id %}selected{% endif %}>{{ '　' * p_.depth }}{{ p_.title }}</option>{% endfor %}</select>
-    <button class="w-full text-xs bg-indigo-600 text-white rounded py-1">作成して開く</button>
+  <div class="px-4 pt-3 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider flex items-center justify-between" title="スペースごとのページ一覧（階層つき）">ページ <span class="font-normal normal-case tracking-normal text-gray-300">スペース別</span>
+    <button @click="newPage = !newPage" class="ml-auto text-gray-400 hover:text-gray-700 text-base leading-none" title="ページを作成">＋</button></div>
+  <form method="post" action="/wiki" x-show="newPage" x-cloak class="mx-2 mb-2 p-2.5 bg-white border border-gray-200 rounded-lg space-y-2 text-xs">
+    <div class="font-semibold text-gray-700">新しいページ</div>
+    <label class="block"><span class="text-[10px] text-gray-500">ページ名 <span class="text-red-500">*</span></span>
+      <input name="title" placeholder="例: 2026-09-22 定例 議事録" required class="mt-0.5 w-full text-xs border border-gray-300 rounded px-2 py-1"></label>
+    <label class="block"><span class="text-[10px] text-gray-500">テンプレート <span class="text-gray-400">— 最初に入っている雛形</span></span>
+      <select name="template" class="mt-0.5 w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white">{% for k, v in templates.items() %}<option value="{{ k }}">{{ v[0] }}</option>{% endfor %}</select></label>
+    <label class="block"><span class="text-[10px] text-gray-500">スペース <span class="text-gray-400">— 置き場所の大分類（部署やプロジェクト名）</span></span>
+      <input name="space" list="wikiSpaces" value="{{ page.space if page else (spaces[0] if spaces else 'general') }}" placeholder="例: 商品企画部" class="mt-0.5 w-full text-xs border border-gray-300 rounded px-2 py-1">
+      <datalist id="wikiSpaces">{% for sp in spaces %}<option value="{{ sp }}">{% endfor %}</datalist></label>
+    <label class="block"><span class="text-[10px] text-gray-500">親ページ <span class="text-gray-400">— この下にぶら下げる（任意）</span></span>
+      <select name="parent_id" class="mt-0.5 w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"><option value="">（親なし・最上位に置く）</option>{% for p_ in pages %}<option value="{{ p_.id }}" {% if page and p_.id == page.id %}selected{% endif %}>{{ '　' * p_.depth }}{{ p_.title }}</option>{% endfor %}</select></label>
+    <div class="flex gap-1 pt-1"><button class="flex-1 text-xs bg-indigo-600 text-white rounded py-1.5">作成して開く</button><button type="button" @click="newPage = false" class="text-xs border border-gray-300 rounded px-2 bg-white">閉じる</button></div>
   </form>
   <nav class="flex-1 overflow-y-auto px-2 pb-2 scrollbar-thin">
     {% for sp in spaces %}
-    <div class="px-2 pt-2 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider">{{ sp }}</div>
+    <div class="px-2 pt-2 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider flex items-center gap-1"><span class="text-gray-300">📂</span>{{ sp }}</div>
     {% for p_ in pages if p_.space == sp %}
     <a href="/wiki/{{ p_.id }}" x-show="!q || {{ p_.title|tojson|forceescape }}.includes(q)" class="flex items-center gap-1.5 px-2 py-1 rounded-lg truncate {% if page and p_.id == page.id %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}" style="padding-left: {{ 8 + p_.depth * 14 }}px">
       <span class="text-gray-400">{{ '└' if p_.depth else '📄' }}</span><span class="truncate">{{ p_.title }}</span></a>
@@ -25,7 +31,7 @@
     {% endfor %}
     {% if not pages %}<div class="px-3 text-xs text-gray-400">まだページがありません</div>{% endif %}
     {% if recent %}
-    <div class="px-2 pt-4 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider">最近の更新</div>
+    <div class="px-2 pt-4 pb-1 text-[10px] font-semibold text-gray-400 tracking-wider" title="全スペースで最近編集されたページ">最近の更新 <span class="font-normal tracking-normal text-gray-300">全スペース</span></div>
     {% for p_ in recent[:5] %}<a href="/wiki/{{ p_.id }}" class="block px-2 py-0.5 text-xs text-gray-600 hover:text-gray-900 truncate">{{ p_.title }} <span class="text-gray-400">{{ p_.updated_at|rel }}</span></a>{% endfor %}
     {% endif %}
   </nav>

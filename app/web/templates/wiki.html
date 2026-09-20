@@ -52,6 +52,13 @@
           {% for t in tags %}<a href="/tags/{{ t.name }}" class="px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
           {% with tp_type='wiki', tp_id=page.id %}{% include "_tag_picker.html" %}{% endwith %}
         </div>
+        {% if reverted %}
+        <div class="mt-4 border border-amber-200 bg-amber-50 rounded-lg px-4 py-2.5 text-sm flex items-center gap-3">
+          <span>↶ 改訂 {{ reverted }} の内容に巻き戻しました（新しい改訂として記録）。</span>
+          <form method="post" action="/wiki/{{ page.id }}/revert/{{ undo_to }}" class="ml-auto"><input type="hidden" name="undo" value="1"><button class="text-xs border border-amber-300 rounded-lg px-2.5 py-1 bg-white hover:bg-amber-100 font-medium">元に戻す</button></form>
+          <a href="/wiki/{{ page.id }}" class="text-gray-400 hover:text-gray-700">✕</a>
+        </div>
+        {% endif %}
         {% if findings %}
         <div class="mt-4 border border-red-200 bg-red-50 rounded-lg px-4 py-3 text-sm">
           <div class="font-semibold text-red-700 text-xs mb-1">⚠ このページの改訂に関する検知</div>
@@ -88,8 +95,11 @@
           <div class="mt-6 text-xs font-semibold text-gray-500 mb-2">改訂履歴</div>
           <ol class="text-xs space-y-1">
             {% for r in revs|reverse %}
-            <li class="flex items-center gap-1"><span class="text-gray-400 w-20 shrink-0">{{ r.created_at|dt }}</span><span data-person="{{ r.actor }}">{{ r.actor }}</span>
-              {% if not loop.last %}<a href="/wiki/{{ page.id }}/diff/{{ r.id }}" class="ml-auto text-indigo-600 hover:underline">差分</a>{% else %}<span class="ml-auto text-gray-400">初版</span>{% endif %}</li>
+            <li class="group flex items-center gap-1" title="{{ r.note or '' }}"><span class="text-gray-400 w-20 shrink-0">{{ r.created_at|dt }}</span><span data-person="{{ r.actor }}" class="truncate">{{ r.actor }}</span>
+              <span class="ml-auto flex items-center gap-1.5 shrink-0">
+                {% if not loop.last %}<a href="/wiki/{{ page.id }}/diff/{{ r.id }}" class="text-indigo-600 hover:underline">差分</a>{% else %}<span class="text-gray-400">初版</span>{% endif %}
+                {% if not loop.first %}<form method="post" action="/wiki/{{ page.id }}/revert/{{ r.id }}" onsubmit="return confirm('改訂 {{ revs|length - loop.index0 }} の内容に巻き戻しますか？（あとで「元に戻す」できます）')"><button class="text-gray-400 hover:text-amber-600 opacity-0 group-hover:opacity-100" title="この版に巻き戻す">↶</button></form>{% endif %}
+              </span></li>
             {% endfor %}
           </ol>
           <div class="mt-6 text-xs font-semibold text-gray-500 mb-2">関連タスク</div>

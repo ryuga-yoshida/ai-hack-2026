@@ -2522,7 +2522,7 @@ def wiki_comment(request: Request, page_id: str, text: str = Form(...)):
 
 
 @app.get("/wiki/{page_id}", response_class=HTMLResponse)
-def wiki_page(request: Request, page_id: str):
+def wiki_page(request: Request, page_id: str, reverted: str = "", undo_to: str = ""):
     conn = get_conn()
     page = wikimod.get(conn, page_id)
     if not page:
@@ -2547,7 +2547,7 @@ def wiki_page(request: Request, page_id: str):
                   revs=revs, tags=tagmod.tags_for(conn, "wiki", page_id), all_tags=tagmod.all_tags(conn),
                   linked_tasks=linked_tasks, findings=findings, changes=changes, children=children, comments=comments,
                   toc=wikimod.toc(page["body"]), breadcrumbs=breadcrumbs,
-                  all_tasks=[t for t in db.list_tasks(conn) if t.status != "done"])
+                  all_tasks=[t for t in db.list_tasks(conn) if t.status != "done"], reverted=reverted, undo_to=undo_to)
 
 
 @app.get("/wiki/{page_id}/edit", response_class=HTMLResponse)
@@ -2591,6 +2591,28 @@ def wiki_diff(request: Request, page_id: str, rev_id: str):
             fmap.setdefault(ev.ref, []).append(db.row_to_finding(r))
     return render("wiki_diff.html", request, conn, **_wiki_ctx(conn, page, me=get_me(request)), cur=cur, prev=prev, diffs=diffs, n=idx + 1,
                   findings_by_ref=fmap, evs=evs)
+
+
+@app.post("/wiki/{page_id}/revert/{rev_id}")
+def wiki_revert(request: Request, page_id: str, rev_id: str, undo: str = Form("")):
+    """指定した改訂の内容に巻き戻す（新しい改訂として積む）。undo=1 なら「元に戻す」操作"""
+    conn = get_conn()
+    page = wikimod.get(conn, page_id)
+    revs = wikimod.revisions(conn, page_id)
+    idx = next((i for i, r in enumerate(revs) if r["id"] == rev_id), None)
+    if not page or idx is None:
+        raise HTTPException(404)
+    target = revs[idx]
+    before = revs[-1]   # 巻き戻す前に最新だった改訂（元に戻す先）
+    me = who(request)
+    note = "巻き戻しを取り消し" if undo else f"改訂 {idx + 1} に巻き戻し"
+    changed = wikimod.update(conn, page_id, target["title"], target["body"], me, note=note)
+    if changed:
+        from app import agent
+        agent.request_tick(f"Wiki 巻き戻し（{target['title']}）")
+    if undo or not changed:
+        return RedirectResponse(f"/wiki/{page_id}", status_code=303)
+    return RedirectResponse(f"/wiki/{page_id}?reverted={idx + 1}&undo_to={before['id']}", status_code=303)
 
 
 @app.post("/wiki/{page_id}/link_task")
