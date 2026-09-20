@@ -136,6 +136,7 @@ def run(conn: sqlite3.Connection) -> None:
         if conn.execute("SELECT 1 FROM cal_events WHERE id=?", (eid,)).fetchone():
             continue
         calendar.create(conn, title, datetime.fromisoformat(st), datetime.fromisoformat(en), attendees=att,
-                        location=loc, description=desc, channel=ch, organizer="鈴木", event_id=eid, meeting_id=mtg)
+                        location=loc, description=desc, channel=ch, organizer="鈴木", event_id=eid, meeting_id=mtg,
+                        kind="appointment" if eid in ("cal-0926", "cal-0930") else "meeting")
         ne += 1
     print(f"seed: 予定 {ne} 件を投入（計 {len(EVENTS)} 件）")

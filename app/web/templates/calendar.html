@@ -53,8 +53,8 @@
       {% for e in d.events %}
       {% set sm = (e.start.hour - H0) * 60 + e.start.minute %}{% set em = (e.end.hour - H0) * 60 + e.end.minute %}
       {% set top = (sm if sm > 0 else 0) * HPX / 60 %}{% set height = ((em if em < hours|length * 60 else hours|length * 60) - (sm if sm > 0 else 0)) * HPX / 60 %}
-      <a href="/calendar/{{ e.id }}" @click.stop class="absolute left-1 right-1 rounded-md px-2 py-1 text-xs leading-snug overflow-hidden border shadow-sm hover:shadow-md {% if e.meeting_status == 'done' %}bg-emerald-50 border-emerald-200 text-emerald-900{% elif e.meeting_status == 'recording' %}bg-red-50 border-red-200 text-red-800{% else %}bg-indigo-50 border-indigo-200 text-indigo-900{% endif %}" style="top: {{ top }}px; height: {{ [height, 22]|max }}px;">
-        <div class="font-medium truncate">{{ e.start.strftime('%H:%M') }} {{ e.title }}</div>
+      <a href="/calendar/{{ e.id }}" @click.stop class="absolute left-1 right-1 rounded-md px-2 py-1 text-xs leading-snug overflow-hidden border shadow-sm hover:shadow-md {% if e.meeting_status == 'done' %}bg-emerald-50 border-emerald-200 text-emerald-900{% elif e.meeting_status == 'recording' %}bg-red-50 border-red-200 text-red-800{% elif e.kind == 'appointment' %}bg-gray-50 border-gray-300 text-gray-800{% else %}bg-indigo-50 border-indigo-200 text-indigo-900{% endif %}" style="top: {{ top }}px; height: {{ [height, 22]|max }}px;">
+        <div class="font-medium truncate">{% if e.kind != 'appointment' %}📹 {% endif %}{{ e.start.strftime('%H:%M') }} {{ e.title }}</div>
         {% if height >= 40 %}<div class="text-[10px] text-gray-500 truncate">{{ e.attendees|join('・') }}</div>{% endif %}
         {% if height >= 56 %}{% if e.meeting_status == 'done' %}<div class="text-[10px] text-emerald-700">📝 議事録あり{% if e.n_decisions %} · 決定 {{ e.n_decisions }}{% endif %}</div>{% elif e.meeting_status == 'recording' %}<div class="text-[10px] text-red-700">● 進行中</div>{% endif %}{% endif %}
       </a>
@@ -96,6 +96,9 @@
         <input type="time" name="start" value="10:00" required class="border border-gray-300 rounded-lg px-2 py-1.5">
         <input type="time" name="end" value="10:30" required class="border border-gray-300 rounded-lg px-2 py-1.5">
       </div>
+      <label class="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 cursor-pointer">
+        <input type="checkbox" name="with_meeting" value="1" checked class="rounded">
+        <span><b>オンライン会議室を用意する</b><span class="block text-xs text-gray-500">エージェントが15分前に会議室を作り、参加者へ案内。外すと「予定」だけ（締切・外出など）</span></span></label>
       <div><label class="text-xs text-gray-500">参加者</label>{% with pp_name='attendees', pp_selected=[], pp_multi=true, pp_placeholder='参加者を検索して追加' %}{% include "_people_picker.html" %}{% endwith %}</div>
       <div class="grid grid-cols-2 gap-2">
         <input name="location" placeholder="場所（任意）" class="border border-gray-300 rounded-lg px-3 py-1.5">

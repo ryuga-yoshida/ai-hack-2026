@@ -1008,7 +1008,8 @@ def calendar_page(request: Request, view: str = "week", d: str = "", person: str
 @app.post("/calendar")
 def calendar_create(request: Request, title: str = Form(...), date_: str = Form(..., alias="date"), start: str = Form(...),
                     end: str = Form(...), attendees: list[str] = Form([]), location: str = Form(""),
-                    description: str = Form(""), channel: str = Form(""), organizer: str = Form("")):
+                    description: str = Form(""), channel: str = Form(""), organizer: str = Form(""),
+                    with_meeting: str = Form("")):
     conn = get_conn()
     st = datetime.fromisoformat(f"{date_}T{start}")
     en = datetime.fromisoformat(f"{date_}T{end}")
@@ -1016,7 +1017,8 @@ def calendar_create(request: Request, title: str = Form(...), date_: str = Form(
         en = st + __import__("datetime").timedelta(minutes=30)
     who_ = who(request, organizer)
     eid = cal.create(conn, title.strip(), st, en, attendees=list(attendees), location=location.strip() or None,
-                     description=description.strip() or None, channel=channel.strip() or None, organizer=who_)
+                     description=description.strip() or None, channel=channel.strip() or None, organizer=who_,
+                     kind="meeting" if with_meeting else "appointment")
     if channel.strip():
         chat.post_message(conn, channel.strip(), who_,
                           f"📅 予定を追加しました: {title.strip()} {st:%m/%d %H:%M}〜{en:%H:%M} 参加: {'・'.join(attendees)}")

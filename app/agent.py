@@ -387,13 +387,20 @@ def stage_calendar(conn, stats: TickResult, now: datetime | None = None) -> None
     from app.connectors import calendar, chat, meet
     now = now or datetime.now()
     for ev in calendar.upcoming_unreminded(conn, now, timedelta(minutes=15)):
+        mins = max(1, int((ev["start"] - now).total_seconds() // 60))
+        if ev.get("kind") == "appointment":
+            # 予定のみ（会議室なし）: リマインドだけ
+            text = f"⏰ {mins}分後に「{ev['title']}」です（{ev['start']:%H:%M}〜、{ev.get('location') or '場所未定'}）。参加: {'・'.join(ev['attendees'])}"
+            chat.post_message(conn, ev.get("channel") or "general", "エージェント", text)
+            calendar.update(conn, ev["id"], reminded_at=db.now_iso())
+            say(f"calendar: 「{ev['title']}」の {mins} 分前。#{ev.get('channel') or 'general'} にリマインド（会議室なし）")
+            continue
         mid = ev.get("meeting_id")
         if not mid or not conn.execute("SELECT 1 FROM meetings WHERE id=?", (mid,)).fetchone():
             mid = meet.create_meeting(conn, ev["title"], started_at=ev["start"], channel=ev.get("channel"))
             calendar.update(conn, ev["id"], meeting_id=mid)
         for a in ev["attendees"]:
             meet.join(conn, mid, a)
-        mins = max(1, int((ev["start"] - now).total_seconds() // 60))
         url = f"{config.APP_BASE_URL}/meet/{mid}"
         text = (f"⏰ {mins}分後に「{ev['title']}」です（{ev['start']:%H:%M}〜、{ev.get('location') or 'オンライン'}）。"
                 f"会議室を用意しました → {url}  参加: {'・'.join(ev['attendees'])}")

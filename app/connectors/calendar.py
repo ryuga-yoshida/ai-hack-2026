@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS cal_events (
     meeting_id  TEXT,              -- 会議室（開催時に紐付く）
     organizer   TEXT,
     reminded_at TEXT,              -- エージェントがリマインドした時刻
+    kind        TEXT NOT NULL DEFAULT 'meeting',   -- meeting（会議室を用意）| appointment（予定のみ）
     created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_cal_start ON cal_events(start_at);
@@ -32,20 +33,22 @@ CREATE INDEX IF NOT EXISTS idx_cal_start ON cal_events(start_at);
 
 def init(conn: sqlite3.Connection) -> None:
     conn.executescript(DDL)
+    if "kind" not in {r[1] for r in conn.execute("PRAGMA table_info(cal_events)")}:
+        conn.execute("ALTER TABLE cal_events ADD COLUMN kind TEXT NOT NULL DEFAULT 'meeting'")
     conn.commit()
 
 
 def create(conn: sqlite3.Connection, title: str, start_at: datetime, end_at: datetime,
            attendees: list[str] | None = None, location: str | None = None, description: str | None = None,
            channel: str | None = None, organizer: str | None = None, event_id: str | None = None,
-           meeting_id: str | None = None) -> str:
+           meeting_id: str | None = None, kind: str = "meeting") -> str:
     eid = event_id or new_id()
     conn.execute(
-        "INSERT OR IGNORE INTO cal_events (id, title, start_at, end_at, attendees, location, description, channel, meeting_id, organizer, created_at) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO cal_events (id, title, start_at, end_at, attendees, location, description, channel, meeting_id, organizer, kind, created_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (eid, title, db.to_iso(start_at.replace(microsecond=0)), db.to_iso(end_at.replace(microsecond=0)),
          json.dumps(attendees or [], ensure_ascii=False), location, description, channel, meeting_id, organizer,
-         db.now_iso()))
+         kind if kind in ("meeting", "appointment") else "meeting", db.now_iso()))
     conn.commit()
     return eid
 
