@@ -368,6 +368,12 @@ def stage_detect(conn, stats: TickResult, now: datetime | None = None) -> None:
         stats.findings.append(f)
         stats.actions[decide_action(conn, f)] += 1
 
+    for f, payload in detector.suggest_status_updates(conn):
+        db.save_finding(conn, f, payload=payload)
+        stats.findings.append(f)
+        stats.actions["review"] += 1
+        say(f"suggest: {f.summary}（{f.reason[:40]}…）")
+
 
 def stage_calendar(conn, stats: TickResult, now: datetime | None = None) -> None:
     """開始 15 分前までの予定に対して、会議室を用意してチャットにリマインドする（人の指示なし）"""

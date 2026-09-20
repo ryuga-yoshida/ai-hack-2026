@@ -389,3 +389,59 @@ def detect_stalled(conn: sqlite3.Connection, now: datetime | None = None) -> lis
             model_used=None, status="pending",
         ))
     return out
+
+
+# ---------- タスク状態の更新提案（LLM 不使用） ----------
+
+_DONE_PAT = re.compile(r"(出せました|出しました|提出しました|送りました|送付しました|完了しました|終わりました|終えました|対応済み|反映しました|反映済み|"
+                       r"上げました|更新しました|修正しました|直しました|追加しました|確認しました|案内しました|できました|やりました|済みです|しておきました)")
+_START_PAT = re.compile(r"(着手しました|始めました|今やってます|やってます|進めています|取りかかりました|作業中|対応中|確認中|回ります|回りました)")
+_BLOCK_PAT = re.compile(r"(止まって|ブロック|待ちです|待ちになって|できません|進められません|遅れ|遅延|間に合いません)")
+
+STATUS_PENALTY = {"done": 0.7, "in_progress": 0.6, "blocked": 0.6}
+
+
+def suggest_status_updates(conn: sqlite3.Connection) -> list[tuple[Finding, dict]]:
+    """タスクに紐付いた発言・コメント・メールの文面から、状態の更新を提案する。
+    「出しました」→ 完了、「着手しました」→ 進行中、「止まっています」→ ブロック。
+    LLM は使わず、人が「適用」するまで状態は変えない（承認ゲート）。"""
+    out: list[tuple[Finding, dict]] = []
+    already = {(r["task_id"], json.loads(r["payload"] or "{}").get("to")) for r in conn.execute(
+        "SELECT task_id, payload FROM findings WHERE kind='status_suggestion' AND status IN ('pending','notified')")}
+    for task in db.list_tasks(conn):
+        if task.status == "done":
+            continue
+        rows = conn.execute(
+            "SELECT e.* FROM links l JOIN events e ON e.id = l.from_id "
+            "WHERE l.to_type='task' AND l.to_id=? AND l.relation='discusses' AND e.kind='utterance' "
+            "ORDER BY e.occurred_at DESC LIMIT 5", (task.id,)).fetchall()
+        for r in rows:
+            ev = db.row_to_event(r)
+            if db.is_processed(conn, "suggest", ev.id):
+                continue
+            # 担当者本人（または担当未設定）の発言だけを根拠にする
+            if task.assignee and ev.actor != task.assignee:
+                continue
+            to = None
+            if _DONE_PAT.search(ev.text):
+                to = "done"
+            elif _BLOCK_PAT.search(ev.text) and task.status != "blocked":
+                to = "blocked"
+            elif _START_PAT.search(ev.text) and task.status == "todo":
+                to = "in_progress"
+            db.mark_processed(conn, "suggest", ev.id, {"task_id": task.id, "to": to})
+            if not to or to == task.status or (task.id, to) in already:
+                continue
+            label = {"done": "完了", "in_progress": "進行中", "blocked": "ブロック"}[to]
+            cur = {"todo": "未着手", "in_progress": "進行中", "blocked": "ブロック", "done": "完了"}[task.status]
+            f = Finding(
+                id=new_id(), kind="status_suggestion", severity="low", task_id=task.id,
+                evidence=[ev.id, task.created_from] if task.created_from else [ev.id, ev.id],
+                summary=f"「{task.title}」を {cur} → {label} にしませんか？",
+                confidence=STATUS_PENALTY[to], model_used=None, status="pending",
+                reason=f"{ev.actor} の発言「{ev.text[:60]}」から判断（ルールベース・LLM 不使用）",
+            )
+            out.append((f, {"to": to, "from": task.status, "event_id": ev.id}))
+            already.add((task.id, to))
+            break
+    return out

@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS findings (
     model_used    TEXT,
     status        TEXT NOT NULL DEFAULT 'pending',  -- pending|notified|acknowledged|dismissed
     dismiss_note  TEXT,
+    payload       TEXT,            -- JSON: 提案の内容（status_suggestion など）
     created_at    TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_findings_status ON findings(status);
@@ -138,6 +139,8 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
 def init_db(conn: sqlite3.Connection) -> None:
     """DDL を冪等適用する。マイグレーション機構は持たない。"""
     conn.executescript(DDL)
+    if "payload" not in {r[1] for r in conn.execute("PRAGMA table_info(findings)")}:
+        conn.execute("ALTER TABLE findings ADD COLUMN payload TEXT")
     conn.commit()
     from app.connectors import calendar, chat, mail, meet  # 自作ツールのテーブル（循環importを避けて遅延）
     from app import tags
@@ -287,16 +290,17 @@ def row_to_link(r: sqlite3.Row) -> Link:
 
 # ---------- Finding ----------
 
-def save_finding(conn: sqlite3.Connection, f: Finding) -> None:
+def save_finding(conn: sqlite3.Connection, f: Finding, payload: dict | None = None) -> None:
     # dataclass の __post_init__ に加えて DB 直前でも再確認する（安全装置）
     if len(f.evidence) < 2:
         raise ValueError("Finding には最低2件の根拠が必要")
     conn.execute(
         """INSERT OR IGNORE INTO findings
-           (id, kind, severity, task_id, evidence, summary, reason, confidence, model_used, status, created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+           (id, kind, severity, task_id, evidence, summary, reason, confidence, model_used, status, payload, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
         (f.id, f.kind, f.severity, f.task_id, json.dumps(f.evidence),
-         f.summary, f.reason, f.confidence, f.model_used, f.status, now_iso()),
+         f.summary, f.reason, f.confidence, f.model_used, f.status,
+         json.dumps(payload, ensure_ascii=False) if payload else None, now_iso()),
     )
     conn.commit()
 

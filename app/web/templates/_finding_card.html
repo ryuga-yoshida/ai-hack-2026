@@ -2,7 +2,7 @@
 <div class="bg-white border border-gray-200 rounded-xl p-5 {% if f.status == 'dismissed' %}opacity-60{% endif %}" id="finding-{{ f.id }}">
   <div class="flex items-center gap-2 flex-wrap">
     <span class="px-2 py-0.5 rounded-md text-xs font-semibold
-      {% if f.kind == 'contradiction' %}bg-red-100 text-red-800{% elif f.kind == 'stalled' %}bg-amber-100 text-amber-800{% else %}bg-gray-200 text-gray-700{% endif %}">{{ KIND_LABEL[f.kind] }}</span>
+      {% if f.kind == 'contradiction' %}bg-red-100 text-red-800{% elif f.kind == 'stalled' %}bg-amber-100 text-amber-800{% elif f.kind == 'status_suggestion' %}bg-emerald-100 text-emerald-800{% else %}bg-gray-200 text-gray-700{% endif %}">{{ KIND_LABEL.get(f.kind, f.kind) }}</span>
     <span class="text-xs px-2 py-0.5 rounded-md border {% if f.severity == 'high' %}border-red-300 text-red-700{% elif f.severity == 'medium' %}border-amber-300 text-amber-700{% else %}border-gray-300 text-gray-600{% endif %}">{{ f.severity }}</span>
     <span class="text-xs text-gray-500">confidence <b class="text-gray-800">{{ '%.2f' % f.confidence }}</b></span>
     <span class="text-xs px-2 py-0.5 rounded-full {% if f.status == 'notified' %}bg-indigo-100 text-indigo-700{% elif f.status == 'pending' %}bg-amber-50 text-amber-700{% elif f.status == 'acknowledged' %}bg-emerald-50 text-emerald-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ FINDING_STATUS_LABEL[f.status] }}</span>
@@ -33,6 +33,13 @@
   {% endfor %}
   </ol>
 
+  {% if f.kind == 'status_suggestion' and c.payload %}
+  <div class="mt-3 flex items-center gap-2 text-sm">
+    <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{{ STATUS_LABEL.get(c.payload.from, c.payload.from) }}</span><span class="text-gray-400">→</span>
+    <span class="px-2 py-0.5 rounded-full {% if c.payload.to == 'done' %}bg-emerald-100 text-emerald-700{% elif c.payload.to == 'blocked' %}bg-red-100 text-red-700{% else %}bg-indigo-100 text-indigo-700{% endif %} font-medium">{{ STATUS_LABEL.get(c.payload.to, c.payload.to) }}</span>
+    {% if f.status in ('pending', 'notified') %}<form method="post" action="/findings/{{ f.id }}/apply" class="ml-2"><button class="text-sm bg-emerald-600 text-white rounded-lg px-3 py-1 hover:bg-emerald-700">✓ 適用する</button></form>{% endif %}
+  </div>
+  {% endif %}
   {% if f.reason %}<div class="text-sm mt-3 bg-gray-50 rounded-lg p-3"><span class="text-gray-500">判定理由:</span> {{ f.reason }}</div>{% endif %}
   <div class="flex items-center gap-3 mt-3">
     <span class="text-xs text-gray-500">判定モデル: {{ f.model_used or 'ルールベース（LLM 不使用）' }}</span>

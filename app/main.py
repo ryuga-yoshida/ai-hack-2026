@@ -21,7 +21,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templ
 
 STATUSES = [("todo", "未着手"), ("in_progress", "進行中"), ("blocked", "ブロック"), ("done", "完了")]
 STATUS_LABEL = dict(STATUSES)
-KIND_LABEL = {"contradiction": "矛盾", "stalled": "停滞", "orphan_change": "根拠なし変更"}
+KIND_LABEL = {"contradiction": "矛盾", "stalled": "停滞", "orphan_change": "根拠なし変更", "status_suggestion": "状態更新の提案"}
 EVENT_LABEL = {"decision": "決定", "task_hint": "タスク候補", "utterance": "発言", "artifact_change": "変更"}
 FINDING_STATUS_LABEL = {"notified": "通知済", "pending": "確認待ち", "acknowledged": "確認済", "dismissed": "却下"}
 PEOPLE = config.PERSONS
@@ -168,7 +168,7 @@ def finding_cards(conn: sqlite3.Connection, where: str = "", params: tuple = (),
         evidence = [e for e in (db.get_event(conn, i) for i in f.evidence) if e]
         evidence.sort(key=lambda e: e.occurred_at)
         cards.append({"finding": f, "evidence": evidence, "dismiss_note": r["dismiss_note"],
-                      "created_at": r["created_at"],
+                      "created_at": r["created_at"], "payload": json.loads(r["payload"]) if r["payload"] else {},
                       "task": db.get_task(conn, f.task_id) if f.task_id else None})
     return cards
 
@@ -235,6 +235,23 @@ def dismiss_finding(finding_id: str, request: Request, note: str = Form("")):
     conn = get_conn()
     conn.execute("UPDATE findings SET status='dismissed', dismiss_note=? WHERE id=?",
                  (note.strip() or None, finding_id))
+    conn.commit()
+    return RedirectResponse(request.headers.get("referer") or "/", status_code=303)
+
+
+@app.post("/findings/{finding_id}/apply")
+def apply_finding(finding_id: str, request: Request):
+    """状態更新の提案を適用する（人の承認）"""
+    conn = get_conn()
+    r = conn.execute("SELECT * FROM findings WHERE id=?", (finding_id,)).fetchone()
+    if not r or r["kind"] != "status_suggestion":
+        raise HTTPException(404)
+    payload = json.loads(r["payload"] or "{}")
+    task = db.get_task(conn, r["task_id"]) if r["task_id"] else None
+    if task and payload.get("to") in STATUS_LABEL:
+        task.status = payload["to"]
+        db.save_task(conn, task)
+    conn.execute("UPDATE findings SET status='acknowledged' WHERE id=?", (finding_id,))
     conn.commit()
     return RedirectResponse(request.headers.get("referer") or "/", status_code=303)
 
