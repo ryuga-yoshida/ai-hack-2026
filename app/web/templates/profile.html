@@ -5,7 +5,8 @@
   <div class="col-span-2 bg-white border border-gray-200 rounded-xl p-6 space-y-4">
     <div class="flex items-center gap-4">
       <span class="w-16 h-16 rounded-full bg-indigo-600 text-white grid place-items-center text-2xl font-semibold">{{ me|initials if me else '?' }}</span>
-      <div><div class="text-xl font-semibold">{{ me or '未設定' }}</div><div class="text-sm text-gray-500">{% if me %}{{ me }}@aoba-beverage.example{% else %}名前を設定してください{% endif %}</div></div>
+      <div><div class="text-xl font-semibold">{{ me or '未設定' }}</div><div class="text-sm text-gray-500">{% if me %}{{ me }}@aoba-beverage.example{% if info.role %} · {{ info.role }}（{{ info.dept }}）{% endif %}{% else %}サインインしてください{% endif %}</div></div>
+      <form method="post" action="/logout" class="ml-auto"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">サインアウト</button></form>
     </div>
     {% if stats %}
     <div class="grid grid-cols-3 gap-3 text-sm">
@@ -15,8 +16,8 @@
     </div>
     {% endif %}
     <form method="post" action="/profile" class="border-t pt-4 space-y-2 text-sm">
-      <div class="font-medium">名前を変更 / 別の人として使う</div>
-      <p class="text-xs text-gray-500">この端末での「あなた」を切り替えます（デモで複数人の操作を1台で行うとき用）。</p>
+      <div class="font-medium">アカウントを切り替える</div>
+      <p class="text-xs text-gray-500">デモで複数人の操作を1台で行うとき用。本番では SSO のためこの操作はありません。</p>
       <div class="grid grid-cols-3 gap-1">{% for p in people %}<button name="name" value="{{ p }}" class="border rounded-lg px-2 py-2 flex items-center gap-2 {% if p == me %}border-indigo-500 bg-indigo-50{% else %}border-gray-200 hover:bg-gray-50{% endif %}"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ p|initials }}</span>{{ p }}</button>{% endfor %}</div>
       <div class="flex gap-2"><input name="name" placeholder="新しい名前" class="flex-1 border border-gray-300 rounded-lg px-3 py-2"><button class="bg-indigo-600 text-white rounded-lg px-4">設定</button></div>
     </form>

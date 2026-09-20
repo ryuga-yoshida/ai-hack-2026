@@ -24,7 +24,7 @@
       <h2 class="font-semibold mb-2">会議室</h2>
       <div class="flex items-center gap-3">
         <span class="text-xs px-2 py-0.5 rounded-full {% if meeting.status == 'recording' %}bg-red-100 text-red-700{% elif meeting.status == 'done' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ {'recording': '● 進行中', 'processing': '文字起こし中', 'done': '議事録あり', 'failed': '失敗'}[meeting.status] }}</span>
-        <a href="/meet/{{ meeting.id }}" class="text-indigo-600 hover:underline">{{ '議事録を見る' if meeting.status == 'done' else '会議室を開く' }} →</a>
+        {% if meeting.status == 'done' %}<a href="/meet/{{ meeting.id }}/minutes" class="text-indigo-600 hover:underline">📝 議事録サマリー →</a><a href="/meet/{{ meeting.id }}" class="text-gray-500 hover:underline">全文</a>{% else %}<a href="/meet/{{ meeting.id }}" class="text-indigo-600 hover:underline">会議室を開く →</a>{% endif %}
       </div>
     </div>
     {% endif %}

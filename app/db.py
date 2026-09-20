@@ -143,12 +143,13 @@ def init_db(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE findings ADD COLUMN payload TEXT")
     conn.commit()
     from app.connectors import calendar, chat, mail, meet  # 自作ツールのテーブル（循環importを避けて遅延）
-    from app import tags
+    from app import minutes, tags
     chat.init(conn)
     meet.init(conn)
     mail.init(conn)
     calendar.init(conn)
     tags.init(conn)
+    minutes.init(conn)
 
 
 def table_names(conn: sqlite3.Connection) -> list[str]:

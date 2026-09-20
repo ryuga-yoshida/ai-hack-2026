@@ -61,6 +61,8 @@
     <div class="bg-red-50 border border-red-200 rounded-xl p-5 text-sm text-red-700">文字起こしに失敗しました: {{ m.error }}</div>
     {% endif %}
     {% if lines %}
+    <a href="/meet/{{ m.id }}/minutes" class="block bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl p-4 hover:opacity-95">
+      <div class="font-semibold">📝 1枚の議事録サマリーを見る →</div><div class="text-xs opacity-80 mt-0.5">議題と結論・決定事項・ToDo・保留事項を1ページに。印刷 / PDF / チャット共有</div></a>
     <div class="bg-white border border-gray-200 rounded-xl p-5">
       <h2 class="font-semibold mb-3">議事録（文字起こし）<span class="text-xs text-gray-400 font-normal ml-2">{{ lines|length }} 発言</span></h2>
       <div class="space-y-1.5 text-sm max-h-[70vh] overflow-y-auto scrollbar-thin pr-2">

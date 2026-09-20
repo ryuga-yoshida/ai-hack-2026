@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>サインイン · 進行管理エージェント</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif; }</style></head>
+<body class="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-violet-50 text-gray-900 antialiased">
+<div class="min-h-screen grid place-items-center p-6">
+  <div class="w-full max-w-md">
+    <div class="flex items-center gap-3 mb-6">
+      <span class="w-10 h-10 rounded-xl bg-indigo-600 text-white grid place-items-center text-lg font-bold">A</span>
+      <div><div class="font-semibold">進行管理エージェント</div><div class="text-xs text-gray-500">青葉ビバレッジ株式会社</div></div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+      <h1 class="text-xl font-semibold">サインイン</h1>
+      <p class="text-sm text-gray-500 mt-1">アカウントを選択してください</p>
+      <form method="post" action="/login" class="mt-5 space-y-2">
+        <input type="hidden" name="next" value="{{ next }}">
+        {% for a in accounts %}
+        <button name="name" value="{{ a.name }}" class="w-full flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2.5 hover:border-indigo-400 hover:bg-indigo-50 text-left">
+          <span class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-sm font-semibold">{{ a.name[:1] }}</span>
+          <span class="min-w-0"><span class="block text-sm font-medium">{{ a.name }}</span><span class="block text-xs text-gray-500 truncate">{{ a.email }}{% if a.role %} · {{ a.role }}{% endif %}</span></span>
+        </button>
+        {% endfor %}
+        <details class="pt-2">
+          <summary class="text-sm text-indigo-600 cursor-pointer">別のアカウントを使う</summary>
+          <div class="flex gap-2 mt-2"><input name="name" placeholder="名前" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"><button class="bg-indigo-600 text-white rounded-lg px-4 text-sm">サインイン</button></div>
+        </details>
+      </form>
+    </div>
+    <p class="text-xs text-gray-400 mt-4 text-center">デモ用のアカウント選択です。本番では Microsoft Entra ID（SSO）でサインインします。</p>
+  </div>
+</div>
+</body></html>

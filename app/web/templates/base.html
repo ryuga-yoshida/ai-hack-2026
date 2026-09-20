@@ -52,7 +52,7 @@
     <a href="/profile" class="flex items-center gap-2 px-4 py-2.5 border-t border-gray-200 hover:bg-gray-50">
       {% if me %}<span class="w-8 h-8 rounded-full bg-indigo-600 text-white grid place-items-center text-sm font-semibold">{{ me|initials }}</span>
       <div class="min-w-0"><div class="text-sm font-medium truncate">{{ me }}</div><div class="text-[11px] text-gray-400">プロフィール</div></div>
-      {% else %}<span class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 grid place-items-center text-sm">?</span><div class="text-sm text-indigo-600">名前を設定</div>{% endif %}
+      {% else %}<span class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 grid place-items-center text-sm">?</span><div class="text-sm text-indigo-600">サインイン</div>{% endif %}
     </a>
     <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
       <div class="flex items-center justify-between">
@@ -83,19 +83,6 @@
     </main>
   </div>
 </div>
-
-<!-- 初回: 名前の設定 -->
-{% if not me and request.url.path != '/profile' %}
-<div class="fixed inset-0 bg-black/40 z-50 grid place-items-center">
-  <form method="post" action="/profile" class="bg-white rounded-xl shadow-xl p-6 w-[400px] space-y-3 text-sm">
-    <h3 class="font-semibold text-base">はじめに、あなたの名前を選んでください</h3>
-    <p class="text-xs text-gray-500">投稿・コメント・会議・ファイル更新はこの名前で行われます。あとからプロフィールで変更できます。</p>
-    <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
-    <div class="grid grid-cols-3 gap-1">{% for p in people %}<button name="name" value="{{ p }}" class="border border-gray-200 rounded-lg px-2 py-2 hover:bg-indigo-50 hover:border-indigo-300 flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ p|initials }}</span>{{ p }}</button>{% endfor %}</div>
-    <div class="flex gap-2"><input name="name" placeholder="一覧にない場合は名前を入力" class="flex-1 border border-gray-300 rounded-lg px-3 py-2"><button class="bg-indigo-600 text-white rounded-lg px-4">決定</button></div>
-  </form>
-</div>
-{% endif %}
 
 <!-- 人のホバーカード -->
 <div x-data="personCard()" x-init="init()" x-cloak>

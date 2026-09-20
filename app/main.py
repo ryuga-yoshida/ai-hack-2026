@@ -19,6 +19,18 @@ from app.models import Event, Link, Task, new_id
 app = FastAPI(title="進行管理エージェント")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
 
+
+@app.middleware("http")
+async def require_signin(request: Request, call_next):
+    """未サインイン（プロフィール未設定）なら /login へ。API・WebSocket・静的ファイルは対象外。
+    本番では Microsoft Entra ID などの SSO に置き換える"""
+    path = request.url.path
+    if request.method == "GET" and not request.cookies.get("me") and not (
+        path.startswith(("/login", "/api/", "/ws/", "/static", "/artifacts/file/", "/meet/")) or path == "/tick"
+    ) and "text/html" in request.headers.get("accept", "text/html"):
+        return RedirectResponse(f"/login?next={quote(str(request.url.path) + ('?' + request.url.query if request.url.query else ''))}", status_code=303)
+    return await call_next(request)
+
 STATUSES = [("todo", "未着手"), ("in_progress", "進行中"), ("blocked", "ブロック"), ("done", "完了")]
 STATUS_LABEL = dict(STATUSES)
 KIND_LABEL = {"contradiction": "矛盾", "stalled": "停滞", "orphan_change": "根拠なし変更", "status_suggestion": "状態更新の提案"}
@@ -116,7 +128,28 @@ def render(name: str, request: Request, conn: sqlite3.Connection | None = None, 
     return templates.TemplateResponse(request, name, ctx)
 
 
-# ---------- プロフィール ----------
+# ---------- サインイン / プロフィール ----------
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request, next: str = "/"):
+    conn = get_conn()
+    accounts = [{"name": p, **config.PERSON_INFO.get(p, {"role": "", "dept": ""}), "email": f"{p}@aoba-beverage.example"}
+                for p in people_list(conn)]
+    return templates.TemplateResponse(request, "login.html", {"accounts": accounts, "next": next or "/"})
+
+
+@app.post("/login")
+def login_post(name: str = Form(...), next: str = Form("/")):
+    resp = RedirectResponse(next if next.startswith("/") else "/", status_code=303)
+    return set_me(resp, name)
+
+
+@app.post("/logout")
+def logout():
+    resp = RedirectResponse("/login", status_code=303)
+    resp.delete_cookie("me")
+    return resp
+
 
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request):
@@ -129,7 +162,7 @@ def profile_page(request: Request):
             "msgs": conn.execute("SELECT COUNT(*) FROM chat_messages WHERE actor=? AND deleted=0", (me,)).fetchone()[0],
             "teams": [t["name"] for t in tagmod.teams(conn) if me in t["members"]],
         }
-    return render("profile.html", request, conn, me=me, stats=stats)
+    return render("profile.html", request, conn, me=me, stats=stats, info=config.PERSON_INFO.get(me, {}))
 
 
 @app.get("/api/people/{name}")
@@ -961,6 +994,82 @@ def meet_room(request: Request, meeting_id: str, me: str = ""):
                 lines.append({"time": mm[1], "actor": mm[2].strip(), "text": mm[3]})
     return render("meet_room.html", request, conn, m=m, me=me,
                   participants=participants, lines=lines, extracted=meeting_extracted(conn, meeting_id))
+
+
+def _meeting_source(conn: sqlite3.Connection, meeting_id: str) -> tuple[dict, list[dict], str] | None:
+    """会議のヘッダ・発言行・文字起こし全文（自作 Meet でも fixtures でも同じ形に）"""
+    m = conn.execute("SELECT * FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+    if m and m["transcript"]:
+        lines = []
+        for raw in m["transcript"].splitlines():
+            mm = re.match(r"^\[(\d{1,2}:\d{2})\]\s*([^:：]+)[:：]\s*(.*)$", raw)
+            if mm:
+                lines.append({"time": mm[1], "actor": mm[2].strip(), "text": mm[3]})
+        return {"id": meeting_id, "title": m["title"], "started_at": m["started_at"], "ended_at": m["ended_at"]}, lines, m["transcript"]
+    utts = conn.execute(
+        "SELECT * FROM events WHERE source='meet' AND kind='utterance' AND json_extract(meta,'$.meeting_id')=? "
+        "ORDER BY json_extract(meta,'$.line')", (meeting_id,)).fetchall()
+    if not utts:
+        return None
+    first = db.row_to_event(utts[0])
+    lines = [{"time": fmt_dt(db.from_iso(u["occurred_at"]), False), "actor": u["actor"], "text": u["text"]} for u in utts]
+    transcript = first.meta.get("transcript") or "\n".join(f"[{l['time']}] {l['actor']}: {l['text']}" for l in lines)
+    return {"id": meeting_id, "title": first.meta.get("meeting_title", meeting_id),
+            "started_at": first.meta.get("meeting_at") or first.occurred_at.isoformat(),
+            "ended_at": utts[-1]["occurred_at"]}, lines, transcript
+
+
+@app.get("/meet/{meeting_id}/minutes", response_class=HTMLResponse)
+def meeting_minutes(request: Request, meeting_id: str, regen: str = ""):
+    """1枚の議事録サマリー"""
+    from app import minutes as minutes_mod
+    conn = get_conn()
+    src = _meeting_source(conn, meeting_id)
+    if not src:
+        raise HTTPException(404)
+    head, lines, transcript = src
+    summary = minutes_mod.summarize(conn, meeting_id, transcript, force=bool(regen))
+    extracted = meeting_extracted(conn, meeting_id)
+    decisions = [e for e in extracted if e.kind == "decision"]
+    hints = [e for e in extracted if e.kind == "task_hint"]
+    todos = []
+    for h in hints:
+        t = conn.execute("SELECT t.* FROM tasks t WHERE t.created_from=?", (h.id,)).fetchone()
+        if not t:
+            l = conn.execute("SELECT to_id FROM links WHERE from_type='event' AND from_id=? AND to_type='task' LIMIT 1", (h.id,)).fetchone()
+            t = conn.execute("SELECT * FROM tasks WHERE id=?", (l["to_id"],)).fetchone() if l else None
+        todos.append({"hint": h, "task": db.row_to_task(t) if t else None})
+    findings = []
+    dec_ids = {d.id for d in decisions}
+    for r in conn.execute("SELECT * FROM findings WHERE kind='contradiction' AND status != 'dismissed'"):
+        f = db.row_to_finding(r)
+        if f.evidence[0] in dec_ids:
+            findings.append(f)
+    participants = []
+    for l in lines:
+        if l["actor"] not in participants and l["actor"] != "全員":
+            participants.append(l["actor"])
+    counts = {p: sum(1 for l in lines if l["actor"] == p) for p in participants}
+    start = db.from_iso(head["started_at"]) if head.get("started_at") else None
+    end = db.from_iso(head["ended_at"]) if head.get("ended_at") else None
+    duration = int((end - start).total_seconds() // 60) if start and end and end > start else None
+    cal_ev = conn.execute("SELECT id, title, location FROM cal_events WHERE meeting_id=?", (meeting_id,)).fetchone()
+    return render("minutes.html", request, conn, head=head, lines=lines, summary=summary, decisions=decisions, todos=todos,
+                  findings=findings, participants=participants, counts=counts, start=start, duration=duration,
+                  cal_ev=dict(cal_ev) if cal_ev else None, channels=chat.list_channels(conn))
+
+
+@app.post("/meet/{meeting_id}/minutes/share")
+def share_minutes(request: Request, meeting_id: str, channel: str = Form("general")):
+    conn = get_conn()
+    src = _meeting_source(conn, meeting_id)
+    if not src:
+        raise HTTPException(404)
+    me = who(request)
+    n_dec = conn.execute("SELECT COUNT(*) FROM events WHERE kind='decision' AND json_extract(meta,'$.meeting_id')=?", (meeting_id,)).fetchone()[0]
+    chat.post_message(conn, channel, me, f"📝 「{src[0]['title']}」の議事録サマリーです（決定 {n_dec} 件） {config.APP_BASE_URL}/meet/{meeting_id}/minutes")
+    _ingest_chat(conn)
+    return RedirectResponse(f"/meet/{meeting_id}/minutes", status_code=303)
 
 
 @app.websocket("/ws/meet/{meeting_id}")
