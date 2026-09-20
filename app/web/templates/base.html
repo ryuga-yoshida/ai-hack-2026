@@ -30,7 +30,8 @@
 <body class="h-full bg-gray-50 text-gray-900 antialiased" x-data="shell()" x-init="init()">
 <div class="flex h-full min-h-screen">
   <!-- サイドバー -->
-  <aside class="w-60 shrink-0 bg-white border-r border-gray-200 flex-col" :class="sidebar ? 'flex' : 'hidden'" x-cloak>
+  <div x-show="sidebar && mobile" x-cloak class="fixed inset-0 bg-black/30 z-30 md:hidden" @click="sidebar = false"></div>
+  <aside class="w-60 shrink-0 bg-white border-r border-gray-200 flex-col max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl" :class="sidebar ? 'flex' : 'hidden'" x-cloak>
     <a href="/" class="flex items-center gap-2 px-5 h-14 border-b border-gray-200">
       <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white grid place-items-center text-sm font-bold">A</span>
       <span class="font-semibold text-sm">進行管理エージェント</span>
@@ -331,9 +332,11 @@ function palette() {
 function shell() {
   return {
     agent: {{ agent_state|tojson if agent_state is defined else '{}' }},
-    toasts: [], notif: 0, sidebar: (function () { try { return localStorage.getItem('sidebar') !== '0'; } catch (e) { return true; } })(),
+    toasts: [], notif: 0, mobile: window.innerWidth < 768,
+    sidebar: (function () { if (window.innerWidth < 768) return false; try { return localStorage.getItem('sidebar') !== '0'; } catch (e) { return true; } })(),
     init() {
       this.refresh(); setInterval(() => this.refresh(), 5000);
+      window.addEventListener('resize', () => { this.mobile = window.innerWidth < 768; });
       // キーボード: / で検索、Esc でモーダルを閉じる、g+d/t/c でジャンプ
       let g = false;
       document.addEventListener('keydown', e => {

@@ -2,7 +2,7 @@
 {% block title %}ダッシュボード{% endblock %}
 {% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>{% endblock %}
 {% block content %}
-<div class="grid grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
   <div class="bg-white border border-gray-200 rounded-xl p-4">
     <div class="text-xs text-gray-500">未対応の検知</div>
     <div class="text-3xl font-semibold mt-1">{{ counts.notified + counts.pending }}</div>
@@ -31,7 +31,7 @@
 </div>
 
 <!-- 自律性の数値化 -->
-<div class="bg-gray-900 text-white rounded-xl p-5 mb-6 grid grid-cols-6 gap-4 text-sm">
+<div class="bg-gray-900 text-white rounded-xl p-5 mb-6 grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
   <div class="col-span-6 flex items-center justify-between"><div class="text-xs tracking-wider text-gray-400">AUTONOMY · 人間の指示なしに行った判断</div><div class="text-xs text-gray-400">巡回 自動 {{ autonomy.ticks_auto }} 回 · 手動 {{ autonomy.ticks_manual }} 回</div></div>
   <div><div class="text-3xl font-semibold">{{ autonomy.changes }}</div><div class="text-xs text-gray-400">調べた成果物の変更</div></div>
   <div><div class="text-3xl font-semibold text-emerald-400">{{ autonomy.auto_rate }}%</div><div class="text-xs text-gray-400">自動で完結（無視 {{ autonomy.ignored }} ＋ 通知 {{ autonomy.notified }}）</div></div>
@@ -41,7 +41,7 @@
   <div><div class="text-3xl font-semibold">{{ autonomy.suggestions }}<span class="text-base text-gray-400"> 提案</span></div><div class="text-xs text-gray-400">状態更新の提案（適用 {{ autonomy.applied }} · 会議リマインド {{ autonomy.reminders }}）</div></div>
 </div>
 
-<div class="grid grid-cols-3 gap-6">
+<div class="grid md:grid-cols-3 gap-6">
   <div class="col-span-2 space-y-4">
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">未対応の検知</h2>
