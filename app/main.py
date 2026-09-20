@@ -384,7 +384,7 @@ def login_page(request: Request, next: str = "/", error: str = ""):
     auth.seed_demo_users(conn)
     accounts = [{"name": u["name"], "email": u["email"], **config.PERSON_INFO.get(u["name"], {"role": "", "dept": ""})} for u in auth.list_users(conn) if u["active"]]
     return templates.TemplateResponse(request, "login.html", {"accounts": accounts, "next": next or "/", "error": error,
-                                                              "demo_mode": auth.DEMO_MODE, "demo_password": auth.DEMO_PASSWORD if auth.DEMO_MODE else ""})
+                                                              "demo_mode": auth.DEMO_MODE, "demo_password": auth.DEMO_PASSWORD})   # 架空社員のデモ用なのでパスワードは公開
 
 
 @app.post("/login")
