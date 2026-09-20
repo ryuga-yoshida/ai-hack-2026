@@ -1016,7 +1016,8 @@ def render_message(text: str, conn: sqlite3.Connection | None = None) -> str:
 def _markdown_lite(html: str) -> str:
     """エスケープ済み HTML に軽量の書式を当てる: ```code```, `code`, **太字**, ~~取消~~, > 引用, - 箇条書き, 改行"""
     html = re.sub(r"```\n?(.*?)```", lambda m: f'<pre class="bg-gray-900 text-gray-100 rounded-lg px-3 py-2 my-1 text-xs overflow-x-auto">{m.group(1).strip()}</pre>', html, flags=re.S)
-    html = re.sub(r"`([^`\n]+)`", r'<code class="bg-gray-100 rounded px-1 text-[13px]">\1</code>', html)
+    html = re.sub(r"\n{3,}", "\n\n", html)   # 空行は1つまで
+    html = re.sub(r"`([^`]+)`", r'<code class="bg-gray-100 rounded px-1 text-[13px]">\1</code>', html)   # 改行をまたぐコードも可
     html = re.sub(r"\*\*([^*\n]+)\*\*", r"<b>\1</b>", html)
     html = re.sub(r"~~([^~\n]+)~~", r"<s>\1</s>", html)
     lines, out, in_list = html.split("\n"), [], False
