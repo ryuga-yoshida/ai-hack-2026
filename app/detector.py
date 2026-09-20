@@ -178,7 +178,7 @@ def related_utterances(conn: sqlite3.Connection, task_id: str | None,
         hits = vec.search(conn, change.text, kind="utterance", top_k=5, since=since,
                           until=until or change.occurred_at) or []
         for e, sim in hits:
-            if sim >= config.LINK_EMBED_THRESHOLD and e.source == "chat":
+            if sim >= config.LINK_EMBED_THRESHOLD and e.source in ("chat", "mail"):
                 found.setdefault(e.id, e)
                 # 直後の返答（同じチャンネル・5分以内）も添える。「お願いします」のような合意が拾える
                 r = conn.execute(

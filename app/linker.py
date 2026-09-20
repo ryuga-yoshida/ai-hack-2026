@@ -82,7 +82,7 @@ def by_explicit(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | Non
 def last_linked_message(conn: sqlite3.Connection, channel: str, before) -> tuple[Event, str] | None:
     r = conn.execute(
         "SELECT e.*, l.to_id AS task_id FROM events e JOIN links l ON l.from_id = e.id "
-        "WHERE e.source='chat' AND e.kind='utterance' AND l.to_type='task' AND l.relation='discusses' "
+        "WHERE e.source IN ('chat','mail') AND e.kind='utterance' AND l.to_type='task' AND l.relation='discusses' "
         "AND json_extract(e.meta, '$.channel') = ? AND e.occurred_at < ? "
         "ORDER BY e.occurred_at DESC LIMIT 1", (channel, db.to_iso(before))).fetchone()
     return (db.row_to_event(r), r["task_id"]) if r else None
@@ -142,7 +142,7 @@ def by_embedding(conn: sqlite3.Connection, msg: Event,
 
 def recent_messages(conn: sqlite3.Connection, msg: Event, n: int = 5) -> list[Event]:
     rows = conn.execute(
-        "SELECT * FROM events WHERE source='chat' AND kind='utterance' "
+        "SELECT * FROM events WHERE source IN ('chat','mail') AND kind='utterance' "
         "AND json_extract(meta, '$.channel') = ? AND occurred_at < ? ORDER BY occurred_at DESC LIMIT ?",
         (msg.meta.get("channel", ""), db.to_iso(msg.occurred_at), n)).fetchall()
     return [db.row_to_event(r) for r in reversed(rows)]
@@ -268,7 +268,7 @@ def unlinked_chat_messages(conn: sqlite3.Connection) -> list[Event]:
     """まだ紐付け判定をしていない発言（processed.stage='link' にないもの）"""
     rows = conn.execute(
         "SELECT e.* FROM events e LEFT JOIN processed p ON p.stage='link' AND p.key = e.id "
-        "WHERE e.kind='utterance' AND e.source='chat' AND p.key IS NULL ORDER BY e.occurred_at").fetchall()
+        "WHERE e.kind='utterance' AND e.source IN ('chat','mail') AND p.key IS NULL ORDER BY e.occurred_at").fetchall()
     return [db.row_to_event(r) for r in rows]
 
 

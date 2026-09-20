@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{{ e.title }}{% endblock %}
+{% block heading %}<a href="/calendar?d={{ e.start.date().isoformat() }}" class="text-gray-400 hover:text-gray-600 mr-2">予定表</a><span class="text-gray-300 mr-2">/</span>{{ e.title }}{% endblock %}
+{% block actions %}
+{% if not meeting or meeting.status == 'recording' %}
+<form method="post" action="/calendar/{{ e.id }}/start" class="flex gap-2"><input name="me" value="{{ me }}" placeholder="名前" required list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-24"><datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist>
+  <button class="text-sm bg-emerald-600 text-white rounded-lg px-3 py-1.5 hover:bg-emerald-700">📹 {{ '会議に参加' if meeting else '会議を始める' }}</button></form>
+{% endif %}
+<form method="post" action="/calendar/{{ e.id }}/delete" onsubmit="return confirm('この予定を削除しますか？')"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white text-gray-600 hover:text-red-600">削除</button></form>
+{% endblock %}
+{% block content %}
+<div class="grid grid-cols-3 gap-6">
+  <div class="col-span-2 space-y-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-5 text-sm space-y-2">
+      <div class="text-lg font-semibold">{{ e.title }}</div>
+      <div class="text-gray-600">🗓 {{ e.start.strftime('%Y/%m/%d (%a) %H:%M') }} 〜 {{ e.end.strftime('%H:%M') }}{% if e.location %} · 📍 {{ e.location }}{% endif %}</div>
+      <div class="text-gray-600">👥 {{ e.attendees|join('・') or '—' }}{% if e.organizer %} <span class="text-gray-400">（主催: {{ e.organizer }}）</span>{% endif %}</div>
+      {% if e.channel %}<div class="text-gray-600">💬 <a href="/chat?channel={{ e.channel }}" class="text-indigo-600 hover:underline">#{{ e.channel }}</a></div>{% endif %}
+      {% if e.description %}<div class="pt-2 border-t text-gray-700">{{ e.description }}</div>{% endif %}
+      {% if e.reminded_at %}<div class="text-xs text-gray-400">エージェントが {{ e.reminded_at|dt }} にリマインド済み</div>{% endif %}
+    </div>
+    {% if meeting %}
+    <div class="bg-white border border-gray-200 rounded-xl p-5 text-sm">
+      <h2 class="font-semibold mb-2">会議室</h2>
+      <div class="flex items-center gap-3">
+        <span class="text-xs px-2 py-0.5 rounded-full {% if meeting.status == 'recording' %}bg-red-100 text-red-700{% elif meeting.status == 'done' %}bg-emerald-100 text-emerald-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ {'recording': '● 進行中', 'processing': '文字起こし中', 'done': '議事録あり', 'failed': '失敗'}[meeting.status] }}</span>
+        <a href="/meet/{{ meeting.id }}" class="text-indigo-600 hover:underline">{{ '議事録を見る' if meeting.status == 'done' else '会議室を開く' }} →</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <aside class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+    <h2 class="font-semibold text-sm mb-2">この会議で決まったこと・タスク</h2>
+    {% if extracted %}
+    <ul class="space-y-2">{% for x in extracted %}<li class="flex gap-2"><span class="text-[10px] px-1.5 rounded shrink-0 h-fit mt-0.5 {% if x.kind == 'decision' %}bg-rose-100 text-rose-700{% else %}bg-gray-200 text-gray-700{% endif %}">{{ '決定' if x.kind == 'decision' else 'タスク' }}</span><div>{{ x.text }}<div class="text-[11px] text-gray-400">{{ x.actor }}</div></div></li>{% endfor %}</ul>
+    {% else %}<p class="text-xs text-gray-400">{% if meeting and meeting.status == 'done' %}まだ抽出されていません（次の巡回で）{% else %}会議後に自動で抽出されます{% endif %}</p>{% endif %}
+  </aside>
+</div>
+{% endblock %}

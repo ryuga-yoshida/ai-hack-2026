@@ -58,7 +58,7 @@
     {% if tag.kind == 'team' %}
     <form method="post" action="/tags/{{ tag.name }}/members" class="bg-white border border-gray-200 rounded-xl p-4 text-sm space-y-2">
       <h2 class="font-semibold">メンバー</h2>
-      <div class="grid grid-cols-2 gap-1">{% for p in PEOPLE %}<label class="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1.5"><input type="checkbox" name="members" value="{{ p }}" {% if p in tag.members %}checked{% endif %}>{{ p }}</label>{% endfor %}</div>
+      {% with pp_name='members', pp_selected=tag.members, pp_multi=true, pp_placeholder='メンバーを検索して追加' %}{% include "_people_picker.html" %}{% endwith %}
       <button class="w-full border border-gray-300 rounded-lg py-1.5 bg-white hover:bg-gray-50">更新</button>
       <p class="text-xs text-gray-500">チャットで <b>@{{ tag.name }}</b> と書くとメンバー全員にメンションされます。</p>
     </form>

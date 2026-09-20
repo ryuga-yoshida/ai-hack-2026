@@ -24,7 +24,7 @@
       <h2 class="font-semibold">チームを作る</h2>
       <input type="hidden" name="kind" value="team">
       <input name="name" required placeholder="営業チーム" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-      <div class="grid grid-cols-3 gap-1">{% for p in PEOPLE %}<label class="flex items-center gap-1.5 border border-gray-200 rounded-lg px-2 py-1.5"><input type="checkbox" name="members" value="{{ p }}">{{ p }}</label>{% endfor %}</div>
+      {% with pp_name='members', pp_selected=[], pp_multi=true, pp_placeholder='メンバーを検索して追加' %}{% include "_people_picker.html" %}{% endwith %}
       <input name="description" placeholder="説明（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2">
       <button class="w-full bg-indigo-600 text-white rounded-lg py-2">作成（チャットで @名前 でメンションできます）</button>
     </form>

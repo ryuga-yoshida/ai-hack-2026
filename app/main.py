@@ -13,7 +13,7 @@ from markupsafe import Markup
 from pydantic import BaseModel
 
 from app import config, db, tags as tagmod
-from app.connectors import chat, meet
+from app.connectors import calendar as cal, chat, mail as mailmod, meet
 from app.models import Event, Link, Task, new_id
 
 app = FastAPI(title="進行管理エージェント")
@@ -77,17 +77,31 @@ templates.env.globals.update(STATUSES=STATUSES, STATUS_LABEL=STATUS_LABEL, KIND_
                              EVENT_LABEL=EVENT_LABEL, FINDING_STATUS_LABEL=FINDING_STATUS_LABEL, PEOPLE=PEOPLE)
 
 
+def people_list(conn: sqlite3.Connection) -> list[str]:
+    """メンバー一覧。設定の登場人物に加えて、チャット・メール・タスク・会議に登場した人を集める"""
+    names = list(PEOPLE)
+    seen = set(names)
+    sql = ("SELECT actor n FROM chat_messages UNION SELECT sender FROM mails UNION SELECT assignee FROM tasks "
+           "UNION SELECT name FROM meeting_participants UNION SELECT organizer FROM cal_events")
+    for r in conn.execute(sql):
+        n = (r[0] or "").strip()
+        if n and n not in seen and n != "エージェント" and len(n) <= 20:
+            names.append(n); seen.add(n)
+    return names
+
+
 def nav_context(conn: sqlite3.Connection) -> dict:
     from app import agent
     open_findings = conn.execute(
         "SELECT COUNT(*) FROM findings WHERE status IN ('notified','pending')").fetchone()[0]
-    return {"nav_open_findings": open_findings, "agent_state": dict(agent.state)}
+    unread_mail = 0
+    return {"nav_open_findings": open_findings, "agent_state": dict(agent.state), "people": people_list(conn)}
 
 
 def render(name: str, request: Request, conn: sqlite3.Connection | None = None, **ctx) -> HTMLResponse:
     if conn is not None:
         ctx.update(nav_context(conn))
-    ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet"))
+    ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar"))
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -614,6 +628,164 @@ def create_channel(name: str = Form(...), description: str = Form("")):
     name = re.sub(r"[^\w\-]", "", name.strip().lstrip("#"))[:32] or "general"
     chat.ensure_channel(conn, name, description.strip() or None)
     return RedirectResponse(f"/chat?channel={name}", status_code=303)
+
+
+# ---------- メール（Outlook の代わり） ----------
+
+def _ingest_mail(conn: sqlite3.Connection) -> None:
+    from app import linker
+    adapter = mailmod.MailAdapter(conn)
+    events = adapter.fetch(db.last_synced(conn, adapter.name))
+    db.save_events(conn, events)
+    db.update_sync_state(conn, adapter.name)
+    for ev in events:
+        r = linker.by_explicit(conn, ev) or linker.by_context(conn, ev)
+        if r:
+            method = "explicit" if linker.by_explicit(conn, ev) else "context"
+            db.save_link(conn, Link(id=new_id(), from_type="event", from_id=ev.id, to_type="task", to_id=r[0],
+                                    relation="discusses", confidence=r[1], method=method))
+            linker.mark_linked(conn, ev, method, r[0])
+            linker.register_artifacts(conn, r[0], ev)
+
+
+def _mail_meta(conn: sqlite3.Connection, m: dict) -> dict:
+    link = conn.execute(
+        "SELECT l.to_id, l.method, t.title FROM links l JOIN tasks t ON t.id = l.to_id "
+        "WHERE l.from_type='event' AND l.from_id=? AND l.to_type='task' AND l.relation='discusses' LIMIT 1", (m["id"],)).fetchone()
+    dec = conn.execute("SELECT text FROM events WHERE kind IN ('decision','task_hint') AND source='mail' AND json_extract(meta,'$.message_id')=?",
+                       (m["id"],)).fetchall()
+    return {**m, "html": render_message(m["body"], conn).replace("\n", "<br>"),
+            "task": {"id": link["to_id"], "title": link["title"], "method": link["method"]} if link else None,
+            "extracted": [d["text"] for d in dec]}
+
+
+@app.get("/mail", response_class=HTMLResponse)
+def mail_page(request: Request, folder: str = "inbox", thread: str = "", me: str = ""):
+    conn = get_conn()
+    me = me.strip() or get_me(request)
+    threads = mailmod.inbox(conn, me or None, folder)
+    msgs = []
+    if thread:
+        mailmod.mark_read(conn, thread)
+        msgs = [_mail_meta(conn, m) for m in mailmod.thread(conn, thread)]
+    resp = render("mail.html", request, conn, folder=folder, threads=threads, thread=thread, msgs=msgs, me=me,
+                  unread=sum(t["unread"] for t in mailmod.inbox(conn, me or None, "inbox")))
+    if me:
+        set_me(resp, me)
+    return resp
+
+
+@app.post("/mail/send")
+def mail_send(request: Request, sender: str = Form(...), recipients: list[str] = Form(...), cc: list[str] = Form([]),
+              subject: str = Form(...), body: str = Form(...), thread_id: str = Form(""),
+              attachment_url: str = Form(""), attachment_name: str = Form("")):
+    conn = get_conn()
+    att = None
+    if attachment_url.strip():
+        att = [{"url": attachment_url.strip(), "name": attachment_name.strip() or attachment_url.strip().rsplit("/", 1)[-1]}]
+        if attachment_url.strip() not in body:
+            body = f"{body.rstrip()}\n{attachment_url.strip()}"
+    tid = mailmod.send(conn, sender.strip(), list(recipients), subject.strip(), body.strip(), cc=list(cc),
+                       thread_id=thread_id.strip() or None, attachments=att)
+    _ingest_mail(conn)
+    from app import agent
+    agent.request_tick(f"メール送信（{sender.strip()}: {subject.strip()[:20]}）")
+    resp = RedirectResponse(f"/mail?folder=sent&thread={thread_id.strip() or tid}", status_code=303)
+    return set_me(resp, sender)
+
+
+# ---------- 予定表（Outlook 予定表の代わり） ----------
+
+@app.get("/calendar", response_class=HTMLResponse)
+def calendar_page(request: Request, view: str = "week", d: str = ""):
+    from datetime import timedelta
+    conn = get_conn()
+    base = date.fromisoformat(d) if d else date.today()
+    if view == "month":
+        first = base.replace(day=1)
+        start = first - timedelta(days=first.weekday())
+        end = start + timedelta(days=42)
+    else:
+        start = base - timedelta(days=base.weekday())
+        end = start + timedelta(days=7)
+    evs = cal.between(conn, datetime.combine(start, datetime.min.time()), datetime.combine(end, datetime.min.time()))
+    for e in evs:
+        m = conn.execute("SELECT status FROM meetings WHERE id=?", (e["meeting_id"],)).fetchone() if e.get("meeting_id") else None
+        fx = conn.execute("SELECT 1 FROM events WHERE source='meet' AND json_extract(meta,'$.meeting_id')=? LIMIT 1", (e["meeting_id"],)).fetchone() if e.get("meeting_id") else None
+        e["meeting_status"] = m["status"] if m else ("done" if fx else None)
+        e["n_decisions"] = conn.execute("SELECT COUNT(*) FROM events WHERE kind='decision' AND json_extract(meta,'$.meeting_id')=?", (e["meeting_id"],)).fetchone()[0] if e.get("meeting_id") else 0
+    days = []
+    for i in range((end - start).days):
+        day = start + timedelta(days=i)
+        day_evs = [e for e in evs if e["start"].date() <= day <= e["end"].date()]
+        due = [t for t in db.list_tasks(conn) if t.due_date == day]
+        days.append({"date": day, "events": day_evs, "due": due, "today": day == date.today(), "in_month": day.month == base.month})
+    prev = (base - timedelta(days=7)) if view == "week" else (base.replace(day=1) - timedelta(days=1))
+    nxt = (base + timedelta(days=7)) if view == "week" else (base.replace(day=28) + timedelta(days=4))
+    return render("calendar.html", request, conn, view=view, base=base, days=days, prev=prev.isoformat(), nxt=nxt.isoformat(),
+                  me=get_me(request), channels=chat.list_channels(conn), today=date.today().isoformat())
+
+
+@app.post("/calendar")
+def calendar_create(request: Request, title: str = Form(...), date_: str = Form(..., alias="date"), start: str = Form(...),
+                    end: str = Form(...), attendees: list[str] = Form([]), location: str = Form(""),
+                    description: str = Form(""), channel: str = Form(""), organizer: str = Form("")):
+    conn = get_conn()
+    st = datetime.fromisoformat(f"{date_}T{start}")
+    en = datetime.fromisoformat(f"{date_}T{end}")
+    if en <= st:
+        en = st + __import__("datetime").timedelta(minutes=30)
+    who = organizer.strip() or get_me(request)
+    eid = cal.create(conn, title.strip(), st, en, attendees=list(attendees), location=location.strip() or None,
+                     description=description.strip() or None, channel=channel.strip() or None, organizer=who or None)
+    if channel.strip():
+        chat.post_message(conn, channel.strip(), who or "エージェント",
+                          f"📅 予定を追加しました: {title.strip()} {st:%m/%d %H:%M}〜{en:%H:%M} 参加: {'・'.join(attendees)}")
+        _ingest_chat(conn)
+    resp = RedirectResponse(f"/calendar?view=week&d={date_}", status_code=303)
+    return set_me(resp, who) if who else resp
+
+
+@app.get("/calendar/{event_id}", response_class=HTMLResponse)
+def calendar_detail(request: Request, event_id: str):
+    conn = get_conn()
+    e = cal.get(conn, event_id)
+    if not e:
+        raise HTTPException(404)
+    meeting = None
+    if e.get("meeting_id"):
+        m = conn.execute("SELECT * FROM meetings WHERE id=?", (e["meeting_id"],)).fetchone()
+        meeting = dict(m) if m else {"id": e["meeting_id"], "status": "done", "title": e["title"], "fixture": True}
+    extracted = meeting_extracted(conn, e["meeting_id"]) if e.get("meeting_id") else []
+    return render("calendar_detail.html", request, conn, e=e, meeting=meeting, extracted=extracted, me=get_me(request),
+                  channels=chat.list_channels(conn))
+
+
+@app.post("/calendar/{event_id}/start")
+def calendar_start_meeting(request: Request, event_id: str, me: str = Form("")):
+    """予定から会議室を開く（既にあればそれに参加）"""
+    conn = get_conn()
+    e = cal.get(conn, event_id)
+    if not e:
+        raise HTTPException(404)
+    who = me.strip() or get_me(request) or "参加者"
+    mid = e.get("meeting_id")
+    if not mid or not conn.execute("SELECT 1 FROM meetings WHERE id=?", (mid,)).fetchone():
+        mid = meet.create_meeting(conn, e["title"], channel=e.get("channel"))
+        cal.update(conn, event_id, meeting_id=mid)
+        if e.get("channel"):
+            chat.post_message(conn, e["channel"], who, f"📹 「{e['title']}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
+            _ingest_chat(conn)
+    meet.join(conn, mid, who)
+    resp = RedirectResponse(f"/meet/{mid}?me={who}", status_code=303)
+    return set_me(resp, who)
+
+
+@app.post("/calendar/{event_id}/delete")
+def calendar_delete(event_id: str):
+    conn = get_conn()
+    cal.delete(conn, event_id)
+    return RedirectResponse("/calendar", status_code=303)
 
 
 # ---------- 会議室 ----------

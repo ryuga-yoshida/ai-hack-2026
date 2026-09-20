@@ -139,10 +139,12 @@ def init_db(conn: sqlite3.Connection) -> None:
     """DDL を冪等適用する。マイグレーション機構は持たない。"""
     conn.executescript(DDL)
     conn.commit()
-    from app.connectors import chat, meet  # 自作チャット/Meet のテーブル（循環importを避けて遅延）
+    from app.connectors import calendar, chat, mail, meet  # 自作ツールのテーブル（循環importを避けて遅延）
     from app import tags
     chat.init(conn)
     meet.init(conn)
+    mail.init(conn)
+    calendar.init(conn)
     tags.init(conn)
 
 

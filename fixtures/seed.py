@@ -8,7 +8,7 @@ import hashlib
 import sqlite3
 from datetime import datetime
 
-from app.connectors import chat
+from app.connectors import calendar, chat, mail
 
 # (日時, チャンネル, 発言者, 発言)
 CHAT = [
@@ -79,6 +79,36 @@ def _id(i: int) -> str:
     return hashlib.sha1(f"seed-chat-{i}".encode()).hexdigest()[:12]
 
 
+# (日時, 差出人, 宛先, CC, 件名, 本文, スレッド番号, 添付)
+MAILS = [
+    ("2026-09-09 18:10", "佐藤", ["鈴木"], ["山田"], "商品D 得意先ヒアリング結果（2社）",
+     "鈴木さん\n\n本日回った2社の結果です。\n・A社: 秋口に棚を取れる見込み。初回は30ケース希望\n・B社: 前向き。サンプル待ち\n残り3社は来週回ります。\n\n佐藤", 1, None),
+    ("2026-09-12 09:30", "高橋", ["鈴木", "山田", "田中", "佐藤"], [], "予算会議の日程と資料締切のご連絡",
+     "各位\n\n予算会議は 9/29（月）午後で確定しました。資料の締切は 9/26（金）です。\n売上見込表は山田さんの最新版をもとに私が資料へ流し込みます。\n\n高橋", 2, None),
+    ("2026-09-16 11:20", "佐藤", ["鈴木"], [], "商品A 秋キャンペーンの増量について（大手2社）",
+     "鈴木さん\n\n大手2社から秋キャンペーンで商品Aの数量を増やしたいと口頭で連絡がありました。書面はまだです。\n第3四半期の見込みに反映してよいでしょうか。\n\n佐藤", 3, None),
+    ("2026-09-16 13:05", "鈴木", ["佐藤"], ["山田"], "Re: 商品A 秋キャンペーンの増量について（大手2社）",
+     "佐藤さん\n\n書面が2社とも揃うまでは見込みは動かしません。揃ったら再度上げてください。\n山田さんも見込み表は据え置きでお願いします。\n\n鈴木", 3, None),
+    ("2026-09-17 17:40", "田中", ["山田"], ["鈴木"], "商品D 原価試算（送付）",
+     "山田さん\n\n商品Dの原価試算を送ります。原価率は想定より2ポイント高い結果でした。\n共有フォルダにも置いてあります。\n\n田中", 4,
+     [{"url": "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/商品D_原価試算.xlsx", "name": "商品D_原価試算.xlsx"}]),
+    ("2026-09-19 09:05", "佐藤", ["鈴木"], [], "商品A 書面1社受領",
+     "鈴木さん\n\n大手1社から増量の書面が届きました。もう1社は来週になりそうです。\n\n佐藤", 5, None),
+    ("2026-09-19 12:40", "高橋", ["山田", "鈴木"], [], "予算会議 日程変更（9/30 午前）",
+     "山田さん、鈴木さん\n\n予算会議が 9/30（火）午前に変更になりました。資料締切は 9/26 のままです。\n\n高橋", 6, None),
+]
+
+# (id, タイトル, 開始, 終了, 参加者, 場所, チャンネル, 会議室 id, 説明)
+EVENTS = [
+    ("cal-0908", "定例会議（商品企画部）", "2026-09-08 10:00", "2026-09-08 10:30", ["鈴木", "山田", "田中", "佐藤", "高橋"], "会議室A", "general", "2026-09-08_teirei", "新商品・見込み表・商品Cの扱い"),
+    ("cal-0915", "定例会議（商品企画部）", "2026-09-15 10:30", "2026-09-15 11:00", ["鈴木", "山田", "田中", "佐藤", "高橋"], "会議室A", "general", "2026-09-15_teirei", "予算会議前の見込み表の最終確認"),
+    ("cal-0919", "臨時定例（商品企画部）", "2026-09-19 10:00", "2026-09-19 10:30", ["鈴木", "山田", "田中", "佐藤", "高橋"], "会議室A", "general", "2026-09-19_teirei", "商品Cの結論・見込み表の最終確認"),
+    ("cal-0922", "定例会議（商品企画部）", "2026-09-22 10:00", "2026-09-22 10:30", ["鈴木", "山田", "田中", "佐藤", "高橋"], "会議室A", "general", None, None),
+    ("cal-0926", "予算会議 資料締切", "2026-09-26 17:00", "2026-09-26 17:30", ["高橋", "山田"], None, "general", None, "売上見込表の最終版を資料に流し込む"),
+    ("cal-0930", "予算会議", "2026-09-30 09:00", "2026-09-30 11:00", ["鈴木", "高橋"], "大会議室", None, None, "全社予算会議"),
+]
+
+
 def run(conn: sqlite3.Connection) -> None:
     n = 0
     for i, (at, channel, actor, text) in enumerate(CHAT):
@@ -88,3 +118,23 @@ def run(conn: sqlite3.Connection) -> None:
         chat.post_message(conn, channel, actor, text, posted_at=datetime.fromisoformat(at), msg_id=mid)
         n += 1
     print(f"seed: チャット発言 {n} 件を投入（計 {len(CHAT)} 件）")
+    nm = 0
+    thread_ids = {}
+    for i, (at, sender, to, cc, subject, body, tno, att) in enumerate(MAILS):
+        mid = hashlib.sha1(f"seed-mail-{i}".encode()).hexdigest()[:12]
+        if conn.execute("SELECT 1 FROM mails WHERE id=?", (mid,)).fetchone():
+            thread_ids.setdefault(tno, mid)
+            continue
+        tid = thread_ids.setdefault(tno, mid)
+        mail.send(conn, sender, to, subject, body, cc=cc, sent_at=datetime.fromisoformat(at), thread_id=tid,
+                  attachments=att, mail_id=mid)
+        nm += 1
+    print(f"seed: メール {nm} 件を投入（計 {len(MAILS)} 件）")
+    ne = 0
+    for eid, title, st, en, att, loc, ch, mtg, desc in EVENTS:
+        if conn.execute("SELECT 1 FROM cal_events WHERE id=?", (eid,)).fetchone():
+            continue
+        calendar.create(conn, title, datetime.fromisoformat(st), datetime.fromisoformat(en), attendees=att,
+                        location=loc, description=desc, channel=ch, organizer="鈴木", event_id=eid, meeting_id=mtg)
+        ne += 1
+    print(f"seed: 予定 {ne} 件を投入（計 {len(EVENTS)} 件）")

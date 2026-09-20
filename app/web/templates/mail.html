@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}メール{% endblock %}
+{% block heading %}メール {% if unread %}<span class="ml-2 text-xs bg-red-100 text-red-700 rounded-full px-2 py-0.5 font-normal">未読 {{ unread }}</span>{% endif %}{% endblock %}
+{% block actions %}
+<form method="get" action="/mail" class="flex items-center gap-2"><input name="me" value="{{ me }}" placeholder="あなたの名前" list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-28"><datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white">切替</button></form>
+<button @click="$dispatch('open-compose', {})" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">✉ 新規作成</button>
+{% endblock %}
+{% block main_class %}p-0{% endblock %}
+{% block content %}
+<div class="flex h-[calc(100vh-3.5rem)]">
+  <aside class="w-44 shrink-0 bg-gray-100 border-r border-gray-200 p-3 text-sm space-y-1">
+    <a href="/mail?folder=inbox" class="block px-2 py-1.5 rounded-lg {% if folder == 'inbox' %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">📥 受信トレイ</a>
+    <a href="/mail?folder=sent" class="block px-2 py-1.5 rounded-lg {% if folder == 'sent' %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">📤 送信済み</a>
+    <div class="pt-4 text-xs text-gray-500 leading-relaxed">{% if me %}<b>{{ me }}</b> のメールボックス{% else %}名前を入れると自分宛だけ表示。未入力は全員分{% endif %}</div>
+    <div class="pt-2 text-[11px] text-gray-400 leading-relaxed">メールも情報源。決定・タスクの抽出とタスク紐付けの対象になります。</div>
+  </aside>
+  <section class="w-96 shrink-0 border-r border-gray-200 bg-white overflow-y-auto scrollbar-thin">
+    {% for t in threads %}
+    <a href="/mail?folder={{ folder }}&thread={{ t.thread_id }}" class="block px-4 py-3 border-b border-gray-100 hover:bg-gray-50 {% if t.thread_id == thread %}bg-indigo-50{% endif %}">
+      <div class="flex items-center gap-2 text-sm"><span class="{% if t.unread %}font-semibold{% endif %} truncate flex-1">{{ t.latest.sender }}{% if t.count > 1 %} <span class="text-gray-400 font-normal">({{ t.count }})</span>{% endif %}</span><span class="text-xs text-gray-400 shrink-0">{{ t.latest.sent_at|dt }}</span></div>
+      <div class="text-sm {% if t.unread %}font-semibold{% endif %} truncate">{{ t.subject }}</div>
+      <div class="text-xs text-gray-500 truncate">{{ t.latest.body|replace('\n', ' ')|truncate(70) }}</div>
+    </a>
+    {% else %}<div class="p-8 text-center text-sm text-gray-400">メールはありません</div>{% endfor %}
+  </section>
+  <section class="flex-1 min-w-0 overflow-y-auto scrollbar-thin bg-gray-50 p-6">
+    {% if msgs %}
+    <h2 class="text-lg font-semibold mb-4">{{ msgs[0].subject }}</h2>
+    <div class="space-y-4 max-w-3xl">
+      {% for m in msgs %}
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <div class="flex items-start gap-3">
+          <span class="w-9 h-9 rounded-full bg-indigo-500 text-white grid place-items-center text-sm font-semibold shrink-0">{{ m.sender|initials }}</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline gap-2 flex-wrap"><span class="font-semibold">{{ m.sender }}</span><span class="text-xs text-gray-400">{{ m.sent_at|dt }}</span>
+              {% if m.task %}<a href="/tasks/{{ m.task.id }}" class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">⇢ {{ m.task.title }} <span class="opacity-60">{{ m.task.method }}</span></a>{% endif %}
+              {% for x in m.extracted %}<span class="text-[11px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700" title="{{ x }}">決定/タスクとして抽出</span>{% endfor %}</div>
+            <div class="text-xs text-gray-500">宛先: {{ m.recipients|join('、') }}{% if m.cc %} · CC: {{ m.cc|join('、') }}{% endif %}</div>
+          </div>
+        </div>
+        <div class="text-sm mt-4 leading-relaxed">{{ m.html|safe }}</div>
+        {% for a in m.attachments %}<a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-2 mt-3 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white hover:bg-gray-50"><span class="w-5 h-5 rounded bg-emerald-100 text-emerald-700 grid place-items-center text-[10px] font-bold">X</span>{{ a.name }}</a>{% endfor %}
+      </div>
+      {% endfor %}
+      <button @click="$dispatch('open-compose', { reply: true, thread: '{{ thread }}', subject: {{ ('Re: ' + msgs[0].subject.replace('Re: ', ''))|tojson|forceescape }}, to: {{ ([msgs[-1].sender] + msgs[-1].recipients)|reject('equalto', me)|list|tojson|forceescape }} })" class="text-sm border border-gray-300 rounded-lg px-4 py-2 bg-white hover:bg-gray-50">↩ 返信</button>
+    </div>
+    {% else %}<div class="grid place-items-center h-full text-sm text-gray-400">スレッドを選択してください</div>{% endif %}
+  </section>
+</div>
+
+<div x-data="{ open: false, reply: false, thread: '', subject: '', to: [] }" @open-compose.window="open = true; reply = !!$event.detail.reply; thread = $event.detail.thread || ''; subject = $event.detail.subject || ''; to = $event.detail.to || []" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/mail/send" class="bg-white rounded-xl shadow-xl p-6 w-[640px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="open = false">
+      <h3 class="font-semibold" x-text="reply ? '返信' : '新しいメール'"></h3>
+      <input type="hidden" name="thread_id" :value="thread">
+      <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">差出人</label><input name="sender" value="{{ me }}" required list="people" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5"></div>
+      <div class="flex gap-2"><label class="w-14 text-xs text-gray-500 pt-2">宛先</label><div class="flex-1" x-data x-init="$watch('to', v => { const pk = Alpine.$data($el.querySelector('[x-data]')); if (pk) pk.sel = [...v]; })">{% with pp_name='recipients', pp_selected=[], pp_multi=true, pp_placeholder='宛先を検索' %}{% include "_people_picker.html" %}{% endwith %}</div></div>
+      <div class="flex gap-2"><label class="w-14 text-xs text-gray-500 pt-2">CC</label><div class="flex-1">{% with pp_name='cc', pp_selected=[], pp_multi=true, pp_placeholder='CC を検索' %}{% include "_people_picker.html" %}{% endwith %}</div></div>
+      <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">件名</label><input name="subject" :value="subject" required class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5"></div>
+      <textarea name="body" rows="8" required placeholder="本文" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea>
+      <div class="flex gap-2"><input name="attachment_url" placeholder="添付ファイルのリンク（SharePoint など、任意）" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"><input name="attachment_name" placeholder="表示名" class="w-40 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"></div>
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="px-4 py-1.5 rounded-lg bg-indigo-600 text-white">送信</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

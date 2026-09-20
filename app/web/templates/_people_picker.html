@@ -1,0 +1,23 @@
+{# 人を検索して選ぶピッカー。pp_name（hidden input の name）/ pp_selected（初期選択）/ pp_multi / pp_placeholder / people を渡す #}
+<div x-data="{ q: '', sel: {{ (pp_selected or [])|tojson|forceescape }}, people: {{ people|tojson|forceescape }}, open: false, multi: {{ 'true' if pp_multi is not defined or pp_multi else 'false' }},
+  get list() { return this.people.filter(p => !this.sel.includes(p) && (!this.q || p.includes(this.q))).slice(0, 8); },
+  add(p) { if (!p) return; if (!this.multi) this.sel = []; if (!this.sel.includes(p)) this.sel.push(p); this.q = ''; this.open = this.multi; },
+  remove(p) { this.sel = this.sel.filter(x => x !== p); } }" class="relative" @click.outside="open = false">
+  <div class="flex flex-wrap items-center gap-1 border border-gray-300 rounded-lg px-2 py-1.5 min-h-[38px] bg-white focus-within:border-indigo-400" @click="$refs.q.focus()">
+    <template x-for="p in sel" :key="p">
+      <span class="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-800 rounded-full pl-1 pr-1.5 py-0.5">
+        <span class="w-4 h-4 rounded-full bg-indigo-500 text-white grid place-items-center text-[9px]" x-text="p.slice(0,1)"></span><span x-text="p"></span>
+        <button type="button" @click.stop="remove(p)" class="text-indigo-400 hover:text-indigo-800">×</button>
+        <input type="hidden" name="{{ pp_name }}" :value="p"></span>
+    </template>
+    <input x-ref="q" x-model="q" @focus="open = true" @input="open = true" @keydown.enter.prevent="add(list[0] || (q.trim() || null))" @keydown.backspace="if (!q && sel.length) remove(sel[sel.length-1])"
+           placeholder="{{ pp_placeholder or '名前で検索' }}" class="flex-1 min-w-[100px] text-sm border-0 focus:ring-0 px-1 py-0.5 bg-transparent" autocomplete="off">
+  </div>
+  <div x-show="open && (list.length || q.trim())" x-cloak class="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-lg shadow-lg text-sm max-h-56 overflow-y-auto">
+    <template x-for="p in list" :key="p">
+      <button type="button" @click="add(p)" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 flex items-center gap-2">
+        <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold" x-text="p.slice(0,1)"></span><span x-text="p"></span></button>
+    </template>
+    <button type="button" x-show="q.trim() && !people.includes(q.trim())" @click="add(q.trim())" class="w-full text-left px-3 py-1.5 hover:bg-indigo-50 text-indigo-700 text-xs">「<span x-text="q.trim()"></span>」を新しい人として追加</button>
+  </div>
+</div>

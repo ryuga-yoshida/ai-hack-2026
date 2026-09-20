@@ -160,8 +160,8 @@
       <h3 class="font-semibold">新しいメッセージ</h3>
       <div><label class="text-xs text-gray-500">あなた</label><input name="me" value="{{ me }}" required list="people" placeholder="名前" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
       <div><label class="text-xs text-gray-500">相手（複数選ぶとグループチャット）</label>
-        <div class="mt-1 grid grid-cols-3 gap-1">
-          {% for p in PEOPLE %}<label class="flex items-center gap-1.5 text-sm border border-gray-200 rounded-lg px-2 py-1.5"><input type="checkbox" name="members" value="{{ p }}" :checked="with_ === '{{ p }}'">{{ p }}</label>{% endfor %}
+        <div class="mt-1" x-data x-init="$watch('with_', v => { if (v) { const pk = Alpine.$data($el.querySelector('[x-data]')); if (pk && !pk.sel.includes(v)) pk.sel.push(v); } })">
+          {% with pp_name='members', pp_selected=[], pp_multi=true, pp_placeholder='名前で検索して追加' %}{% include "_people_picker.html" %}{% endwith %}
         </div></div>
       <input name="title" placeholder="グループ名（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">開始</button></div>

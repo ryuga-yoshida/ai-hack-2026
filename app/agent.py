@@ -12,6 +12,7 @@ from app import config, db, detector, extract, linker, vec
 from app.connectors.chat import ChatAdapter
 from app.connectors.docs import DocsAdapter
 from app.connectors.excel import ExcelAdapter
+from app.connectors.mail import MailAdapter
 from app.connectors.meet import MeetAdapter
 from app.llm import router
 from app.models import Event, Finding
@@ -194,7 +195,7 @@ class TickResult:
 
 
 def adapters(conn: sqlite3.Connection):
-    return [MeetAdapter(conn=conn), ChatAdapter(conn), ExcelAdapter(), DocsAdapter()]
+    return [MeetAdapter(conn=conn), ChatAdapter(conn), MailAdapter(conn), ExcelAdapter(), DocsAdapter()]
 
 
 # ---------- アクション決定（エージェントが自分で決める部分） ----------
@@ -298,10 +299,10 @@ def stage_extract(conn, stats: TickResult) -> None:
         stats.tasks_created += created
         db.mark_processed(conn, "extract", f"meet:{mid}", {"events": n, "tasks": created})
 
-    # チャット: 未処理発言をチャンネルごとにまとめて
+    # チャット・メール: 未処理発言をチャンネル（メールはスレッド）ごとにまとめて
     rows = conn.execute(
         "SELECT e.* FROM events e LEFT JOIN processed p ON p.stage='extract' AND p.key = e.id "
-        "WHERE e.source='chat' AND e.kind='utterance' AND p.key IS NULL ORDER BY json_extract(e.meta,'$.channel'), e.occurred_at").fetchall()
+        "WHERE e.source IN ('chat','mail') AND e.kind='utterance' AND p.key IS NULL ORDER BY json_extract(e.meta,'$.channel'), e.occurred_at").fetchall()
     msgs = [db.row_to_event(r) for r in rows]
     if msgs:
         by_ch: dict[str, list[Event]] = {}
@@ -368,6 +369,27 @@ def stage_detect(conn, stats: TickResult, now: datetime | None = None) -> None:
         stats.actions[decide_action(conn, f)] += 1
 
 
+def stage_calendar(conn, stats: TickResult, now: datetime | None = None) -> None:
+    """開始 15 分前までの予定に対して、会議室を用意してチャットにリマインドする（人の指示なし）"""
+    from datetime import timedelta
+    from app.connectors import calendar, chat, meet
+    now = now or datetime.now()
+    for ev in calendar.upcoming_unreminded(conn, now, timedelta(minutes=15)):
+        mid = ev.get("meeting_id")
+        if not mid or not conn.execute("SELECT 1 FROM meetings WHERE id=?", (mid,)).fetchone():
+            mid = meet.create_meeting(conn, ev["title"], started_at=ev["start"], channel=ev.get("channel"))
+            calendar.update(conn, ev["id"], meeting_id=mid)
+        for a in ev["attendees"]:
+            meet.join(conn, mid, a)
+        mins = max(1, int((ev["start"] - now).total_seconds() // 60))
+        url = f"{config.APP_BASE_URL}/meet/{mid}"
+        text = (f"⏰ {mins}分後に「{ev['title']}」です（{ev['start']:%H:%M}〜、{ev.get('location') or 'オンライン'}）。"
+                f"会議室を用意しました → {url}  参加: {'・'.join(ev['attendees'])}")
+        chat.post_message(conn, ev.get("channel") or "general", "エージェント", text)
+        calendar.update(conn, ev["id"], reminded_at=db.now_iso())
+        say(f"calendar: 「{ev['title']}」の {mins} 分前。会議室 {mid} を用意して #{ev.get('channel') or 'general'} にリマインド")
+
+
 # ---------- ループ本体 ----------
 
 def tick(conn: sqlite3.Connection, now: datetime | None = None,
@@ -382,6 +404,8 @@ def tick(conn: sqlite3.Connection, now: datetime | None = None,
     stage_embed(conn, stats)                       # 3. 埋め込み（未生成のみ）
     stage_link(conn, stats)                        # 4. 紐付け（新規 utterance のみ）
     stage_detect(conn, stats, now)                 # 5-6. 検知（新規 artifact_change＋定期）
+    if events_override is None:
+        stage_calendar(conn, stats, now)           # 7. 予定のリマインド（再生時は行わない）
     say(f"巡回終了: 取込{stats.fetched} 抽出{stats.extracted} 紐付け{stats.linked} Finding{len(stats.findings)}")
     return stats
 

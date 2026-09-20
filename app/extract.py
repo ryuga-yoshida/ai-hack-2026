@@ -178,7 +178,7 @@ def extract_from_chat(messages: list[Event]) -> list[Event]:
             idx = _locate(str(it.get("quote", "")), lines)
             src = batch[idx] if idx is not None else batch[0]
             out.append(Event(
-                id=new_id(), source="chat",
+                id=new_id(), source=src.source,
                 kind="decision" if it["kind"] == "decision" else "task_hint",
                 text=str(it["text"]).strip(), actor=it.get("actor") or src.actor,
                 occurred_at=src.occurred_at, ref=src.ref, quote=str(it.get("quote", "")).strip(),
