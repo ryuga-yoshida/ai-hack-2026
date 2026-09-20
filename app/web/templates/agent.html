@@ -7,7 +7,7 @@
       <span>活動ログ（リアルタイム）</span>
       <span x-text="agent.running ? '● 巡回中' : (agent.enabled ? '● 待機中（' + agent.interval + '秒間隔）' : '停止中')" :class="agent.running ? 'text-emerald-400' : 'text-gray-400'"></span>
     </div>
-    <div class="flex-1 overflow-y-auto scrollbar-thin space-y-0.5" x-ref="log">
+    <div class="flex-1 overflow-y-auto scrollbar-thin space-y-0.5" x-ref="log" data-keep-scroll>
       <template x-for="l in logs" :key="l.id">
         <div class="flex gap-2"><span class="text-gray-500 shrink-0" x-text="l.at.slice(11,19)"></span>
           <span :class="{'text-red-400 font-semibold': l.level==='finding', 'text-indigo-300': l.level==='action', 'text-amber-300': l.level==='warn', 'text-gray-100': l.level==='info'}" x-text="l.message" class="break-all"></span></div>

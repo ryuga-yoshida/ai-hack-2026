@@ -126,6 +126,21 @@
 </div>
 
 <script>
+// スクロール位置の保持: 操作（確認済み・却下・適用など）でページが再描画されても元の位置に戻る
+(function () {
+  const key = 'scroll:' + location.pathname + location.search;
+  const save = () => { try { sessionStorage.setItem(key, JSON.stringify({ y: window.scrollY, inner: [...document.querySelectorAll('[data-keep-scroll]')].map(el => el.scrollTop) })); } catch (e) {} };
+  window.addEventListener('beforeunload', save);
+  document.addEventListener('submit', save, true);
+  window.addEventListener('load', () => {
+    try {
+      const v = JSON.parse(sessionStorage.getItem(key) || 'null'); if (!v) return;
+      if (!location.hash) window.scrollTo(0, v.y);
+      document.querySelectorAll('[data-keep-scroll]').forEach((el, i) => { if (v.inner && v.inner[i] != null) el.scrollTop = v.inner[i]; });
+      sessionStorage.removeItem(key);
+    } catch (e) {}
+  });
+})();
 // 人のホバーカード: data-person="名前" を持つ要素にマウスを乗せると表示
 function personCard() {
   return {

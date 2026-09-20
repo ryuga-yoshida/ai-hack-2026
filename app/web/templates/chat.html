@@ -79,7 +79,7 @@
       {% for m in results %}<div class="text-xs text-gray-400 px-4 pt-2"># {{ m.channel }}</div>{% with compact=true %}{% include "_message.html" %}{% endwith %}{% endfor %}
     </div>
     {% else %}
-    <div class="flex-1 overflow-y-auto py-3 scrollbar-thin" id="msglist" x-ref="list">
+    <div class="flex-1 overflow-y-auto py-3 scrollbar-thin" id="msglist" x-ref="list" data-keep-scroll>
       {% set ns = namespace(day=None) %}
       {% for m in messages %}
         {% if m.posted_at[:10] != ns.day %}{% set ns.day = m.posted_at[:10] %}
@@ -180,7 +180,7 @@ function chatPage() {
     newCh: false, last: {{ (messages[-1].posted_at if messages else '')|tojson }},
     ws: null,
     init() {
-      const l = this.$refs.list; if (l) l.scrollTop = l.scrollHeight;
+      const l = this.$refs.list; if (l && !sessionStorage.getItem('chat-keep')) l.scrollTop = l.scrollHeight; sessionStorage.removeItem('chat-keep');
       {% if not q %}this.connect(); setInterval(() => this.poll(), 15000);{% endif %}
     },
     connect() {
