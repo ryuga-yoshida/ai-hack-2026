@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}設定{% endblock %}
+{% block content %}
+<div class="grid grid-cols-3 gap-6">
+  <form method="post" action="/settings" class="col-span-2 space-y-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h2 class="font-semibold mb-1">エージェントの判断の閾値</h2>
+      <p class="text-xs text-gray-500 mb-4">自律と信頼のバランス。全部自動通知にすると誤検知で信用を失い、全部人間確認にすると自律していない。</p>
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        {% for it in items %}
+        <label class="block"><div class="text-gray-700">{{ it.label }} <code class="text-[10px] text-gray-400">{{ it.key }}</code></div>
+          <input name="{{ it.key }}" value="{{ it.value }}" type="number" step="{{ '0.05' if it.type == 'float' else '1' }}" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
+          <div class="text-xs text-gray-400 mt-0.5">{{ it.help }}</div></label>
+        {% endfor %}
+        <label class="block"><div class="text-gray-700">自動巡回の間隔（秒）</div>
+          <input name="interval" value="{{ agent_state.interval }}" type="number" step="10" min="10" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
+          <div class="text-xs text-gray-400 mt-0.5">感度の高いイベント（会議終了・投稿・成果物の新版）は間隔を待たず即時</div></label>
+      </div>
+      <div class="mt-4 flex justify-end"><button class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm">保存</button></div>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5 text-sm">
+      <h2 class="font-semibold mb-3">モデルの使い分け（OrcaRouter）</h2>
+      <table class="w-full text-xs">
+        <tr class="text-gray-500 text-left"><th class="py-1">tier</th><th>モデル</th><th>使う処理</th></tr>
+        <tr class="border-t"><td class="py-1.5 font-semibold">high</td><td>{{ models.high }}</td><td>矛盾判定だけ</td></tr>
+        <tr class="border-t"><td class="py-1.5 font-semibold">mid</td><td>{{ models.mid }}</td><td>決定・タスクの抽出、紐付け第5段、議事録サマリー</td></tr>
+        <tr class="border-t"><td class="py-1.5 font-semibold">embed</td><td>{{ models.embed }}</td><td>候補絞り込み・紐付け第4段</td></tr>
+        <tr class="border-t"><td class="py-1.5 font-semibold text-emerald-700">なし</td><td>—</td><td>分割・正規化・差分の自然言語化・紐付け第1〜3段・時系列ガード・停滞/根拠なし/状態提案</td></tr>
+      </table>
+      <div class="text-xs text-gray-500 mt-3">変更は <code>.env</code> の <code>ORCA_MODEL_*</code>。接続: {{ '✅' if orca else '❌ 未設定' }} {{ base_url }} · 音声文字起こし（Gemini）: {{ '✅' if gemini else '❌ 未設定' }}</div>
+    </div>
+  </form>
+
+  <aside class="space-y-4 text-sm">
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <h2 class="font-semibold mb-2">読み取りスコープ（要求する権限）</h2>
+      <table class="w-full text-xs">{% for src, scope, note in scopes %}<tr class="border-t border-gray-100"><td class="py-1.5 pr-2">{{ src }}</td><td><code>{{ scope }}</code><div class="text-gray-400">{{ note }}</div></td></tr>{% endfor %}</table>
+      <div class="text-xs text-gray-500 mt-2">全て読み取りのみ。「全社検索」は最初から実装しない。</div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <h2 class="font-semibold mb-2">承認ゲート（書き込み）</h2>
+      <table class="w-full text-xs">{% for a, need in writes %}<tr class="border-t border-gray-100"><td class="py-1.5">{{ a }}</td><td class="text-right {% if need == '不要' %}text-gray-500{% elif need == '人の承認' %}text-amber-700 font-semibold{% else %}text-red-700{% endif %}">{{ need }}</td></tr>{% endfor %}</table>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-xs text-gray-600">
+      <h2 class="font-semibold text-sm text-gray-800 mb-2">監視フォルダ（OneDrive 代替）</h2>
+      <code class="break-all">{{ watch_dir or '未設定' }}</code>
+      <div class="mt-1 text-gray-400">.env の ARTIFACT_WATCH_DIR</div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

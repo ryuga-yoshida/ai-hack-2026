@@ -17,6 +17,22 @@
   </div>
 
   <aside class="space-y-4">
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm" x-data="{ open: false, calls: [], async load() { this.calls = (await (await fetch('/api/agent/llm_calls')).json()).calls; } }">
+      <div class="flex items-center justify-between">
+        <div><div class="font-semibold">LLM に送った内容を見る</div><div class="text-xs text-gray-500">外部に出るのはマスク後のテキストだけ（人名 → &lt;PERSON_n&gt; など）</div></div>
+        <button @click="open = !open; if (open) load()" class="text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white" x-text="open ? '閉じる' : '表示'"></button>
+      </div>
+      <div x-show="open" x-cloak class="mt-3 space-y-2 max-h-80 overflow-y-auto scrollbar-thin">
+        <template x-for="c in calls" :key="c.at + c.task + c.user.length">
+          <div class="border border-gray-200 rounded-lg p-2 text-xs">
+            <div class="flex gap-2 text-gray-500"><span x-text="c.at.slice(11,19)"></span><span class="font-semibold text-gray-800" x-text="c.task"></span><span x-text="c.tier + ' · ' + c.model"></span><span x-show="c.cached" class="text-gray-400">キャッシュ</span></div>
+            <pre class="mt-1 whitespace-pre-wrap font-mono text-[11px] bg-gray-50 rounded p-2 max-h-40 overflow-y-auto" x-text="c.user"></pre>
+            <details class="mt-1"><summary class="text-gray-500 cursor-pointer">応答</summary><pre class="whitespace-pre-wrap font-mono text-[11px] bg-gray-50 rounded p-2 max-h-40 overflow-y-auto" x-text="c.response"></pre></details>
+          </div>
+        </template>
+        <div x-show="!calls.length" class="text-xs text-gray-400">このサーバー起動後の呼び出しはまだありません。「今すぐ巡回」か会議の議事録サマリーを開くと記録されます。</div>
+      </div>
+    </div>
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm space-y-3">
       <div class="flex items-center justify-between">
         <div><div class="font-semibold">自動巡回</div><div class="text-xs text-gray-500">人間の指示なしに取込→抽出→紐付け→検知を繰り返します</div></div>

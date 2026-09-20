@@ -33,6 +33,17 @@ _cache: dict | None = None
 _emb: dict[str, np.ndarray] | None = None       # 埋め込みキャッシュ（fixtures/llm_embeddings.npz）
 _emb_usage: dict[str, dict] = {}
 _replayed: set[str] = set()     # replay で既にコスト記録したキー（同じ文の再計算を二重計上しない）
+# 直近に LLM へ送ったテキスト（マスク後）の記録。UI の「LLM に送った内容」表示用
+recent_calls: list[dict] = []
+RECENT_MAX = 30
+
+
+def _remember(task: str, tier: str, system: str, user: str, content: str | None, cached: bool) -> None:
+    from datetime import datetime as _dt
+    recent_calls.append({"at": _dt.now().replace(microsecond=0).isoformat(), "task": task, "tier": tier,
+                         "model": model_for(tier), "system": system[:400], "user": user[:1500],
+                         "response": (content or "")[:800], "cached": cached})
+    del recent_calls[:-RECENT_MAX]
 
 
 class LLMError(Exception):
@@ -152,6 +163,7 @@ def complete(system: str, user: str, tier: Tier, task: str,
         entry = cache[key]
         if CACHE_ONLY:   # replay では記録済み usage からコストを再現する
             _record(task, entry["tier"], entry.get("usage", {}))
+        _remember(task, entry["tier"], system, user, entry["content"], True)
         return _finish(entry["content"], entry["tier"], entry["tier"] != tier)
     if CACHE_ONLY:
         log.warning("cache miss in replay: task=%s", task)
@@ -183,6 +195,7 @@ def complete(system: str, user: str, tier: Tier, task: str,
 
     cache[key] = {"tier": used, "content": content, "usage": usage, "task": task}
     _save_cache()
+    _remember(task, used, system, user, content, False)
     return _finish(content, used, fallback)
 
 

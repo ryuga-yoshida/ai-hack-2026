@@ -60,9 +60,16 @@ def who(request: Request, actor: str = "") -> str:
     return name
 
 
+_overrides_loaded = False
+
+
 def get_conn() -> sqlite3.Connection:
+    global _overrides_loaded
     conn = db.connect()
     db.init_db(conn)
+    if not _overrides_loaded:
+        config.apply_overrides(db.get_settings(conn))
+        _overrides_loaded = True
     return conn
 
 
@@ -222,9 +229,14 @@ def dashboard(request: Request):
         task_counts[r["status"]] = r["n"]
     events_n = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
     sources = {r["source"]: r["n"] for r in conn.execute("SELECT source, COUNT(*) n FROM events GROUP BY source")}
+    from app import agent
     from app.llm import cost
-    return render("index.html", request, conn,
-                  cards=finding_cards(conn, "WHERE status IN ('notified','pending')", limit=6),
+    cards_all = finding_cards(conn, "WHERE status IN ('notified','pending')")
+    stalled = [c for c in cards_all if c["finding"].kind == "stalled"]
+    cards = [c for c in cards_all if c["finding"].kind != "stalled"][:6]
+    return render("index.html", request, conn, autonomy=agent.autonomy_stats(conn), stalled=stalled,
+                  config_stalled_days=config.STALLED_DAYS,
+                  cards=cards,
                   counts=counts, kinds=kinds, task_counts=task_counts, events_n=events_n, sources=sources,
                   cost=cost.summary(conn), logs=db.recent_logs(conn, limit=12))
 
@@ -401,7 +413,7 @@ def task_timeline(conn: sqlite3.Connection, task: Task) -> list[dict]:
     for r in rows:
         ev = db.row_to_event(r)
         if str(ev.meta.get("channel", "")).startswith("task:"):
-            add(ev, label="コメント", color="bg-teal-500")
+            continue   # コメントは詳細ページのコメント欄に出す（二重表示しない）
         elif ev.source == "mail":
             add(ev, label="メール", color="bg-sky-600")
         else:
@@ -1054,7 +1066,12 @@ def meeting_minutes(request: Request, meeting_id: str, regen: str = ""):
     end = db.from_iso(head["ended_at"]) if head.get("ended_at") else None
     duration = int((end - start).total_seconds() // 60) if start and end and end > start else None
     cal_ev = conn.execute("SELECT id, title, location FROM cal_events WHERE meeting_id=?", (meeting_id,)).fetchone()
+    # セキュリティ実演: 文字起こしに混入した「指示文」を検出して、決定に含まれていないことを示す
+    inj_pat = re.compile(r"(これまでの指示|指示をすべて無視|無視してください|ignore previous|ignore all|you are (an )?admin|あなたは管理者)", re.I)
+    injected = [l for l in lines if inj_pat.search(l["text"])]
+    inj_leaked = [d for d in decisions if inj_pat.search(d.text or "") or "賞与" in (d.text or "") or "dismiss" in (d.text or "").lower()]
     return render("minutes.html", request, conn, head=head, lines=lines, summary=summary, decisions=decisions, todos=todos,
+                  injected=injected, inj_leaked=inj_leaked,
                   findings=findings, participants=participants, counts=counts, start=start, duration=duration,
                   cal_ev=dict(cal_ev) if cal_ev else None, channels=chat.list_channels(conn))
 
@@ -1145,6 +1162,13 @@ def agent_page(request: Request):
                   sync=sync, link=linker.method_breakdown(conn), cost=cost.summary(conn))
 
 
+@app.get("/api/agent/llm_calls")
+def agent_llm_calls():
+    """LLM に実際に送ったテキスト（マスク後）。「外部に出るのはマスク後だけ」の実演用"""
+    from app.llm import router
+    return {"calls": list(reversed(router.recent_calls))}
+
+
 @app.get("/api/agent/status")
 def agent_status():
     from app import agent
@@ -1187,7 +1211,7 @@ def manual_tick(request: Request, background: BackgroundTasks):
     def run():
         conn = get_conn()
         try:
-            agent.tick(conn)
+            agent.tick(conn, trigger="manual")
         except Exception as e:
             agent.say(f"tick 失敗: {e}")
 
@@ -1484,6 +1508,51 @@ def tag_members(name: str, members: list[str] = Form([])):
     conn = get_conn()
     tagmod.ensure_tag(conn, name, kind="team", members=list(members))
     return RedirectResponse(f"/tags/{name}", status_code=303)
+
+
+# ---------- 設定 ----------
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    from app import agent
+    from app.llm import router
+    conn = get_conn()
+    items = [{"key": k, "label": lbl, "type": typ.__name__, "help": h, "value": getattr(config, k)}
+             for k, (lbl, typ, h) in config.TUNABLE.items()]
+    models = {t: router.model_for(t) for t in ("high", "mid", "embed")}
+    scopes = [
+        ("会議（Google Drive / 自作 Meet）", "drive.readonly", "読み取り"),
+        ("チャット（Slack 想定）", "channels:history, channels:read", "読み取り・対象チャンネルのみ"),
+        ("メール（Outlook 想定）", "Mail.Read", "読み取り・転送も保存もしない"),
+        ("予定表（Outlook 想定）", "Calendars.Read", "読み取り"),
+        ("成果物（SharePoint / OneDrive 想定）", "Files.Read.All / Sites.Read.All", "読み取り・指定フォルダのみ"),
+        ("Wiki（Confluence 想定）", "read:page:confluence", "読み取り"),
+        ("人・組織（Entra ID 想定）", "User.Read, User.ReadBasic.All", "読み取り"),
+    ]
+    writes = [("画面への通知表示", "不要"), ("矛盾の検知・記録", "不要"), ("Event の取得・保存", "不要"),
+              ("タスクの状態変更（提案の適用）", "人の承認"), ("チャットへの投稿（外部ツール連携時）", "人の承認"),
+              ("Wiki の書き換え", "実装しない"), ("ファイルの更新（外部ストレージ）", "実装しない"), ("Slack・メールへの外部送信", "実装しない")]
+    return render("settings.html", request, conn, items=items, models=models, scopes=scopes, writes=writes,
+                  agent_state=dict(agent.state), watch_dir=config.ARTIFACT_WATCH_DIR, gemini=bool(config.GEMINI_API_KEY),
+                  orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL)
+
+
+@app.post("/settings")
+async def settings_save(request: Request):
+    conn = get_conn()
+    form = await request.form()
+    for key, (lbl, typ, h) in config.TUNABLE.items():
+        if key in form and str(form[key]).strip():
+            try:
+                typ(form[key])
+            except (TypeError, ValueError):
+                continue
+            db.set_setting(conn, key, str(form[key]).strip())
+    config.apply_overrides(db.get_settings(conn))
+    if "interval" in form:
+        from app import agent
+        agent.state["interval"] = max(10, int(form["interval"]))
+    return RedirectResponse("/settings", status_code=303)
 
 
 # ---------- コスト ----------

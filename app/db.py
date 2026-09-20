@@ -114,6 +114,13 @@ CREATE TABLE IF NOT EXISTS agent_logs (
     message       TEXT NOT NULL
 );
 
+-- 設定の上書き（UI から変更した値。config.py の既定値より優先）
+CREATE TABLE IF NOT EXISTS settings (
+    key           TEXT PRIMARY KEY,
+    value         TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+);
+
 -- 処理済みフラグ（増分処理用）。stage = extract | link | detect
 CREATE TABLE IF NOT EXISTS processed (
     stage         TEXT NOT NULL,
@@ -381,3 +388,14 @@ def add_log(conn: sqlite3.Connection, message: str, level: str = "info") -> None
 def recent_logs(conn: sqlite3.Connection, after_id: int = 0, limit: int = 200) -> list[dict]:
     rows = conn.execute("SELECT * FROM agent_logs WHERE id > ? ORDER BY id DESC LIMIT ?", (after_id, limit)).fetchall()
     return [dict(r) for r in reversed(rows)]
+
+
+# ---------- settings ----------
+
+def get_settings(conn: sqlite3.Connection) -> dict[str, str]:
+    return {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?,?,?)", (key, value, now_iso()))
+    conn.commit()

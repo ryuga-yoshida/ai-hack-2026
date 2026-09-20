@@ -29,12 +29,43 @@
   </div>
 </div>
 
+<!-- 自律性の数値化 -->
+<div class="bg-gray-900 text-white rounded-xl p-5 mb-6 grid grid-cols-6 gap-4 text-sm">
+  <div class="col-span-6 flex items-center justify-between"><div class="text-xs tracking-wider text-gray-400">AUTONOMY · 人間の指示なしに行った判断</div><div class="text-xs text-gray-400">巡回 自動 {{ autonomy.ticks_auto }} 回 · 手動 {{ autonomy.ticks_manual }} 回</div></div>
+  <div><div class="text-3xl font-semibold">{{ autonomy.changes }}</div><div class="text-xs text-gray-400">調べた成果物の変更</div></div>
+  <div><div class="text-3xl font-semibold text-emerald-400">{{ autonomy.auto_rate }}%</div><div class="text-xs text-gray-400">自動で完結（無視 {{ autonomy.ignored }} ＋ 通知 {{ autonomy.notified }}）</div></div>
+  <div><div class="text-3xl font-semibold text-amber-300">{{ autonomy.review }}</div><div class="text-xs text-gray-400">人の確認を要求</div></div>
+  <div><div class="text-3xl font-semibold">{{ autonomy.tasks_auto }}<span class="text-base text-gray-400"> / {{ autonomy.tasks_auto + autonomy.tasks_manual }}</span></div><div class="text-xs text-gray-400">自動生成したタスク</div></div>
+  <div><div class="text-3xl font-semibold">{{ autonomy.link_auto }}<span class="text-base text-gray-400"> / {{ autonomy.link_auto + autonomy.link_manual }}</span></div><div class="text-xs text-gray-400">自動で紐付けた発言（手動 {{ autonomy.link_manual }}）</div></div>
+  <div><div class="text-3xl font-semibold">{{ autonomy.suggestions }}<span class="text-base text-gray-400"> 提案</span></div><div class="text-xs text-gray-400">状態更新の提案（適用 {{ autonomy.applied }} · 会議リマインド {{ autonomy.reminders }}）</div></div>
+</div>
+
 <div class="grid grid-cols-3 gap-6">
   <div class="col-span-2 space-y-4">
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">未対応の検知</h2>
       <a href="/findings" class="text-sm text-indigo-600 hover:underline">すべて見る →</a>
     </div>
+    {% if stalled %}
+    <div class="bg-white border border-amber-200 rounded-xl p-4" x-data="{ open: false }">
+      <div class="flex items-center gap-2">
+        <span class="px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-800">停滞</span>
+        <span class="font-medium">動きのないタスクが {{ stalled|length }} 件</span>
+        <span class="text-xs text-gray-500">{{ config_stalled_days }}日以上、会話・コメント・成果物・状態のどれにも動きがありません</span>
+        <button @click="open = !open" class="ml-auto text-xs text-indigo-600 hover:underline" x-text="open ? '閉じる' : '一覧を見る'"></button>
+      </div>
+      <div x-show="open" x-cloak class="mt-3 divide-y divide-gray-100">
+        {% for c in stalled %}
+        <div class="py-2 flex items-center gap-3 text-sm">
+          <a href="/tasks/{{ c.task.id }}" class="flex-1 hover:underline">{{ c.task.title }}</a>
+          <span class="text-xs text-gray-500">{{ c.task.assignee or '未割当' }} · {{ c.finding.reason }}</span>
+          <form method="post" action="/findings/{{ c.finding.id }}/ack"><button class="text-xs border border-gray-300 rounded px-2 py-0.5 bg-white hover:bg-gray-50">確認</button></form>
+          <form method="post" action="/findings/{{ c.finding.id }}/dismiss"><button class="text-xs border border-gray-300 rounded px-2 py-0.5 bg-white hover:bg-gray-50">却下</button></form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
     {% for c in cards %}{% include "_finding_card.html" %}{% else %}
     <div class="bg-white border border-dashed border-gray-300 rounded-xl p-10 text-center text-sm text-gray-500">
       未対応の検知はありません。<br>右上の「今すぐ巡回」か、ターミナルで <code class="bg-gray-100 rounded px-1">python -m app.cli replay</code> を実行してください。

@@ -34,6 +34,14 @@
   </div>
 
   <div class="px-10 py-8 space-y-8">
+    {% if injected %}
+    <section class="border-2 {% if inj_leaked %}border-red-400 bg-red-50{% else %}border-emerald-300 bg-emerald-50{% endif %} rounded-xl px-5 py-4">
+      <div class="text-xs font-semibold tracking-wider {% if inj_leaked %}text-red-700{% else %}text-emerald-700{% endif %}">🛡 PROMPT INJECTION CHECK</div>
+      <p class="text-sm mt-1">この文字起こしには「指示文」が {{ injected|length }} 件混入しています。エージェントは取り込んだテキストを常に<b>データ</b>として扱い、指示として解釈しません。</p>
+      <ul class="mt-2 space-y-1 text-xs">{% for l in injected %}<li class="flex gap-2"><span class="text-gray-400">{{ l.time }} {{ l.actor }}</span><span class="font-mono bg-white/70 rounded px-1.5 py-0.5 text-gray-700 line-through decoration-red-400">{{ l.text|truncate(110) }}</span></li>{% endfor %}</ul>
+      <p class="text-sm mt-2 font-medium {% if inj_leaked %}text-red-700{% else %}text-emerald-700{% endif %}">{% if inj_leaked %}⚠ 決定事項に混入しています: {{ inj_leaked|map(attribute='text')|join(' / ') }}{% else %}✓ 決定事項・ToDo に混入していません（賞与2倍・全タスク完了・検知の却下は出力されていない）{% endif %}</p>
+    </section>
+    {% endif %}
     {% if summary %}
     <!-- サマリー -->
     <section>

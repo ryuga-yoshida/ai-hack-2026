@@ -131,7 +131,7 @@ def _loop():
                     state["last_trigger"] = reasons[-1]
                     _log_conn_set(conn)
                     say("trigger: " + " / ".join(dict.fromkeys(reasons)) + " → 即時巡回")
-                r = tick(conn)
+                r = tick(conn, trigger="event" if reasons else "auto")
                 state["ticks"] += 1
                 state["last_tick"] = datetime.now().replace(microsecond=0).isoformat()
                 state["last_result"] = {"fetched": r.fetched, "extracted": r.extracted, "linked": r.linked,
@@ -399,12 +399,13 @@ def stage_calendar(conn, stats: TickResult, now: datetime | None = None) -> None
 # ---------- ループ本体 ----------
 
 def tick(conn: sqlite3.Connection, now: datetime | None = None,
-         events_override: list[Event] | None = None) -> TickResult:
+         events_override: list[Event] | None = None, trigger: str = "auto") -> TickResult:
     global _log_conn
     router.bind(conn)
     _log_conn = conn
     stats = TickResult()
-    say("巡回開始" if events_override is None else f"再生: {now:%Y-%m-%d} の出来事を投入")
+    label = {"auto": "自動", "manual": "手動", "event": "トリガー", "replay": "再生"}.get(trigger, trigger)
+    say(f"巡回開始（{label}）" if events_override is None else f"再生: {now:%Y-%m-%d} の出来事を投入")
     stage_fetch(conn, stats, events_override)     # 1. 取込
     stage_extract(conn, stats)                     # 2. 抽出（新規 utterance のみ）
     stage_embed(conn, stats)                       # 3. 埋め込み（未生成のみ）
@@ -472,3 +473,27 @@ def mirror_to_watch_dir(version_path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(version_path, dest)
     _watch_sig[str(dest.relative_to(d))] = dest.stat().st_mtime
+
+
+def autonomy_stats(conn: sqlite3.Connection) -> dict:
+    """自律性の数値化（デモ・ダッシュボード用）"""
+    changes = conn.execute("SELECT COUNT(*) FROM processed WHERE stage='detect'").fetchone()[0]
+    with_finding = conn.execute("SELECT COUNT(*) FROM processed WHERE stage='detect' AND json_extract(result,'$.finding') IS NOT NULL").fetchone()[0]
+    notified = conn.execute("SELECT COUNT(*) FROM findings WHERE status IN ('notified','acknowledged') AND kind != 'status_suggestion'").fetchone()[0]
+    review = conn.execute("SELECT COUNT(*) FROM findings WHERE status='pending' AND kind != 'status_suggestion'").fetchone()[0]
+    dismissed = conn.execute("SELECT COUNT(*) FROM findings WHERE status='dismissed'").fetchone()[0]
+    suggestions = conn.execute("SELECT COUNT(*) FROM findings WHERE kind='status_suggestion'").fetchone()[0]
+    applied = conn.execute("SELECT COUNT(*) FROM findings WHERE kind='status_suggestion' AND status='acknowledged'").fetchone()[0]
+    tasks_auto = conn.execute("SELECT COUNT(*) FROM tasks WHERE created_from IS NOT NULL").fetchone()[0]
+    tasks_manual = conn.execute("SELECT COUNT(*) FROM tasks WHERE created_from IS NULL").fetchone()[0]
+    links = conn.execute("SELECT result FROM processed WHERE stage='link'").fetchall()
+    link_auto = sum(1 for r in links if r["result"] and '"task_id": "' in r["result"] and '"manual"' not in r["result"])
+    link_manual = sum(1 for r in links if r["result"] and '"manual"' in r["result"])
+    ticks_auto = conn.execute("SELECT COUNT(*) FROM agent_logs WHERE message IN ('巡回開始（自動）','巡回開始（トリガー）')").fetchone()[0]
+    ticks_manual = conn.execute("SELECT COUNT(*) FROM agent_logs WHERE message='巡回開始（手動）'").fetchone()[0]
+    reminders = conn.execute("SELECT COUNT(*) FROM cal_events WHERE reminded_at IS NOT NULL").fetchone()[0]
+    return {"changes": changes, "ignored": changes - with_finding, "notified": notified, "review": review,
+            "dismissed": dismissed, "suggestions": suggestions, "applied": applied,
+            "tasks_auto": tasks_auto, "tasks_manual": tasks_manual, "link_auto": link_auto, "link_manual": link_manual,
+            "ticks_auto": ticks_auto, "ticks_manual": ticks_manual, "reminders": reminders,
+            "auto_rate": round(100 * (changes - with_finding + notified) / changes) if changes else 0}

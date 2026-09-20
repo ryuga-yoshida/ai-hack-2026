@@ -76,3 +76,27 @@ DETECT_SUPERSEDE_SIM = 0.85        # これ以上似た新しい決定があれ�
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_STT_MODEL = os.getenv("GEMINI_STT_MODEL", "gemini-2.5-flash")
 MODEL_PRICES["stt"] = {"input": 1.00, "output": 2.50}   # 音声入力の単価（USD / 1M tokens。要確認）
+
+
+# --- UI から変更できる設定（DB の settings テーブルで上書き） ---
+TUNABLE = {
+    "DETECT_NOTIFY_THRESHOLD": ("自動通知する確信度", float, "これ以上なら人の確認なしに通知"),
+    "DETECT_REVIEW_THRESHOLD": ("確認キューに入れる確信度", float, "これ以上なら人の確認へ。未満は記録しない"),
+    "STALLED_DAYS": ("停滞とみなす日数", int, "この日数、どこにも動きがなければ停滞"),
+    "DETECT_LOOKBACK_DAYS": ("決定を遡る日数", int, "これより古い決定とは突き合わせない"),
+    "TASK_AUTOGEN_CONFIDENCE": ("タスク自動生成の確信度", float, "抽出したタスク候補をこれ以上ならタスクにする"),
+    "LINK_CONTEXT_WINDOW_MIN": ("会話文脈を継承する分数", int, "直前の発言と同じタスクとみなす時間"),
+    "DISMISS_PENALTY": ("却下後の割引率", float, "却下された類似の指摘の確信度に掛ける"),
+}
+
+
+def apply_overrides(values: dict) -> None:
+    """DB に保存された設定で config の値を上書きする（サーバー起動時・変更時に呼ぶ）"""
+    import sys
+    mod = sys.modules[__name__]
+    for key, raw in values.items():
+        if key in TUNABLE:
+            try:
+                setattr(mod, key, TUNABLE[key][1](raw))
+            except (TypeError, ValueError):
+                pass

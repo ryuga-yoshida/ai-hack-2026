@@ -18,7 +18,7 @@
       <div class="w-24 shrink-0 text-xs text-gray-500 pt-0.5">{{ ev.occurred_at|dt }}</div>
       <div class="w-1 rounded-full shrink-0 {% if ev.kind == 'decision' %}bg-rose-400{% elif ev.kind == 'utterance' %}bg-sky-400{% elif ev.kind == 'artifact_change' %}bg-amber-400{% else %}bg-gray-300{% endif %}"></div>
       <div class="min-w-0">
-        <span class="font-semibold text-gray-700">[{{ EVENT_LABEL.get(ev.kind, ev.kind) }}]</span>
+        <span class="font-semibold text-gray-700">[{{ EVENT_LABEL.get(ev.kind, ev.kind) }}]</span>{% if f.kind == 'orphan_change' and ev.kind == 'decision' %}<span class="text-[10px] text-gray-400 ml-1">参考: 変更時点で最新の決定（この変更を裏付けていない）</span>{% endif %}
         <span>{{ ev.text|linkify }}</span>
         {% if ev.actor %}<span class="text-gray-500">— {{ ev.actor }}</span>{% endif %}
         <div class="text-xs text-gray-500 mt-0.5 break-all">
