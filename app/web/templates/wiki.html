@@ -1,61 +1,126 @@
 {% extends "base.html" %}
 {% block title %}Wiki{% if page %}: {{ page.title }}{% endif %}{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+  .wiki-body h1 { font-size: 1.75rem; font-weight: 700; margin: 1.5rem 0 .5rem; } .wiki-body h2 { font-size: 1.35rem; font-weight: 600; margin: 1.5rem 0 .5rem; border-bottom: 1px solid #e5e7eb; padding-bottom: .25rem; }
+  .wiki-body h3 { font-size: 1.1rem; font-weight: 600; margin: 1.25rem 0 .4rem; } .wiki-body p { margin: .4rem 0; line-height: 1.75; }
+  .wiki-body ul { list-style: disc; padding-left: 1.5rem; } .wiki-body ol { list-style: decimal; padding-left: 1.5rem; } .wiki-body li { margin: .15rem 0; }
+  .wiki-body table { border-collapse: collapse; margin: .75rem 0; font-size: .9rem; } .wiki-body th, .wiki-body td { border: 1px solid #e5e7eb; padding: .35rem .6rem; } .wiki-body th { background: #f9fafb; }
+  .wiki-body code { background: #f3f4f6; border-radius: .25rem; padding: 0 .3rem; font-size: .9em; } .wiki-body pre { background: #111827; color: #f9fafb; padding: .75rem 1rem; border-radius: .5rem; overflow-x: auto; margin: .75rem 0; } .wiki-body pre code { background: none; color: inherit; padding: 0; }
+  .wiki-body blockquote { border-left: 4px solid #c7d2fe; padding-left: .75rem; color: #4b5563; margin: .75rem 0; } .wiki-body img { max-width: 100%; border-radius: .5rem; margin: .5rem 0; }
+  .wiki-body a { color: #4f46e5; text-decoration: underline; } .wiki-body input[type=checkbox] { margin-right: .4rem; } .wiki-body hr { margin: 1.25rem 0; }
+  @media print { aside, header, .no-print { display: none !important; } }
+</style>
+{% endblock %}
 {% block heading %}Wiki{% if page %} <span class="text-gray-400 font-normal ml-2">{{ page.space }}</span>{% endif %}{% endblock %}
 {% block actions %}
 {% if page %}
+<form method="post" action="/wiki/{{ page.id }}/favorite"><button class="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white hover:bg-gray-50" title="お気に入り">{{ '★' if page.id in favs else '☆' }}</button></form>
 <a href="/wiki/{{ page.id }}/edit" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">✎ 編集</a>
-<form method="post" action="/wiki/{{ page.id }}/delete" onsubmit="return confirm('このページを削除しますか？')"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white text-gray-600 hover:text-red-600">削除</button></form>
+<div class="relative" x-data="{ open: false }" @click.outside="open = false">
+  <button @click="open = !open" class="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white hover:bg-gray-50">⋯</button>
+  <div x-show="open" x-cloak class="absolute right-0 top-10 z-30 w-56 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1">
+    <form method="post" action="/wiki/{{ page.id }}/duplicate"><button class="w-full text-left px-3 py-1.5 hover:bg-gray-50">複製</button></form>
+    <a href="/wiki/{{ page.id }}/export" class="block px-3 py-1.5 hover:bg-gray-50">Markdown を書き出し</a>
+    <button onclick="window.print()" class="w-full text-left px-3 py-1.5 hover:bg-gray-50">印刷 / PDF</button>
+    <div class="border-t my-1"></div>
+    <form method="post" action="/wiki/{{ page.id }}/move" class="px-3 py-1.5 space-y-1">
+      <div class="text-xs text-gray-500">移動</div>
+      <select name="parent_id" class="w-full text-xs border border-gray-300 rounded px-2 py-1 bg-white"><option value="">（親なし）</option>{% for p_ in pages if p_.id != page.id %}<option value="{{ p_.id }}" {% if p_.id == page.parent_id %}selected{% endif %}>{{ '　' * p_.depth }}{{ p_.title }}</option>{% endfor %}</select>
+      <input name="space" value="{{ page.space }}" class="w-full text-xs border border-gray-300 rounded px-2 py-1"><button class="w-full text-xs border border-gray-300 rounded py-1 bg-white">適用</button></form>
+    <div class="border-t my-1"></div>
+    <form method="post" action="/wiki/{{ page.id }}/delete" onsubmit="return confirm('このページを削除しますか？')"><button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50">削除</button></form>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
 {% block main_class %}p-0{% endblock %}
 {% block content %}
 <div class="flex h-[calc(100vh-3.5rem)]">
   {% include "_wiki_sidebar.html" %}
-  <section class="flex-1 min-w-0 overflow-y-auto scrollbar-thin bg-white">
+  <section class="flex-1 min-w-0 overflow-y-auto scrollbar-thin bg-white" data-keep-scroll>
     {% if page %}
-    <div class="max-w-3xl mx-auto px-10 py-8">
-      <div class="text-xs text-gray-500 flex items-center gap-3 flex-wrap">
-        <span data-person="{{ page.actor }}">最終更新 {{ page.actor }} · {{ page.updated_at|dt }}</span>
-        <span>改訂 {{ revs|length }} 回</span>
-        {% if changes %}<span class="text-indigo-600">エージェントが追跡した変更 {{ changes }} 件</span>{% endif %}
-        {% for t in tags %}<a href="/tags/{{ t.name }}" class="px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
-        {% with tp_type='wiki', tp_id=page.id %}{% include "_tag_picker.html" %}{% endwith %}
-      </div>
-      {% if findings %}
-      <div class="mt-4 border border-red-200 bg-red-50 rounded-lg px-4 py-3 text-sm">
-        <div class="font-semibold text-red-700 text-xs mb-1">⚠ このページの改訂に関する検知</div>
-        {% for f in findings %}<a href="/findings?status=all#finding-{{ f.id }}" class="block hover:underline">{{ f.summary }}</a>{% endfor %}
-      </div>
-      {% endif %}
-      <article class="prose-sm mt-4 text-gray-800 leading-relaxed">{{ html|safe }}</article>
-      {% if children %}
-      <div class="mt-8 border-t pt-4"><div class="text-xs font-semibold text-gray-500 mb-2">子ページ</div>
-        {% for c in children %}<a href="/wiki/{{ c.id }}" class="block text-sm text-indigo-600 hover:underline">📄 {{ c.title }}</a>{% endfor %}</div>
-      {% endif %}
-      <div class="mt-8 grid grid-cols-2 gap-6 border-t pt-6">
-        <div>
-          <div class="text-xs font-semibold text-gray-500 mb-2">改訂履歴</div>
-          <ol class="text-sm space-y-1">
-            {% for r in revs|reverse %}
-            <li class="flex items-center gap-2"><span class="text-gray-400 text-xs w-24">{{ r.created_at|dt }}</span><span data-person="{{ r.actor }}">{{ r.actor }}</span>
-              <span class="text-gray-500 text-xs truncate">{{ r.note or '' }}</span>
-              {% if not loop.last %}<a href="/wiki/{{ page.id }}/diff/{{ r.id }}" class="ml-auto text-xs text-indigo-600 hover:underline">差分</a>{% else %}<span class="ml-auto text-xs text-gray-400">初版</span>{% endif %}</li>
-            {% endfor %}
-          </ol>
+    <div class="max-w-5xl mx-auto px-10 py-8 grid grid-cols-4 gap-8">
+      <div class="col-span-3 min-w-0">
+        <div class="text-xs text-gray-500 flex items-center gap-1 mb-2">{% for b in breadcrumbs %}<a href="/wiki/{{ b.id }}" class="hover:underline">{{ b.title }}</a><span class="text-gray-300">/</span>{% endfor %}<span>{{ page.title }}</span></div>
+        <div class="text-xs text-gray-500 flex items-center gap-3 flex-wrap">
+          <span data-person="{{ page.actor }}">最終更新 {{ page.actor }} · {{ page.updated_at|rel }}</span>
+          <span>改訂 {{ revs|length }} 回</span>
+          {% if changes %}<span class="text-indigo-600">エージェントが追跡した変更 {{ changes }} 件</span>{% endif %}
+          {% for t in tags %}<a href="/tags/{{ t.name }}" class="px-1.5 py-0.5 rounded bg-{{ t.color }}-100 text-{{ t.color }}-800">#{{ t.name }}</a>{% endfor %}
+          {% with tp_type='wiki', tp_id=page.id %}{% include "_tag_picker.html" %}{% endwith %}
         </div>
-        <div>
-          <div class="text-xs font-semibold text-gray-500 mb-2">関連タスク <span class="font-normal text-gray-400">このページを成果物として持つ</span></div>
-          {% for t in linked_tasks %}<a href="/tasks/{{ t.id }}" class="block text-sm hover:underline">☑ {{ t.title }} <span class="text-xs text-gray-400">{{ t.assignee or '' }}</span></a>{% else %}<div class="text-sm text-gray-400">なし</div>{% endfor %}
-          <form method="post" action="/wiki/{{ page.id }}/link_task" class="flex gap-1 mt-2">
-            <select name="task_id" class="flex-1 text-xs border border-gray-300 rounded-lg px-2 py-1 bg-white">{% for t in all_tasks %}<option value="{{ t.id }}">{{ t.title }}</option>{% endfor %}</select>
-            <button class="text-xs border border-gray-300 rounded-lg px-2">紐付け</button>
+        {% if findings %}
+        <div class="mt-4 border border-red-200 bg-red-50 rounded-lg px-4 py-3 text-sm">
+          <div class="font-semibold text-red-700 text-xs mb-1">⚠ このページの改訂に関する検知</div>
+          {% for f in findings %}<a href="/findings?status=all#finding-{{ f.id }}" class="block hover:underline">{{ f.summary }}</a>{% endfor %}
+        </div>
+        {% endif %}
+        <article id="wikiBody" class="wiki-body mt-2 text-gray-800" data-md="{{ page.body|e }}"></article>
+        {% if children %}
+        <div class="mt-8 border-t pt-4"><div class="text-xs font-semibold text-gray-500 mb-2">子ページ</div>
+          <div class="grid grid-cols-2 gap-2">{% for c in children %}<a href="/wiki/{{ c.id }}" class="border border-gray-200 rounded-lg px-3 py-2 text-sm hover:bg-gray-50">📄 {{ c.title }}<div class="text-xs text-gray-400">{{ c.actor }} · {{ c.updated_at|rel }}</div></a>{% endfor %}</div></div>
+        {% endif %}
+
+        <div id="comments" class="mt-10 border-t pt-6">
+          <div class="text-xs font-semibold text-gray-500 mb-3">コメント <span class="font-normal text-gray-400">{{ comments|length }}</span></div>
+          <div class="space-y-3 mb-4">
+            {% for m in comments %}
+            <div class="flex gap-3"><span data-person="{{ m.actor }}" class="w-8 h-8 rounded-full bg-indigo-500 text-white grid place-items-center text-xs font-semibold shrink-0">{{ m.actor|initials }}</span>
+              <div class="min-w-0 flex-1"><div class="text-xs"><span class="font-semibold text-sm">{{ m.actor }}</span> <span class="text-gray-400">{{ m.posted_at|rel }}</span></div><div class="text-sm mt-0.5">{{ m.html|safe }}</div></div>
+              <form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="text-gray-300 hover:text-red-600 text-xs">🗑</button></form></div>
+            {% else %}<div class="text-sm text-gray-400">まだコメントはありません</div>{% endfor %}
+          </div>
+          <form method="post" action="/wiki/{{ page.id }}/comment" class="flex gap-2">
+            <span class="w-9 h-9 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold shrink-0">{{ me|initials }}</span>
+            <div class="flex-1 relative" x-data="mentionInput()"><input name="text" placeholder="コメント（@ でメンション、#タグ）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" @input="onInput" @keydown="onKey" @blur="setTimeout(() => open = false, 150)">{% include "_mention_menu.html" %}</div>
+            <button class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-2">送信</button>
           </form>
         </div>
       </div>
+      <aside class="text-sm space-y-4">
+        {% if toc %}
+        <div class="sticky top-4">
+          <div class="text-xs font-semibold text-gray-500 mb-2">目次</div>
+          <ul class="space-y-1 text-xs">{% for h in toc %}<li style="padding-left: {{ (h.level - 1) * 12 }}px"><a href="#h-{{ loop.index }}" class="text-gray-600 hover:text-indigo-600 {% if h.level == 1 %}font-semibold{% endif %}">{{ h.text }}</a></li>{% endfor %}</ul>
+          <div class="mt-6 text-xs font-semibold text-gray-500 mb-2">改訂履歴</div>
+          <ol class="text-xs space-y-1">
+            {% for r in revs|reverse %}
+            <li class="flex items-center gap-1"><span class="text-gray-400 w-20 shrink-0">{{ r.created_at|dt }}</span><span data-person="{{ r.actor }}">{{ r.actor }}</span>
+              {% if not loop.last %}<a href="/wiki/{{ page.id }}/diff/{{ r.id }}" class="ml-auto text-indigo-600 hover:underline">差分</a>{% else %}<span class="ml-auto text-gray-400">初版</span>{% endif %}</li>
+            {% endfor %}
+          </ol>
+          <div class="mt-6 text-xs font-semibold text-gray-500 mb-2">関連タスク</div>
+          {% for t in linked_tasks %}<a href="/tasks/{{ t.id }}" class="block text-xs hover:underline">☑ {{ t.title }}</a>{% else %}<div class="text-xs text-gray-400">なし</div>{% endfor %}
+          <form method="post" action="/wiki/{{ page.id }}/link_task" class="flex gap-1 mt-2">
+            <select name="task_id" class="flex-1 text-xs border border-gray-300 rounded px-1 py-1 bg-white">{% for t in all_tasks %}<option value="{{ t.id }}">{{ t.title|truncate(24) }}</option>{% endfor %}</select>
+            <button class="text-xs border border-gray-300 rounded px-2">紐付け</button>
+          </form>
+        </div>
+        {% endif %}
+      </aside>
     </div>
     {% else %}
     <div class="grid place-items-center h-full text-sm text-gray-500">左の「＋」からページを作成してください。</div>
     {% endif %}
   </section>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const el = document.getElementById('wikiBody'); if (!el) return;
+  marked.setOptions({ gfm: true, breaks: false });
+  let i = 0;
+  const renderer = new marked.Renderer();
+  renderer.heading = function ({ text, depth }) { i += 1; return `<h${depth} id="h-${i}">${text}</h${depth}>`; };
+  let html = marked.parse(el.dataset.md, { renderer });
+  html = html.replace(/@([^\s<@,、。]+)/g, '<span class="bg-indigo-100 text-indigo-800 rounded px-1">@$1</span>');
+  el.innerHTML = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+  el.querySelectorAll('a[href^="http"]').forEach(a => a.target = '_blank');
+  el.querySelectorAll('input[type=checkbox]').forEach(c => c.disabled = true);
+})();
+</script>
 {% endblock %}

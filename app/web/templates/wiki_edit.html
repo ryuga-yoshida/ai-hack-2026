@@ -1,41 +1,47 @@
 {% extends "base.html" %}
 {% block title %}編集: {{ page.title }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css">
+<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+<script src="https://uicdn.toast.com/editor/latest/i18n/ja-jp.js"></script>
+<style>.toastui-editor-defaultUI { border: 0 !important; } .toastui-editor-defaultUI-toolbar { border-bottom: 1px solid #e5e7eb; }</style>
+{% endblock %}
 {% block heading %}<a href="/wiki/{{ page.id }}" class="text-gray-400 hover:text-gray-600 mr-2">{{ page.title|truncate(30) }}</a><span class="text-gray-300 mr-2">/</span>編集{% endblock %}
+{% block actions %}
+<span id="saveState" class="text-xs text-gray-400"></span>
+<input id="noteInput" placeholder="変更メモ（任意）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-44">
+<select id="channelInput" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
+<a href="/wiki/{{ page.id }}" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white">キャンセル</a>
+<button onclick="save()" class="text-sm bg-indigo-600 text-white rounded-lg px-4 py-1.5 hover:bg-indigo-700">保存</button>
+{% endblock %}
 {% block main_class %}p-0{% endblock %}
 {% block content %}
 <div class="flex h-[calc(100vh-3.5rem)]">
   {% include "_wiki_sidebar.html" %}
-  <form method="post" action="/wiki/{{ page.id }}/edit" class="flex-1 min-w-0 flex flex-col bg-white" x-data="{ body: {{ page.body|tojson|forceescape }}, preview: false }">
-    <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-200 text-sm">
-      <input name="title" value="{{ page.title }}" required class="flex-1 text-lg font-semibold border-0 focus:ring-0 px-1">
-      <button type="button" @click="preview = !preview" class="border border-gray-300 rounded-lg px-3 py-1.5 bg-white" x-text="preview ? '編集に戻る' : 'プレビュー'"></button>
-      <input name="note" placeholder="変更メモ（任意）" class="border border-gray-300 rounded-lg px-3 py-1.5 w-48">
-      <select name="channel" class="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
-      <button class="bg-indigo-600 text-white rounded-lg px-4 py-1.5 hover:bg-indigo-700">保存</button>
-    </div>
-    <div class="flex-1 min-h-0 grid" :class="preview ? 'grid-cols-2' : 'grid-cols-1'">
-      <textarea name="body" x-model="body" class="w-full h-full resize-none border-0 focus:ring-0 px-6 py-4 font-mono text-sm leading-relaxed" placeholder="# 見出し&#10;&#10;本文。- で箇条書き、**太字**、| 表 |"></textarea>
-      <div x-show="preview" x-cloak class="border-l border-gray-200 overflow-y-auto px-6 py-4 text-sm" x-html="mdPreview(body)"></div>
-    </div>
-    <div class="px-4 py-2 border-t border-gray-100 text-[11px] text-gray-400">保存すると改訂として記録され、変わった段落をエージェントが決定事項と突き合わせます。</div>
-  </form>
+  <div class="flex-1 min-w-0 flex flex-col bg-white">
+    <div class="px-6 pt-4 pb-2"><input id="titleInput" value="{{ page.title }}" class="w-full text-2xl font-bold border-0 focus:ring-0 px-0" placeholder="ページ名"></div>
+    <div id="editor" class="flex-1 min-h-0"></div>
+    <div class="px-4 py-2 border-t border-gray-100 text-[11px] text-gray-400">WYSIWYG と Markdown を切り替えられます。画像は貼り付け可。保存すると改訂として記録され、変わった段落をエージェントが決定事項と突き合わせます。⌘/Ctrl+S で保存。</div>
+  </div>
 </div>
+<form id="saveForm" method="post" action="/wiki/{{ page.id }}/edit" class="hidden"><input type="hidden" name="title"><input type="hidden" name="body"><input type="hidden" name="note"><input type="hidden" name="channel"></form>
 {% endblock %}
 {% block scripts %}
 <script>
-function mdPreview(t) {
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`(.+?)`/g, '<code class="bg-gray-100 rounded px-1">$1</code>');
-  let out = [], list = false;
-  for (const l of t.split('\n')) {
-    const h = l.match(/^(#{1,3})\s+(.*)/);
-    if (list && !/^\s*[-*]\s+/.test(l)) { out.push('</ul>'); list = false; }
-    if (h) out.push(`<h${h[1].length} class="font-semibold mt-4 mb-1 ${h[1].length===1?'text-2xl':h[1].length===2?'text-xl':'text-lg'}">${inline(h[2])}</h${h[1].length}>`);
-    else if (/^\s*[-*]\s+/.test(l)) { if (!list) { out.push('<ul class="list-disc pl-6">'); list = true; } out.push(`<li>${inline(l.replace(/^\s*[-*]\s+/, ''))}</li>`); }
-    else if (l.trim()) out.push(`<p class="my-1">${inline(l)}</p>`);
-  }
-  if (list) out.push('</ul>');
-  return out.join('');
+const editor = new toastui.Editor({
+  el: document.getElementById('editor'), height: '100%', initialEditType: 'wysiwyg', previewStyle: 'vertical', language: 'ja-JP',
+  initialValue: {{ page.body|tojson }}, usageStatistics: false,
+  toolbarItems: [['heading', 'bold', 'italic', 'strike'], ['hr', 'quote'], ['ul', 'ol', 'task', 'indent', 'outdent'], ['table', 'image', 'link'], ['code', 'codeblock']],
+  hooks: { addImageBlobHook: (blob, cb) => { const r = new FileReader(); r.onload = () => cb(r.result, blob.name || 'image'); r.readAsDataURL(blob); } },
+});
+let dirty = false; editor.on('change', () => { dirty = true; document.getElementById('saveState').textContent = '未保存の変更'; });
+function save() {
+  const f = document.getElementById('saveForm');
+  f.title.value = document.getElementById('titleInput').value; f.body.value = editor.getMarkdown();
+  f.note.value = document.getElementById('noteInput').value; f.channel.value = document.getElementById('channelInput').value;
+  dirty = false; f.submit();
 }
+document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); save(); } });
+window.addEventListener('beforeunload', e => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
 </script>
 {% endblock %}

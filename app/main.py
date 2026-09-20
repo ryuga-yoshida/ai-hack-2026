@@ -1697,10 +1697,12 @@ async def upload_artifact(request: Request, file: UploadFile = File(...), actor:
 
 # ---------- Wiki（Confluence / Notion の代わり） ----------
 
-def _wiki_ctx(conn: sqlite3.Connection, page: dict | None = None) -> dict:
+def _wiki_ctx(conn: sqlite3.Connection, page: dict | None = None, me: str = "") -> dict:
     pages = wikimod.tree(conn)
     spaces = sorted({p_["space"] for p_ in pages})
-    return {"pages": pages, "spaces": spaces, "page": page}
+    favs = wikimod.favorites(conn, me) if me else []
+    return {"pages": pages, "spaces": spaces, "page": page, "favs": favs, "fav_pages": [p_ for p_ in pages if p_["id"] in favs],
+            "recent": wikimod.recent(conn), "templates": wikimod.TEMPLATES}
 
 
 @app.get("/wiki", response_class=HTMLResponse)
@@ -1710,14 +1712,60 @@ def wiki_index(request: Request):
     if pages:
         latest = max(pages, key=lambda p_: p_["updated_at"])
         return RedirectResponse(f"/wiki/{latest['id']}", status_code=303)
-    return render("wiki.html", request, conn, **_wiki_ctx(conn), html="", revs=[], tags=[], linked_tasks=[])
+    return render("wiki.html", request, conn, **_wiki_ctx(conn, me=get_me(request)), html="", revs=[], tags=[], linked_tasks=[], comments=[])
 
 
 @app.post("/wiki")
-def wiki_create(request: Request, title: str = Form(...), space: str = Form("general"), parent_id: str = Form("")):
+def wiki_create(request: Request, title: str = Form(...), space: str = Form("general"), parent_id: str = Form(""),
+                template: str = Form("blank")):
     conn = get_conn()
-    pid = wikimod.create(conn, title, f"# {title.strip()}\n\n", who(request), parent_id=parent_id or None, space=space.strip() or "general")
+    body = wikimod.TEMPLATES.get(template, wikimod.TEMPLATES["blank"])[1].format(title=title.strip())
+    pid = wikimod.create(conn, title, body, who(request), parent_id=parent_id or None, space=space.strip() or "general")
     return RedirectResponse(f"/wiki/{pid}/edit", status_code=303)
+
+
+@app.post("/wiki/{page_id}/favorite")
+def wiki_favorite(request: Request, page_id: str):
+    conn = get_conn()
+    wikimod.toggle_favorite(conn, who(request), page_id)
+    return RedirectResponse(f"/wiki/{page_id}", status_code=303)
+
+
+@app.post("/wiki/{page_id}/move")
+def wiki_move(page_id: str, parent_id: str = Form(""), space: str = Form("")):
+    conn = get_conn()
+    wikimod.move(conn, page_id, parent_id or None, space.strip() or None)
+    return RedirectResponse(f"/wiki/{page_id}", status_code=303)
+
+
+@app.post("/wiki/{page_id}/duplicate")
+def wiki_duplicate(request: Request, page_id: str):
+    conn = get_conn()
+    new = wikimod.duplicate(conn, page_id, who(request))
+    return RedirectResponse(f"/wiki/{new}/edit", status_code=303)
+
+
+@app.get("/wiki/{page_id}/export")
+def wiki_export(page_id: str):
+    from fastapi.responses import Response
+    conn = get_conn()
+    p_ = wikimod.get(conn, page_id)
+    if not p_:
+        raise HTTPException(404)
+    return Response(p_["body"], media_type="text/markdown; charset=utf-8",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(p_['title'])}.md"})
+
+
+@app.post("/wiki/{page_id}/comment")
+def wiki_comment(request: Request, page_id: str, text: str = Form(...)):
+    conn = get_conn()
+    if not wikimod.get(conn, page_id):
+        raise HTTPException(404)
+    mid = chat.post_message(conn, f"wiki:{page_id}", who(request), text.strip())
+    for tname in tagmod.apply_hashtags(conn, text, "message", mid):
+        tagmod.link(conn, tname, "wiki", page_id)
+    _ingest_chat(conn)
+    return RedirectResponse(f"/wiki/{page_id}#comments", status_code=303)
 
 
 @app.get("/wiki/{page_id}", response_class=HTMLResponse)
@@ -1735,9 +1783,17 @@ def wiki_page(request: Request, page_id: str):
             findings.append(f)
     linked_tasks = [t for t in db.list_tasks(conn) if f"wiki:{page_id}" in t.artifacts or page["title"] in t.artifacts]
     children = [p_ for p_ in wikimod.tree(conn) if p_["parent_id"] == page_id]
-    return render("wiki.html", request, conn, **_wiki_ctx(conn, page), html=wikimod.render_markdown(page["body"]),
+    comments = [_message_dict(conn, r) for r in conn.execute("SELECT * FROM chat_messages WHERE channel=? AND deleted=0 ORDER BY posted_at, rowid", (f"wiki:{page_id}",))]
+    breadcrumbs = []
+    cur = page
+    while cur and cur.get("parent_id"):
+        cur = wikimod.get(conn, cur["parent_id"])
+        if cur:
+            breadcrumbs.insert(0, cur)
+    return render("wiki.html", request, conn, **_wiki_ctx(conn, page, me=get_me(request)), html=wikimod.render_markdown(page["body"]),
                   revs=revs, tags=tagmod.tags_for(conn, "wiki", page_id), all_tags=tagmod.all_tags(conn),
-                  linked_tasks=linked_tasks, findings=findings, changes=changes, children=children,
+                  linked_tasks=linked_tasks, findings=findings, changes=changes, children=children, comments=comments,
+                  toc=wikimod.toc(page["body"]), breadcrumbs=breadcrumbs,
                   all_tasks=[t for t in db.list_tasks(conn) if t.status != "done"])
 
 
@@ -1747,7 +1803,7 @@ def wiki_edit(request: Request, page_id: str):
     page = wikimod.get(conn, page_id)
     if not page:
         raise HTTPException(404)
-    return render("wiki_edit.html", request, conn, **_wiki_ctx(conn, page), channels=chat.list_channels(conn))
+    return render("wiki_edit.html", request, conn, **_wiki_ctx(conn, page, me=get_me(request)), channels=chat.list_channels(conn))
 
 
 @app.post("/wiki/{page_id}/edit")
@@ -1780,7 +1836,7 @@ def wiki_diff(request: Request, page_id: str, rev_id: str):
     for ev in evs:
         for r in conn.execute("SELECT * FROM findings WHERE evidence LIKE ? AND status != 'dismissed'", (f"%{ev.id}%",)):
             fmap.setdefault(ev.ref, []).append(db.row_to_finding(r))
-    return render("wiki_diff.html", request, conn, **_wiki_ctx(conn, page), cur=cur, prev=prev, diffs=diffs, n=idx + 1,
+    return render("wiki_diff.html", request, conn, **_wiki_ctx(conn, page, me=get_me(request)), cur=cur, prev=prev, diffs=diffs, n=idx + 1,
                   findings_by_ref=fmap, evs=evs)
 
 

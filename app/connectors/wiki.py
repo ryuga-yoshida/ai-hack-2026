@@ -150,6 +150,57 @@ def render_markdown(body: str) -> str:
     return "\n".join(html)
 
 
+TEMPLATES = {
+    "blank": ("空白", "# {title}\n\n"),
+    "minutes": ("議事録", "# {title}\n\n**日時**: \n**参加者**: \n\n## 議題\n\n1. \n\n## 決定事項\n\n- \n\n## ToDo\n\n- [ ] 担当: 内容（期限）\n\n## 保留・継続検討\n\n- \n"),
+    "spec": ("仕様書", "# {title}\n\n## 背景・目的\n\n## スコープ\n\n- やること\n- やらないこと\n\n## 仕様\n\n| 項目 | 内容 |\n| --- | --- |\n|  |  |\n\n## 未決事項\n\n- \n"),
+    "decision": ("決定記録（ADR）", "# {title}\n\n**状態**: 提案 / 決定 / 廃止\n**決定日**: \n**決定者**: \n\n## 背景\n\n## 決定\n\n## 理由\n\n## 影響・やること\n\n- [ ] \n"),
+    "retro": ("振り返り", "# {title}\n\n## よかったこと\n\n- \n\n## 問題だったこと\n\n- \n\n## 次に試すこと\n\n- [ ] \n"),
+}
+
+
+def move(conn: sqlite3.Connection, page_id: str, parent_id: str | None, space: str | None = None) -> None:
+    if parent_id == page_id:
+        parent_id = None
+    conn.execute("UPDATE wiki_pages SET parent_id=?, space=COALESCE(?, space) WHERE id=?", (parent_id or None, space, page_id))
+    conn.commit()
+
+
+def duplicate(conn: sqlite3.Connection, page_id: str, actor: str) -> str:
+    p = get(conn, page_id)
+    return create(conn, p["title"] + "（コピー）", p["body"], actor, parent_id=p["parent_id"], space=p["space"], note="複製")
+
+
+def recent(conn: sqlite3.Connection, limit: int = 8) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT id, title, actor, updated_at, space FROM wiki_pages ORDER BY updated_at DESC LIMIT ?", (limit,))]
+
+
+def favorites(conn: sqlite3.Connection, me: str) -> list[str]:
+    import json
+    r = conn.execute("SELECT value FROM settings WHERE key=?", (f"wiki_fav:{me}",)).fetchone()
+    return json.loads(r["value"]) if r else []
+
+
+def toggle_favorite(conn: sqlite3.Connection, me: str, page_id: str) -> bool:
+    import json
+    favs = favorites(conn, me)
+    if page_id in favs:
+        favs.remove(page_id); added = False
+    else:
+        favs.append(page_id); added = True
+    db.set_setting(conn, f"wiki_fav:{me}", json.dumps(favs))
+    return added
+
+
+def toc(body: str) -> list[dict]:
+    out = []
+    for l in (body or "").splitlines():
+        m = re.match(r"^(#{1,3})\s+(.*)", l)
+        if m:
+            out.append({"level": len(m[1]), "text": m[2].strip()})
+    return out
+
+
 class WikiAdapter:
     """改訂間の段落差分を Event にする。ref は "wiki:<page_id>#<rev_id>:段落N" """
     name = "wiki"

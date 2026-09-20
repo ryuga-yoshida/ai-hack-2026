@@ -121,7 +121,7 @@ def list_channels(conn: sqlite3.Connection) -> list[str]:
     dm = {r[0] for r in conn.execute("SELECT name FROM chat_channels WHERE kind != 'channel'")}
     names = {r[0] for r in conn.execute("SELECT name FROM chat_channels WHERE kind = 'channel'")}
     names |= {r[0] for r in conn.execute("SELECT DISTINCT channel FROM chat_messages")} - dm
-    names = {n for n in names if not n.startswith("task:") and n != "tasks"}
+    names = {n for n in names if not n.startswith(("task:", "wiki:")) and n != "tasks"}
     order = {"general": 0, "sales": 1, "random": 2}
     return sorted(names, key=lambda n: (order.get(n, 9), n))
 
