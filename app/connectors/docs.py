@@ -128,3 +128,43 @@ class DocsAdapter:
                                         meta={**base_meta, "diff_kind": f"text_{d['kind']}", "old": d["old"], "new": d["new"],
                                               "row_key": _short(d["old"] or d["new"], 20), "column_label": "本文"}))
         return events
+
+
+# ---------- 書き出し（新規作成・簡易編集用） ----------
+
+_CT = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"""
+_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"""
+
+
+def docx_bytes(paragraphs: list[str]) -> bytes:
+    """段落のリストから最小の docx を作る（Word / LibreOffice で開ける）"""
+    import io
+    from xml.sax.saxutils import escape
+    body = "".join(f'<w:p><w:r><w:t xml:space="preserve">{escape(p)}</w:t></w:r></w:p>' for p in paragraphs)
+    doc = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+           f"{body}<w:sectPr/></w:body></w:document>")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", _CT)
+        z.writestr("_rels/.rels", _RELS)
+        z.writestr("word/document.xml", doc)
+    return buf.getvalue()
+
+
+def xlsx_bytes(sheet_name: str = "Sheet1") -> bytes:
+    import io
+    from openpyxl import Workbook
+    wb = Workbook()
+    wb.active.title = sheet_name[:31]
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

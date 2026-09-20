@@ -823,6 +823,62 @@ def artifacts_page(request: Request, path: str = "", tag: str = ""):
                   all_tags=tagmod.all_tags(conn), me=get_me(request), channels=chat.list_channels(conn))
 
 
+@app.post("/artifacts/new")
+def artifacts_new(request: Request, path: str = Form(""), name: str = Form(...), kind: str = Form("xlsx"),
+                  actor: str = Form("")):
+    """空のファイルを v1 として作り、編集画面へ"""
+    from app.connectors.docs import docx_bytes, xlsx_bytes
+    rel = _safe_rel(path)
+    stem = re.sub(r"[\\/:*?\"<>|]", "", name.strip())[:60] or "新規ファイル"
+    stem = re.sub(r"\.(xlsx|docx|md|txt)$", "", stem, flags=re.I)
+    ext = {"xlsx": ".xlsx", "docx": ".docx", "md": ".md", "txt": ".txt"}.get(kind, ".xlsx")
+    if ext == ".xlsx":
+        data = xlsx_bytes(stem)
+    elif ext == ".docx":
+        data = docx_bytes([stem])
+    else:
+        data = (f"# {stem}\n" if ext == ".md" else "").encode("utf-8")
+    rel_path = str(rel / f"{stem}{ext}") if str(rel) != "." else f"{stem}{ext}"
+    conn = get_conn()
+    who = actor.strip() or get_me(request) or "未設定"
+    _register_version(conn, rel_path, data, who, "", "")
+    key = rel_path[:-len(ext)]
+    resp = RedirectResponse(f"/artifacts/edit/{key}" if ext == ".xlsx" else f"/artifacts/write/{key}{ext}", status_code=303)
+    return set_me(resp, who) if actor.strip() else resp
+
+
+@app.get("/artifacts/write/{key:path}", response_class=HTMLResponse)
+def artifact_write(request: Request, key: str):
+    """docx / md / txt の簡易エディタ（段落＝行）。保存で新しい版"""
+    from app.connectors.docs import extract_paragraphs
+    from app.connectors.excel import version_series
+    series = version_series(LIB(), ext=None).get(key)
+    if not series:
+        raise HTTPException(404)
+    latest = series[-1][1]
+    paragraphs = extract_paragraphs(latest) or []
+    conn = get_conn()
+    return render("artifact_write.html", request, conn, key=key, fname=Path(key).name, version=series[-1][0],
+                  text="\n".join(paragraphs), me=get_me(request), channels=chat.list_channels(conn),
+                  ext=Path(key).suffix.lower())
+
+
+@app.post("/artifacts/write/{key:path}")
+def artifact_write_save(request: Request, key: str, text: str = Form(""), actor: str = Form(...),
+                        channel: str = Form(""), note: str = Form("")):
+    from app.connectors.docs import docx_bytes
+    ext = Path(key).suffix.lower()
+    if ext == ".docx":
+        data = docx_bytes([l for l in text.splitlines() if l.strip()])
+    else:
+        data = text.replace("\r\n", "\n").encode("utf-8")
+    conn = get_conn()
+    _register_version(conn, key, data, actor, note, channel)
+    folder = str(Path(key).parent) if str(Path(key).parent) != "." else ""
+    resp = RedirectResponse(f"/artifacts?path={folder}", status_code=303)
+    return set_me(resp, actor)
+
+
 @app.post("/artifacts/folder")
 def artifacts_new_folder(path: str = Form(""), name: str = Form(...)):
     rel = _safe_rel(path)

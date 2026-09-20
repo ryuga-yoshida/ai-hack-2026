@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}{{ fname }} を編集{% endblock %}
+{% block heading %}<a href="/artifacts" class="text-gray-400 hover:text-gray-600 mr-2">成果物</a><span class="text-gray-300 mr-2">/</span>{{ key }} <span class="text-xs text-gray-400 font-normal ml-2">v{{ version }} を編集中 → 保存すると v{{ version + 1 }}</span>{% endblock %}
+{% block content %}
+<form method="post" action="/artifacts/write/{{ key }}" class="max-w-4xl bg-white border border-gray-200 rounded-xl p-5 space-y-3">
+  <div class="text-xs text-gray-500">{% if ext == '.docx' %}1行 = 1段落として Word 文書（docx）に保存します。{% else %}テキストとして保存します。{% endif %}保存すると新しい版になり、段落単位の差分をエージェントが決定事項と突き合わせます。</div>
+  <textarea name="text" rows="22" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed">{{ text }}</textarea>
+  <div class="flex items-center gap-2 text-sm">
+    <input name="actor" value="{{ me }}" required list="people" placeholder="更新者" class="border border-gray-300 rounded-lg px-3 py-1.5 w-28">
+    <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
+    <select name="channel" class="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
+    <input name="note" placeholder="共有メッセージ（任意）" class="border border-gray-300 rounded-lg px-3 py-1.5 w-64">
+    <a href="/artifacts/file/{{ key }}" class="ml-auto text-gray-500 hover:underline">この版をダウンロード</a>
+    <button class="bg-indigo-600 text-white rounded-lg px-4 py-1.5 hover:bg-indigo-700">保存して新しい版にする</button>
+  </div>
+</form>
+{% endblock %}

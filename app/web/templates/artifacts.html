@@ -9,6 +9,7 @@
     <option value="">全タグ</option>{% for t in all_tags %}<option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>#{{ t.name }}</option>{% endfor %}
   </select>
 </form>
+<button @click="$dispatch('open-new')" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">＋ 新規作成</button>
 <button @click="$dispatch('open-folder')" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">＋ フォルダ</button>
 <button @click="$dispatch('open-upload')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">↑ アップロード</button>
 {% endblock %}
@@ -46,6 +47,7 @@
       </div>
       <div class="ml-auto flex items-center gap-2 text-xs shrink-0">
         {% if a.editable %}<a href="/artifacts/edit/{{ a.key[:-5] }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ ブラウザで編集</a>{% endif %}
+        {% if a.ext in ('.docx', '.md', '.txt') %}<a href="/artifacts/write/{{ a.key }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ 編集</a>{% endif %}
         {% if a.textual %}<button @click="open = !open; if (open && !$refs.pv.dataset.loaded) { fetch('/artifacts/text/{{ a.latest.rel }}').then(r => r.json()).then(j => { $refs.pv.innerHTML = j.paragraphs.map(p => '<p>' + p.replace(/</g,'&lt;') + '</p>').join('') || '<p class=\'text-gray-400\'>本文なし</p>'; $refs.pv.dataset.loaded = 1; }); }" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">👁 本文</button>{% endif %}
         <a href="/artifacts/file/{{ a.latest.rel }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">↓ ダウンロード</a>
         {% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[200px]">⇢ {{ t.title }}</a>{% endfor %}
@@ -82,6 +84,25 @@
       <select name="channel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} にリンクを共有</option>{% endfor %}</select>
       <input name="note" placeholder="共有メッセージ（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">アップロード</button></div>
+    </form>
+  </div>
+</div>
+<div x-data="{ open: false, kind: 'xlsx' }" @open-new.window="open = true" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/artifacts/new" class="bg-white rounded-xl shadow-xl p-6 w-[420px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">新規作成 <span class="text-xs text-gray-400 font-normal">→ /{{ folder or '（ルート）' }}</span></h3>
+      <input type="hidden" name="path" value="{{ folder }}">
+      <div class="grid grid-cols-4 gap-1 text-sm">
+        {% for k, label, cls in [('xlsx','スプレッドシート','bg-emerald-100 text-emerald-700'),('docx','Word 文書','bg-sky-100 text-sky-700'),('md','Markdown','bg-gray-200 text-gray-700'),('txt','テキスト','bg-gray-200 text-gray-700')] %}
+        <label class="flex flex-col items-center gap-1 border rounded-lg p-2 cursor-pointer" :class="kind === '{{ k }}' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'">
+          <input type="radio" name="kind" value="{{ k }}" x-model="kind" class="hidden"><span class="w-8 h-8 rounded grid place-items-center text-xs font-bold {{ cls }}">{{ k|upper }}</span><span class="text-xs">{{ label }}</span></label>
+        {% endfor %}
+      </div>
+      <input name="name" required placeholder="ファイル名（拡張子なし）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <input name="actor" value="{{ me }}" list="people" placeholder="作成者" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <p class="text-xs text-gray-500">v1 として作成し、そのまま編集画面を開きます。</p>
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">作成して開く</button></div>
     </form>
   </div>
 </div>
