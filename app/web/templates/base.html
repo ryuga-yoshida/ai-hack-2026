@@ -134,7 +134,7 @@
   <div x-show="show" class="fixed inset-0 bg-black/30 z-[60]" @click="show = false"></div>
   <div x-show="show" class="fixed inset-x-0 top-24 z-[61] grid place-items-start justify-center pointer-events-none">
     <div class="w-[560px] bg-white rounded-xl shadow-2xl border border-gray-200 pointer-events-auto overflow-hidden" @keydown.escape.window="show = false">
-      <input x-ref="q" x-model="q" @input="load()" @keydown.down.prevent="idx = Math.min(idx + 1, items.length - 1)" @keydown.up.prevent="idx = Math.max(idx - 1, 0)" @keydown.enter.prevent="go()" placeholder="ページ・タスク・人・ファイル・Wiki を検索…（↑↓ で選択、Enter で移動）" class="w-full text-sm px-4 py-3 border-0 border-b border-gray-200 focus:ring-0">
+      <input x-ref="q" x-model="q" @input="load()" @keydown.down.prevent="idx = Math.min(idx + 1, items.length - 1)" @keydown.up.prevent="idx = Math.max(idx - 1, 0)" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; $event.preventDefault(); go()" placeholder="ページ・タスク・人・ファイル・Wiki を検索…（↑↓ で選択、Enter で移動）" class="w-full text-sm px-4 py-3 border-0 border-b border-gray-200 focus:ring-0">
       <div class="max-h-80 overflow-y-auto py-1">
         <template x-for="(it, i) in items" :key="it.href + i">
           <a :href="it.href" class="flex items-center gap-3 px-4 py-2 text-sm" :class="i === idx ? 'bg-indigo-50' : 'hover:bg-gray-50'" @mouseenter="idx = i">
@@ -207,6 +207,7 @@ function mentionInput() {
       this.items = this.all.filter(p => !this.q || p.includes(this.q)).slice(0, 6); this.idx = 0; this.open = this.items.length > 0;
     },
     onKey(e) {
+      if (e.isComposing || e.keyCode === 229) return;   // 日本語入力の変換確定 Enter は無視
       if (!this.open) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); this.idx = (this.idx + 1) % this.items.length; }
       else if (e.key === 'ArrowUp') { e.preventDefault(); this.idx = (this.idx - 1 + this.items.length) % this.items.length; }

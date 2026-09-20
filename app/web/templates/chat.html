@@ -112,7 +112,7 @@
         <div class="border border-gray-300 rounded-xl focus-within:ring-2 focus-within:ring-indigo-200 bg-white">
           <div class="relative" x-data="mentionInput()">
             <div contenteditable="true" x-ref="ed" data-placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（Enter で送信・Shift+Enter で改行・@ メンション・#タグ）"
-              class="rich w-full text-sm px-3 py-2 min-h-[38px] max-h-40 overflow-y-auto outline-none rounded-t-xl" @input="onInput($event); typing(); syncHidden()" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); if (syncHidden()) $event.target.closest('form').requestSubmit(); }" @blur="setTimeout(() => open = false, 150)" @paste.prevent="document.execCommand('insertText', false, ($event.clipboardData || window.clipboardData).getData('text/plain'))"></div>
+              class="rich w-full text-sm px-3 py-2 min-h-[38px] max-h-40 overflow-y-auto outline-none rounded-t-xl" @input="onInput($event); typing(); syncHidden()" @keydown="onKey" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; if (!$event.shiftKey && !open) { $event.preventDefault(); if (syncHidden()) $event.target.closest('form').requestSubmit(); }" @blur="setTimeout(() => open = false, 150)" @paste.prevent="document.execCommand('insertText', false, ($event.clipboardData || window.clipboardData).getData('text/plain'))"></div>
             <input type="hidden" name="text" x-ref="hidden">
             {% include "_mention_menu.html" %}
           </div>
@@ -209,7 +209,7 @@
     <form method="post" action="/chat" class="border-t border-gray-200 p-3 flex gap-2">
       <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="reply_to" value="{{ thread.root.id }}">
       <div class="flex-1 relative" x-data="mentionInput()">
-        <textarea name="text" rows="1" placeholder="返信…（@ でメンション、Shift+Enter で改行）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-none" @input="onInput($event); $event.target.style.height = 'auto'; $event.target.style.height = Math.min($event.target.scrollHeight, 160) + 'px'" @keydown="onKey" @keydown.enter="if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
+        <textarea name="text" rows="1" placeholder="返信…（@ でメンション、Shift+Enter で改行）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 resize-none" @input="onInput($event); $event.target.style.height = 'auto'; $event.target.style.height = Math.min($event.target.scrollHeight, 160) + 'px'" @keydown="onKey" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; if (!$event.shiftKey && !open) { $event.preventDefault(); $event.target.form.requestSubmit(); }" @blur="setTimeout(() => open = false, 150)"></textarea>
         {% include "_mention_menu.html" %}
       </div>
       <button class="text-sm bg-indigo-600 text-white rounded-lg px-3">送信</button>

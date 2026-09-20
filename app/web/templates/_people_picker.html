@@ -10,7 +10,7 @@
         <button type="button" @click.stop="remove(p)" class="text-indigo-400 hover:text-indigo-800">×</button>
         <input type="hidden" name="{{ pp_name }}" :value="p"></span>
     </template>
-    <input x-ref="q" x-model="q" @focus="open = true" @input="open = true" @keydown.enter.prevent="add(list[0] || (q.trim() || null))" @keydown.backspace="if (!q && sel.length) remove(sel[sel.length-1])"
+    <input x-ref="q" x-model="q" @focus="open = true" @input="open = true" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; $event.preventDefault(); add(list[0] || (q.trim() || null))" @keydown.backspace="if (!q && sel.length) remove(sel[sel.length-1])"
            placeholder="{{ pp_placeholder or '名前で検索' }}" class="flex-1 min-w-[100px] text-sm border-0 focus:ring-0 px-1 py-0.5 bg-transparent" autocomplete="off">
   </div>
   <div x-show="open && (list.length || q.trim())" x-cloak class="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-lg shadow-lg text-sm max-h-56 overflow-y-auto">

@@ -24,7 +24,7 @@
     </div>
     <div class="text-sm mt-0.5 leading-relaxed break-words" x-show="!editing">{{ m.html|safe }}</div>
     <form method="post" action="/chat/{{ m.id }}/edit" x-show="editing" x-cloak class="mt-1 flex gap-2">
-      <textarea name="text" rows="2" class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1" @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); $event.target.form.requestSubmit(); }">{{ m.text }}</textarea>
+      <textarea name="text" rows="2" class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; if (!$event.shiftKey) { $event.preventDefault(); $event.target.form.requestSubmit(); }">{{ m.text }}</textarea>
       <button class="text-xs bg-indigo-600 text-white rounded px-2">保存</button>
       <button type="button" @click="editing = false" class="text-xs text-gray-500">取消</button>
     </form>
