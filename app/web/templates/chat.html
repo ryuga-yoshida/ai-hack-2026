@@ -11,7 +11,7 @@
 <a href="/chat?channel={{ channel }}&view=mentions" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 {% if view == 'mentions' %}bg-indigo-50 border-indigo-300{% endif %}">@ メンション</a>
 {% if not meeting %}
 <form method="post" action="/meet" class="flex">
-  <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="title" value="{{ ch.title if ch.kind != 'channel' else '#' + channel }} の会議"><input type="hidden" name="me" value="{{ me or '鈴木' }}">
+  <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="title" value="{{ ch.title if ch.kind != 'channel' else '#' + channel }} の会議">
   <button class="text-sm bg-emerald-600 text-white rounded-lg px-3 py-1.5 hover:bg-emerald-700">📹 会議を始める</button>
 </form>
 {% endif %}
@@ -49,7 +49,7 @@
     </nav>
     <div class="px-4 py-3 text-xs text-gray-500 border-t border-gray-200">
       <div class="font-semibold mb-1">メンバー{% if me %} <span class="font-normal text-gray-400">（あなた: {{ me }}）</span>{% endif %}</div>
-      {% for p in PEOPLE %}<a href="#" @click.prevent="$dispatch('open-new-dm', { with: '{{ p }}' })" class="flex items-center gap-1.5 py-0.5 hover:text-gray-900"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>{{ p }}</a>{% endfor %}
+      {% for p in people %}{% if p != me %}<a href="#" @click.prevent="$dispatch('open-new-dm', { with: '{{ p }}' })" data-person="{{ p }}" class="flex items-center gap-1.5 py-0.5 hover:text-gray-900"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>{{ p }}</a>{% endif %}{% endfor %}
     </div>
   </aside>
 
@@ -94,9 +94,11 @@
     <form method="post" action="/chat" class="border-t border-gray-200 p-3" x-data="{ attach: false }">
       <input type="hidden" name="channel" value="{{ channel }}">
       <div class="flex gap-2">
-        <input name="actor" value="{{ me }}" placeholder="名前" required list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-24">
-        <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
-        <input name="text" placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（@名前 / @チーム でメンション、#タグ でタグ付け）" required autocomplete="off" class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+        <span class="w-9 h-9 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold shrink-0 self-center" title="{{ me }} として投稿">{{ me|initials }}</span>
+        <div class="flex-1 relative" x-data="mentionInput()">
+          <input name="text" placeholder="{{ '#' + channel if ch.kind == 'channel' else ch.title }} にメッセージを送信（@ でメンション、#タグ）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" @input="onInput" @keydown="onKey" @blur="setTimeout(() => open = false, 150)">
+          {% include "_mention_menu.html" %}
+        </div>
         <button type="button" @click="attach = !attach" class="text-sm border border-gray-300 rounded-lg px-3 bg-white hover:bg-gray-50" title="ファイルのリンクを添付">📎</button>
         <button class="text-sm bg-indigo-600 text-white rounded-lg px-4 py-2 hover:bg-indigo-700">送信</button>
       </div>
@@ -120,8 +122,10 @@
     </div>
     <form method="post" action="/chat" class="border-t border-gray-200 p-3 flex gap-2">
       <input type="hidden" name="channel" value="{{ channel }}"><input type="hidden" name="reply_to" value="{{ thread.root.id }}">
-      <input name="actor" value="{{ me }}" placeholder="名前" required class="text-sm border border-gray-300 rounded-lg px-2 py-2 w-20">
-      <input name="text" placeholder="返信…" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+      <div class="flex-1 relative" x-data="mentionInput()">
+        <input name="text" placeholder="返信…（@ でメンション）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" @input="onInput" @keydown="onKey" @blur="setTimeout(() => open = false, 150)">
+        {% include "_mention_menu.html" %}
+      </div>
       <button class="text-sm bg-indigo-600 text-white rounded-lg px-3">送信</button>
     </form>
   </aside>
@@ -158,7 +162,6 @@
   <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
     <form method="post" action="/chat/conversations" class="bg-white rounded-xl shadow-xl p-6 w-[440px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
       <h3 class="font-semibold">新しいメッセージ</h3>
-      <div><label class="text-xs text-gray-500">あなた</label><input name="me" value="{{ me }}" required list="people" placeholder="名前" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
       <div><label class="text-xs text-gray-500">相手（複数選ぶとグループチャット）</label>
         <div class="mt-1" x-data x-init="$watch('with_', v => { if (v) { const pk = Alpine.$data($el.querySelector('[x-data]')); if (pk && !pk.sel.includes(v)) pk.sel.push(v); } })">
           {% with pp_name='members', pp_selected=[], pp_multi=true, pp_placeholder='名前で検索して追加' %}{% include "_people_picker.html" %}{% endwith %}

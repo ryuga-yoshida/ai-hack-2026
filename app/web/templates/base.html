@@ -49,6 +49,11 @@
       </a>
       {% endfor %}
     </nav>
+    <a href="/profile" class="flex items-center gap-2 px-4 py-2.5 border-t border-gray-200 hover:bg-gray-50">
+      {% if me %}<span class="w-8 h-8 rounded-full bg-indigo-600 text-white grid place-items-center text-sm font-semibold">{{ me|initials }}</span>
+      <div class="min-w-0"><div class="text-sm font-medium truncate">{{ me }}</div><div class="text-[11px] text-gray-400">プロフィール</div></div>
+      {% else %}<span class="w-8 h-8 rounded-full bg-gray-200 text-gray-500 grid place-items-center text-sm">?</span><div class="text-sm text-indigo-600">名前を設定</div>{% endif %}
+    </a>
     <div class="px-4 py-3 border-t border-gray-200 text-xs text-gray-500">
       <div class="flex items-center justify-between">
         <span>自動巡回</span>
@@ -79,6 +84,37 @@
   </div>
 </div>
 
+<!-- 初回: 名前の設定 -->
+{% if not me and request.url.path != '/profile' %}
+<div class="fixed inset-0 bg-black/40 z-50 grid place-items-center">
+  <form method="post" action="/profile" class="bg-white rounded-xl shadow-xl p-6 w-[400px] space-y-3 text-sm">
+    <h3 class="font-semibold text-base">はじめに、あなたの名前を選んでください</h3>
+    <p class="text-xs text-gray-500">投稿・コメント・会議・ファイル更新はこの名前で行われます。あとからプロフィールで変更できます。</p>
+    <input type="hidden" name="next" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+    <div class="grid grid-cols-3 gap-1">{% for p in people %}<button name="name" value="{{ p }}" class="border border-gray-200 rounded-lg px-2 py-2 hover:bg-indigo-50 hover:border-indigo-300 flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ p|initials }}</span>{{ p }}</button>{% endfor %}</div>
+    <div class="flex gap-2"><input name="name" placeholder="一覧にない場合は名前を入力" class="flex-1 border border-gray-300 rounded-lg px-3 py-2"><button class="bg-indigo-600 text-white rounded-lg px-4">決定</button></div>
+  </form>
+</div>
+{% endif %}
+
+<!-- 人のホバーカード -->
+<div x-data="personCard()" x-init="init()" x-cloak>
+  <div x-show="show" @mouseenter="hold = true" @mouseleave="hold = false; hide()" :style="`left:${x}px; top:${y}px`" class="fixed z-50 w-64 bg-white border border-gray-200 rounded-xl shadow-xl p-4 text-sm">
+    <div class="flex items-center gap-3"><span class="w-10 h-10 rounded-full bg-indigo-600 text-white grid place-items-center font-semibold" x-text="(p.name || '?').slice(0,1)"></span>
+      <div><div class="font-semibold" x-text="p.name"></div><div class="text-xs text-gray-500" x-text="p.email"></div></div></div>
+    <div class="mt-3 text-xs space-y-1 text-gray-600">
+      <div>チーム: <template x-for="t in (p.teams || [])" :key="t"><a :href="'/tags/' + t" class="px-1.5 rounded bg-violet-100 text-violet-800 mr-1" x-text="'@' + t"></a></template><span x-show="!(p.teams || []).length" class="text-gray-400">—</span></div>
+      <div>未完了タスク <b x-text="p.open_tasks"></b> · 期限切れ <b :class="p.overdue && 'text-red-600'" x-text="p.overdue"></b> · 未対応の検知 <b :class="p.open_findings && 'text-red-600'" x-text="p.open_findings"></b></div>
+      <div>最終活動: <span x-text="p.last_active ? p.last_active.slice(5,16).replace('T',' ') : '—'"></span></div>
+    </div>
+    <div class="mt-3 flex gap-2 text-xs">
+      <a :href="'/tasks?view=list&assignee=' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">タスク</a>
+      <a :href="'/chat/dm/' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">DM</a>
+      <a :href="'/mail?compose=' + encodeURIComponent(p.name || '')" class="border border-gray-300 rounded-lg px-2 py-1 hover:bg-gray-50">メール</a>
+    </div>
+  </div>
+</div>
+
 <!-- トースト -->
 <div class="fixed bottom-4 right-4 space-y-2 z-50" x-cloak>
   <template x-for="t in toasts" :key="t.id">
@@ -87,6 +123,53 @@
 </div>
 
 <script>
+// 人のホバーカード: data-person="名前" を持つ要素にマウスを乗せると表示
+function personCard() {
+  return {
+    show: false, hold: false, p: {}, x: 0, y: 0, timer: null, cache: {},
+    init() {
+      document.addEventListener('mouseover', e => {
+        const el = e.target.closest('[data-person]'); if (!el) return;
+        clearTimeout(this.timer);
+        this.timer = setTimeout(async () => {
+          const name = el.dataset.person; if (!name) return;
+          if (!this.cache[name]) { try { this.cache[name] = await (await fetch('/api/people/' + encodeURIComponent(name))).json(); } catch (err) { return; } }
+          this.p = this.cache[name];
+          const r = el.getBoundingClientRect(); this.x = Math.min(r.left, window.innerWidth - 270); this.y = r.bottom + 6 + 260 > window.innerHeight ? r.top - 200 : r.bottom + 6;
+          this.show = true;
+        }, 350);
+      });
+      document.addEventListener('mouseout', e => { if (e.target.closest('[data-person]')) { clearTimeout(this.timer); this.hide(); } });
+    },
+    hide() { setTimeout(() => { if (!this.hold) this.show = false; }, 200); },
+  };
+}
+// @メンション補完: mention-input の中で @ を打つと人・チームの候補を出す
+function mentionInput() {
+  return {
+    open: false, items: [], q: '', idx: 0, start: -1,
+    all: [...({{ people|tojson|forceescape if people is defined else '[]' }}), ...({{ teams_all|tojson|forceescape if teams_all is defined else '[]' }})],
+    onInput(e) {
+      const el = e.target, pos = el.selectionStart, text = el.value.slice(0, pos);
+      const m = text.match(/(?:^|\s)@([^\s@]*)$/);
+      if (!m) { this.open = false; return; }
+      this.start = pos - m[1].length - 1; this.q = m[1];
+      this.items = this.all.filter(p => !this.q || p.includes(this.q)).slice(0, 6); this.idx = 0; this.open = this.items.length > 0;
+    },
+    onKey(e) {
+      if (!this.open) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); this.idx = (this.idx + 1) % this.items.length; }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); this.idx = (this.idx - 1 + this.items.length) % this.items.length; }
+      else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); this.pick(e.target, this.items[this.idx]); }
+      else if (e.key === 'Escape') { this.open = false; }
+    },
+    pick(el, name) {
+      if (!name) return;
+      const before = el.value.slice(0, this.start), after = el.value.slice(el.selectionStart);
+      el.value = before + '@' + name + ' ' + after; const p = before.length + name.length + 2; el.setSelectionRange(p, p); el.focus(); this.open = false;
+    },
+  };
+}
 function shell() {
   return {
     agent: {{ agent_state|tojson if agent_state is defined else '{}' }},

@@ -13,15 +13,7 @@
 {% block content %}
 {% if m.status == 'recording' %}
   {% if not me %}
-  <div class="grid place-items-center h-[calc(100vh-3.5rem)]">
-    <form method="get" class="bg-white border border-gray-200 rounded-xl p-6 w-[380px] space-y-3 text-sm">
-      <h2 class="font-semibold">会議「{{ m.title }}」に参加</h2>
-      <div class="text-xs text-gray-500">参加中: {{ participants|join('・') or 'まだいません' }}</div>
-      <input name="me" placeholder="あなたの名前" required list="people" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-      <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
-      <button class="w-full bg-indigo-600 text-white rounded-lg py-2">カメラとマイクをオンにして参加</button>
-    </form>
-  </div>
+  <div class="grid place-items-center h-[calc(100vh-3.5rem)] text-sm text-gray-500">左下の「名前を設定」から名前を選ぶと参加できます。</div>
   {% else %}
   <div class="flex h-[calc(100vh-3.5rem)] bg-gray-900 text-white">
     <!-- 映像タイル -->

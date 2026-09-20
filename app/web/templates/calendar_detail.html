@@ -3,7 +3,7 @@
 {% block heading %}<a href="/calendar?d={{ e.start.date().isoformat() }}" class="text-gray-400 hover:text-gray-600 mr-2">予定表</a><span class="text-gray-300 mr-2">/</span>{{ e.title }}{% endblock %}
 {% block actions %}
 {% if not meeting or meeting.status == 'recording' %}
-<form method="post" action="/calendar/{{ e.id }}/start" class="flex gap-2"><input name="me" value="{{ me }}" placeholder="名前" required list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-24"><datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist>
+<form method="post" action="/calendar/{{ e.id }}/start" class="flex gap-2">
   <button class="text-sm bg-emerald-600 text-white rounded-lg px-3 py-1.5 hover:bg-emerald-700">📹 {{ '会議に参加' if meeting else '会議を始める' }}</button></form>
 {% endif %}
 <form method="post" action="/calendar/{{ e.id }}/delete" onsubmit="return confirm('この予定を削除しますか？')"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white text-gray-600 hover:text-red-600">削除</button></form>

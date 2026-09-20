@@ -12,8 +12,7 @@
 <style>#sheet { position: absolute; inset: 0; } .luckysheet-share-logo, .luckysheet_info_detail { display: none !important; }</style>
 {% endblock %}
 {% block actions %}
-<input id="actor" value="{{ me }}" placeholder="更新者" list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-28">
-<datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
+<input id="actor" type="hidden" value="{{ me }}">
 <select id="channel" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
 <input id="note" placeholder="共有メッセージ（任意）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-56">
 <button id="saveBtn" onclick="save()" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">保存して新しい版にする</button>
@@ -40,7 +39,6 @@ async function load() {
 }
 async function save() {
   const actor = document.getElementById('actor').value.trim();
-  if (!actor) { alert('更新者を入力してください'); return; }
   const btn = document.getElementById('saveBtn'); btn.disabled = true; btn.textContent = '保存中…';
   try { luckysheet.exitEditMode(); } catch (e) {}
   const sheets = luckysheet.getAllSheets();

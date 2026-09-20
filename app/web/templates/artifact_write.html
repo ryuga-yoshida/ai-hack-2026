@@ -6,8 +6,7 @@
   <div class="text-xs text-gray-500">{% if ext == '.docx' %}1行 = 1段落として Word 文書（docx）に保存します。{% else %}テキストとして保存します。{% endif %}保存すると新しい版になり、段落単位の差分をエージェントが決定事項と突き合わせます。</div>
   <textarea name="text" rows="22" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed">{{ text }}</textarea>
   <div class="flex items-center gap-2 text-sm">
-    <input name="actor" value="{{ me }}" required list="people" placeholder="更新者" class="border border-gray-300 rounded-lg px-3 py-1.5 w-28">
-    <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
+    <span class="text-xs text-gray-500">更新者: <b>{{ me }}</b></span>
     <select name="channel" class="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に共有</option>{% endfor %}</select>
     <input name="note" placeholder="共有メッセージ（任意）" class="border border-gray-300 rounded-lg px-3 py-1.5 w-64">
     <a href="/artifacts/file/{{ key }}" class="ml-auto text-gray-500 hover:underline">この版をダウンロード</a>

@@ -40,7 +40,7 @@
       <div class="space-y-3 mb-4">
         {% for m in comments %}
         <div class="flex gap-3">
-          <span class="w-8 h-8 rounded-full bg-teal-500 text-white grid place-items-center text-xs font-semibold shrink-0">{{ m.actor|initials }}</span>
+          <span data-person="{{ m.actor }}" class="w-8 h-8 rounded-full bg-teal-500 text-white grid place-items-center text-xs font-semibold shrink-0">{{ m.actor|initials }}</span>
           <div class="min-w-0 flex-1">
             <div class="text-xs"><span class="font-semibold text-sm">{{ m.actor }}</span> <span class="text-gray-400">{{ m.posted_at|dt }}</span>
               {% if m.mentions %}<span class="text-gray-400 ml-1">→ {{ m.mentions|join('・') }}</span>{% endif %}
@@ -53,9 +53,11 @@
         {% else %}<div class="text-sm text-gray-400">まだコメントはありません。</div>{% endfor %}
       </div>
       <form method="post" action="/tasks/{{ task.id }}/comment" class="flex gap-2">
-        <input name="actor" value="{{ me }}" placeholder="名前" required list="people" class="text-sm border border-gray-300 rounded-lg px-3 py-2 w-28">
-        <datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist>
-        <input name="text" placeholder="コメントを書く（@名前 でメンション、#タグ、SPO リンクも可）" required class="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2">
+        <span class="w-9 h-9 rounded-full bg-indigo-600 text-white grid place-items-center text-xs font-semibold shrink-0" title="{{ me }} としてコメント">{{ me|initials }}</span>
+        <div class="flex-1 relative" x-data="mentionInput()">
+          <input name="text" placeholder="コメントを書く（@ でメンション、#タグ、SPO リンクも可）" required autocomplete="off" class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2" @input="onInput" @keydown="onKey" @blur="setTimeout(() => open = false, 150)">
+          {% include "_mention_menu.html" %}
+        </div>
         <button class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-2">送信</button>
       </form>
     </div>

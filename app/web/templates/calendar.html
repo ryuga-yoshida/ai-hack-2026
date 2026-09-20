@@ -50,7 +50,7 @@
         <input name="location" placeholder="場所（任意）" class="border border-gray-300 rounded-lg px-3 py-1.5">
         <select name="channel" class="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">関連チャンネルなし</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に通知</option>{% endfor %}</select>
       </div>
-      <input name="organizer" value="{{ me }}" placeholder="主催者" list="people" class="w-full border border-gray-300 rounded-lg px-3 py-1.5"><datalist id="people">{% for p in people %}<option value="{{ p }}">{% endfor %}</datalist>
+      <div class="text-xs text-gray-500">主催者: <b>{{ me }}</b></div>
       <textarea name="description" rows="2" placeholder="説明（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea>
       <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="px-4 py-1.5 rounded-lg bg-indigo-600 text-white">作成</button></div>
     </form>

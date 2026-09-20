@@ -81,8 +81,8 @@
         <a href="/tasks/{{ t.id }}" class="text-sm font-medium leading-snug hover:underline block">{{ t.title }}</a>
         {% if m.tags or m.teams %}<div class="flex flex-wrap gap-1 mt-1">{% for tm in m.teams %}<span class="text-[10px] px-1.5 rounded bg-violet-100 text-violet-800">@{{ tm.name }}</span>{% endfor %}{% for tg in m.tags %}<span class="text-[10px] px-1.5 rounded bg-{{ tg.color }}-100 text-{{ tg.color }}-800">#{{ tg.name }}</span>{% endfor %}</div>{% endif %}
         <div class="flex items-center gap-2 mt-2 text-xs text-gray-500">
-          <span class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>
-          <span>{{ t.assignee or "未割当" }}</span>
+          <span data-person="{{ t.assignee }}" class="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-[10px] font-semibold">{{ t.assignee|initials }}</span>
+          <span data-person="{{ t.assignee }}">{{ t.assignee or "未割当" }}</span>
           {% if t.due_date %}<span class="{% if m.overdue %}text-red-600 font-medium{% endif %}">期限 {{ t.due_date.strftime('%m/%d') }}</span>{% endif %}
           <span class="ml-auto flex items-center gap-2">
             {% if m.n_findings %}<span class="text-red-600 font-semibold" title="未対応の検知">⚠ {{ m.n_findings }}</span>{% endif %}

@@ -35,8 +35,17 @@ def get_me(request: Request) -> str:
 
 
 def set_me(resp, name: str):
-    resp.set_cookie("me", quote(name.strip()), max_age=86400 * 30)
+    if name and name.strip():
+        resp.set_cookie("me", quote(name.strip()), max_age=86400 * 365)
     return resp
+
+
+def who(request: Request, actor: str = "") -> str:
+    """操作している人。フォームで明示されていなければプロフィール（cookie）を使う"""
+    name = (actor or "").strip() or get_me(request)
+    if not name:
+        raise HTTPException(400, "プロフィールで名前を設定してください（左下の「あなた」から）")
+    return name
 
 
 def get_conn() -> sqlite3.Connection:
@@ -95,14 +104,52 @@ def nav_context(conn: sqlite3.Connection) -> dict:
     open_findings = conn.execute(
         "SELECT COUNT(*) FROM findings WHERE status IN ('notified','pending')").fetchone()[0]
     unread_mail = 0
-    return {"nav_open_findings": open_findings, "agent_state": dict(agent.state), "people": people_list(conn)}
+    return {"nav_open_findings": open_findings, "agent_state": dict(agent.state), "people": people_list(conn),
+            "teams_all": [t["name"] for t in tagmod.teams(conn)]}
 
 
 def render(name: str, request: Request, conn: sqlite3.Connection | None = None, **ctx) -> HTMLResponse:
     if conn is not None:
         ctx.update(nav_context(conn))
+    ctx.setdefault("me", get_me(request))
     ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar"))
     return templates.TemplateResponse(request, name, ctx)
+
+
+# ---------- プロフィール ----------
+
+@app.get("/profile", response_class=HTMLResponse)
+def profile_page(request: Request):
+    conn = get_conn()
+    me = get_me(request)
+    stats = None
+    if me:
+        stats = {
+            "tasks": conn.execute("SELECT COUNT(*) FROM tasks WHERE assignee=? AND status != 'done'", (me,)).fetchone()[0],
+            "msgs": conn.execute("SELECT COUNT(*) FROM chat_messages WHERE actor=? AND deleted=0", (me,)).fetchone()[0],
+            "teams": [t["name"] for t in tagmod.teams(conn) if me in t["members"]],
+        }
+    return render("profile.html", request, conn, me=me, stats=stats)
+
+
+@app.get("/api/people/{name}")
+def person_card(name: str):
+    """ホバーカード用のプロフィール"""
+    conn = get_conn()
+    open_tasks = conn.execute("SELECT COUNT(*) FROM tasks WHERE assignee=? AND status != 'done'", (name,)).fetchone()[0]
+    overdue = sum(1 for t in db.list_tasks(conn) if t.assignee == name and t.due_date and t.due_date < date.today() and t.status != "done")
+    last = conn.execute("SELECT MAX(occurred_at) FROM events WHERE actor=?", (name,)).fetchone()[0]
+    findings = conn.execute(
+        "SELECT COUNT(*) FROM findings f JOIN tasks t ON t.id = f.task_id WHERE t.assignee=? AND f.status IN ('notified','pending')", (name,)).fetchone()[0]
+    return {"name": name, "teams": [t["name"] for t in tagmod.teams(conn) if name in t["members"]],
+            "open_tasks": open_tasks, "overdue": overdue, "last_active": last, "open_findings": findings,
+            "email": f"{name}@aoba-beverage.example"}
+
+
+@app.post("/profile")
+def profile_set(request: Request, name: str = Form(...), next: str = Form("")):
+    resp = RedirectResponse(next or "/profile", status_code=303)
+    return set_me(resp, name)
 
 
 # ---------- 共通: Finding カード ----------
@@ -369,13 +416,14 @@ def task_comments(conn: sqlite3.Connection, task_id: str) -> list[dict]:
 
 
 @app.post("/tasks/{task_id}/comment")
-def task_comment(task_id: str, request: Request, actor: str = Form(...), text: str = Form(...)):
+def task_comment(task_id: str, request: Request, actor: str = Form(""), text: str = Form(...)):
     """タスクへのコメント。タスク上に残り、Event としてこのタスクに紐付く（チャットには流さない）"""
     conn = get_conn()
     task = db.get_task(conn, task_id)
     if not task:
         raise HTTPException(404)
-    mid = chat.post_message(conn, f"task:{task_id}", actor.strip(), text.strip())
+    actor = who(request, actor)
+    mid = chat.post_message(conn, f"task:{task_id}", actor, text.strip())
     for tname in tagmod.apply_hashtags(conn, text, "message", mid):
         tagmod.link(conn, tname, "task", task_id)
     _ingest_chat(conn)
@@ -510,10 +558,21 @@ def team_chat(request: Request, name: str):
     return RedirectResponse(f"/chat?channel={ch}", status_code=303)
 
 
+@app.get("/chat/dm/{name}")
+def open_dm(request: Request, name: str):
+    conn = get_conn()
+    me = who(request)
+    if name == me:
+        return RedirectResponse("/chat", status_code=303)
+    ch = chat.ensure_conversation(conn, [me, name])
+    return RedirectResponse(f"/chat?channel={ch}", status_code=303)
+
+
 @app.post("/chat/conversations")
 def create_conversation(request: Request, members: list[str] = Form(...), title: str = Form(""), me: str = Form("")):
     conn = get_conn()
-    people = list(members) + ([me] if me.strip() else [])
+    me = who(request, me)
+    people = list(members) + [me]
     try:
         name = chat.ensure_conversation(conn, people, title.strip() or None)
     except ValueError as e:
@@ -538,9 +597,10 @@ def chat_thread_api(root_id: str):
 
 
 @app.post("/chat")
-def post_chat(request: Request, channel: str = Form("general"), actor: str = Form(...), text: str = Form(...),
+def post_chat(request: Request, channel: str = Form("general"), actor: str = Form(""), text: str = Form(...),
               reply_to: str = Form(""), attachment_url: str = Form(""), attachment_name: str = Form("")):
     conn = get_conn()
+    actor = who(request, actor)
     attachments = None
     if attachment_url.strip():
         url = attachment_url.strip()
@@ -548,14 +608,14 @@ def post_chat(request: Request, channel: str = Form("general"), actor: str = For
         attachments = [{"url": url, "name": name}]
         if url not in text:
             text = f"{text.strip()} {url}".strip()   # URL を本文にも入れる（成果物の自動登録が効く）
-    mid = chat.post_message(conn, channel.strip() or "general", actor.strip(), text.strip(),
+    mid = chat.post_message(conn, channel.strip() or "general", actor, text.strip(),
                             reply_to=reply_to.strip() or None, attachments=attachments)
     for tname in tagmod.apply_hashtags(conn, text, "message", mid):
         for a in (attachments or []):
             tagmod.link(conn, tname, "artifact", a["name"])
     _ingest_chat(conn)
     from app import agent
-    agent.request_tick(f"チャット投稿（#{channel.strip() or 'general'} {actor.strip()}）")
+    agent.request_tick(f"チャット投稿（#{channel.strip() or 'general'} {actor}）")
     linked = conn.execute("SELECT to_id FROM links WHERE from_type='event' AND from_id=? AND to_type='task' LIMIT 1", (mid,)).fetchone()
     if linked:
         for tname in tagmod.hashtags(text):
@@ -673,36 +733,34 @@ def _mail_meta(conn: sqlite3.Connection, m: dict) -> dict:
 
 
 @app.get("/mail", response_class=HTMLResponse)
-def mail_page(request: Request, folder: str = "inbox", thread: str = "", me: str = ""):
+def mail_page(request: Request, folder: str = "inbox", thread: str = ""):
     conn = get_conn()
-    me = me.strip() or get_me(request)
+    me = get_me(request)
     threads = mailmod.inbox(conn, me or None, folder)
     msgs = []
     if thread:
         mailmod.mark_read(conn, thread)
         msgs = [_mail_meta(conn, m) for m in mailmod.thread(conn, thread)]
-    resp = render("mail.html", request, conn, folder=folder, threads=threads, thread=thread, msgs=msgs, me=me,
+    return render("mail.html", request, conn, folder=folder, threads=threads, thread=thread, msgs=msgs, me=me,
                   unread=sum(t["unread"] for t in mailmod.inbox(conn, me or None, "inbox")))
-    if me:
-        set_me(resp, me)
-    return resp
 
 
 @app.post("/mail/send")
-def mail_send(request: Request, sender: str = Form(...), recipients: list[str] = Form(...), cc: list[str] = Form([]),
+def mail_send(request: Request, sender: str = Form(""), recipients: list[str] = Form(...), cc: list[str] = Form([]),
               subject: str = Form(...), body: str = Form(...), thread_id: str = Form(""),
               attachment_url: str = Form(""), attachment_name: str = Form("")):
     conn = get_conn()
+    sender = who(request, sender)
     att = None
     if attachment_url.strip():
         att = [{"url": attachment_url.strip(), "name": attachment_name.strip() or attachment_url.strip().rsplit("/", 1)[-1]}]
         if attachment_url.strip() not in body:
             body = f"{body.rstrip()}\n{attachment_url.strip()}"
-    tid = mailmod.send(conn, sender.strip(), list(recipients), subject.strip(), body.strip(), cc=list(cc),
+    tid = mailmod.send(conn, sender, list(recipients), subject.strip(), body.strip(), cc=list(cc),
                        thread_id=thread_id.strip() or None, attachments=att)
     _ingest_mail(conn)
     from app import agent
-    agent.request_tick(f"メール送信（{sender.strip()}: {subject.strip()[:20]}）")
+    agent.request_tick(f"メール送信（{sender}: {subject.strip()[:20]}）")
     resp = RedirectResponse(f"/mail?folder=sent&thread={thread_id.strip() or tid}", status_code=303)
     return set_me(resp, sender)
 
@@ -748,15 +806,14 @@ def calendar_create(request: Request, title: str = Form(...), date_: str = Form(
     en = datetime.fromisoformat(f"{date_}T{end}")
     if en <= st:
         en = st + __import__("datetime").timedelta(minutes=30)
-    who = organizer.strip() or get_me(request)
+    who_ = who(request, organizer)
     eid = cal.create(conn, title.strip(), st, en, attendees=list(attendees), location=location.strip() or None,
-                     description=description.strip() or None, channel=channel.strip() or None, organizer=who or None)
+                     description=description.strip() or None, channel=channel.strip() or None, organizer=who_)
     if channel.strip():
-        chat.post_message(conn, channel.strip(), who or "エージェント",
+        chat.post_message(conn, channel.strip(), who_,
                           f"📅 予定を追加しました: {title.strip()} {st:%m/%d %H:%M}〜{en:%H:%M} 参加: {'・'.join(attendees)}")
         _ingest_chat(conn)
-    resp = RedirectResponse(f"/calendar?view=week&d={date_}", status_code=303)
-    return set_me(resp, who) if who else resp
+    return RedirectResponse(f"/calendar?view=week&d={date_}", status_code=303)
 
 
 @app.get("/calendar/{event_id}", response_class=HTMLResponse)
@@ -781,17 +838,16 @@ def calendar_start_meeting(request: Request, event_id: str, me: str = Form("")):
     e = cal.get(conn, event_id)
     if not e:
         raise HTTPException(404)
-    who = me.strip() or get_me(request) or "参加者"
+    who_ = who(request, me)
     mid = e.get("meeting_id")
     if not mid or not conn.execute("SELECT 1 FROM meetings WHERE id=?", (mid,)).fetchone():
         mid = meet.create_meeting(conn, e["title"], channel=e.get("channel"))
         cal.update(conn, event_id, meeting_id=mid)
         if e.get("channel"):
-            chat.post_message(conn, e["channel"], who, f"📹 「{e['title']}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
+            chat.post_message(conn, e["channel"], who_, f"📹 「{e['title']}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
             _ingest_chat(conn)
-    meet.join(conn, mid, who)
-    resp = RedirectResponse(f"/meet/{mid}?me={who}", status_code=303)
-    return set_me(resp, who)
+    meet.join(conn, mid, who_)
+    return RedirectResponse(f"/meet/{mid}", status_code=303)
 
 
 @app.post("/calendar/{event_id}/delete")
@@ -836,15 +892,16 @@ def meet_page(request: Request):
 
 
 @app.post("/meet")
-def create_meeting(title: str = Form("定例会議"), me: str = Form(...), channel: str = Form("")):
+def create_meeting(request: Request, title: str = Form("定例会議"), me: str = Form(""), channel: str = Form("")):
     conn = get_conn()
+    me = who(request, me)
     mid = meet.create_meeting(conn, title, channel=channel.strip() or None)
-    meet.join(conn, mid, me.strip())
+    meet.join(conn, mid, me)
     if channel.strip():
-        chat.post_message(conn, channel.strip(), me.strip(),
+        chat.post_message(conn, channel.strip(), me,
                           f"📹 会議「{title}」を始めました。参加: {config.APP_BASE_URL}/meet/{mid}")
         _ingest_chat(conn)
-    resp = RedirectResponse(f"/meet/{mid}?me={me.strip()}", status_code=303)
+    resp = RedirectResponse(f"/meet/{mid}", status_code=303)
     set_me(resp, me)
     return resp
 
@@ -859,6 +916,7 @@ def meeting_extracted(conn: sqlite3.Connection, meeting_id: str) -> list[Event]:
 @app.get("/meet/{meeting_id}", response_class=HTMLResponse)
 def meet_room(request: Request, meeting_id: str, me: str = ""):
     conn = get_conn()
+    me = me.strip() or get_me(request)
     m = conn.execute("SELECT * FROM meetings WHERE id=?", (meeting_id,)).fetchone()
     if not m:
         # fixtures / Drive 由来の会議は utterance から組み立てて表示する
@@ -884,7 +942,7 @@ def meet_room(request: Request, meeting_id: str, me: str = ""):
             mm = re.match(r"^\[(\d{1,2}:\d{2})\]\s*([^:：]+)[:：]\s*(.*)$", raw)
             if mm:
                 lines.append({"time": mm[1], "actor": mm[2].strip(), "text": mm[3]})
-    return render("meet_room.html", request, conn, m=m, me=me.strip() or get_me(request),
+    return render("meet_room.html", request, conn, m=m, me=me,
                   participants=participants, lines=lines, extracted=meeting_extracted(conn, meeting_id))
 
 
@@ -909,7 +967,7 @@ def meet_status(meeting_id: str):
 
 
 @app.post("/meet/{meeting_id}/audio")
-async def meet_audio(meeting_id: str, speaker: str = Form(...), rec_started_at: str = Form(...),
+async def meet_audio(meeting_id: str, speaker: str = Form(""), rec_started_at: str = Form(...),
                      audio: UploadFile = File(...)):
     conn = get_conn()
     data = await audio.read()
@@ -1092,6 +1150,7 @@ def artifacts_page(request: Request, path: str = "", tag: str = ""):
 @app.post("/artifacts/new")
 def artifacts_new(request: Request, path: str = Form(""), name: str = Form(...), kind: str = Form("xlsx"),
                   actor: str = Form("")):
+    actor = who(request, actor)
     """空のファイルを v1 として作り、編集画面へ"""
     from app.connectors.docs import docx_bytes, xlsx_bytes
     rel = _safe_rel(path)
@@ -1106,11 +1165,9 @@ def artifacts_new(request: Request, path: str = Form(""), name: str = Form(...),
         data = (f"# {stem}\n" if ext == ".md" else "").encode("utf-8")
     rel_path = str(rel / f"{stem}{ext}") if str(rel) != "." else f"{stem}{ext}"
     conn = get_conn()
-    who = actor.strip() or get_me(request) or "未設定"
-    _register_version(conn, rel_path, data, who, "", "")
+    _register_version(conn, rel_path, data, actor, "", "")
     key = rel_path[:-len(ext)]
-    resp = RedirectResponse(f"/artifacts/edit/{key}" if ext == ".xlsx" else f"/artifacts/write/{key}{ext}", status_code=303)
-    return set_me(resp, who) if actor.strip() else resp
+    return RedirectResponse(f"/artifacts/edit/{key}" if ext == ".xlsx" else f"/artifacts/write/{key}{ext}", status_code=303)
 
 
 @app.get("/artifacts/write/{key:path}", response_class=HTMLResponse)
@@ -1130,9 +1187,10 @@ def artifact_write(request: Request, key: str):
 
 
 @app.post("/artifacts/write/{key:path}")
-def artifact_write_save(request: Request, key: str, text: str = Form(""), actor: str = Form(...),
+def artifact_write_save(request: Request, key: str, text: str = Form(""), actor: str = Form(""),
                         channel: str = Form(""), note: str = Form("")):
     from app.connectors.docs import docx_bytes
+    actor = who(request, actor)
     ext = Path(key).suffix.lower()
     if ext == ".docx":
         data = docx_bytes([l for l in text.splitlines() if l.strip()])
@@ -1217,25 +1275,25 @@ def _register_version(conn: sqlite3.Connection, rel_path: str, data: bytes | Non
 
 class SheetSave(BaseModel):
     sheets: list[dict]
-    actor: str
+    actor: str = ""
     channel: str = ""
     note: str = ""
 
 
 @app.post("/artifacts/save/{key:path}")
-def artifact_save(key: str, body: SheetSave):
+def artifact_save(request: Request, key: str, body: SheetSave):
     """ブラウザ編集（Luckysheet）の保存。JSON → xlsx → 新しい版"""
     conn = get_conn()
-    if not body.actor.strip():
-        raise HTTPException(422, "更新者が必要")
-    dest = _register_version(conn, key + ".xlsx", None, body.actor, body.note, body.channel, sheets=body.sheets)
+    actor = who(request, body.actor)
+    dest = _register_version(conn, key + ".xlsx", None, actor, body.note, body.channel, sheets=body.sheets)
     return {"ok": True, "file": dest.name}
 
 
 @app.post("/artifacts/upload")
-async def upload_artifact(request: Request, file: UploadFile = File(...), actor: str = Form(...), note: str = Form(""),
+async def upload_artifact(request: Request, file: UploadFile = File(...), actor: str = Form(""), note: str = Form(""),
                           channel: str = Form(""), path: str = Form("")):
     """任意の種類のファイルを新しい版としてアップロード（フォルダ指定可）"""
+    actor = who(request, actor)
     name = Path(file.filename or "upload.bin").name
     rel = _safe_rel(path)
     rel_path = str(rel / name) if str(rel) != "." else name

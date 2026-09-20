@@ -19,7 +19,7 @@
         <td class="px-4 py-2.5 text-gray-600">{{ m.participants|join('・') }}</td>
         <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_lines }}</td>
         <td class="px-4 py-2.5 text-right text-gray-600">{{ m.n_decisions }}</td>
-        <td class="px-4 py-2.5 text-right"><a href="/meet/{{ m.id }}{% if m.status == 'recording' and me %}?me={{ me }}{% endif %}" class="text-indigo-600 hover:underline">{% if m.status == 'recording' %}参加{% else %}開く{% endif %} →</a></td>
+        <td class="px-4 py-2.5 text-right"><a href="/meet/{{ m.id }}" class="text-indigo-600 hover:underline">{% if m.status == 'recording' %}参加{% else %}開く{% endif %} →</a></td>
       </tr>
       {% endfor %}
       {% for m in fixtures %}
@@ -45,9 +45,7 @@
     <form method="post" action="/meet" class="bg-white rounded-xl shadow-xl p-6 w-[420px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
       <h3 class="font-semibold">会議を始める</h3>
       <input name="title" value="定例会議" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-      <input name="me" value="{{ me }}" placeholder="あなたの名前" required list="people" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-      <datalist id="people">{% for p in PEOPLE %}<option value="{{ p }}">{% endfor %}</datalist>
-      <p class="text-xs text-gray-500">開始するとマイクの許可を求めます。他の参加者には会議室の URL を共有してください。</p>
+      <p class="text-xs text-gray-500"><b>{{ me }}</b> として開始します。カメラ・マイクの許可を求めます。他の参加者には会議室の URL を共有してください。</p>
       <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">開始</button></div>
     </form>
   </div>
