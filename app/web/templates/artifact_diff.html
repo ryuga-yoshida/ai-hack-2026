@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ name }} v{{ ver }} の差分{% endblock %}
+{% block heading %}<a href="/artifacts" class="text-gray-400 hover:text-gray-600 mr-2">成果物</a><span class="text-gray-300 mr-2">/</span>{{ name }} <span class="text-gray-400 font-normal text-sm ml-2">v{{ ver }} で変わったこと{% if prev %}（{{ prev }} との比較）{% endif %}</span>{% endblock %}
+{% block actions %}<a href="/artifacts/file/{{ rel }}" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white">↓ この版をダウンロード</a>{% endblock %}
+{% block content %}
+<div class="max-w-4xl space-y-4">
+  <div class="text-sm text-gray-600">更新者 <b>{{ info.actor or '—' }}</b> · {{ info.at|dt if info.at else '' }} · 変更 <b>{{ rows|length }}</b> 件（行の挿入・削除があってもセル単位で追跡。数式は別レコード）</div>
+  {% if not rows %}<div class="bg-white border border-dashed border-gray-300 rounded-xl p-8 text-center text-sm text-gray-500">{% if ver == 1 %}初版のため差分はありません。{% else %}まだ巡回で処理されていません。{% endif %}</div>{% endif %}
+  {% for r in rows %}{% set ev = r.ev %}
+  <div class="bg-white border rounded-xl px-5 py-4 {% if r.findings %}border-red-200{% else %}border-gray-200{% endif %}">
+    <div class="flex items-start gap-3">
+      <span class="text-[10px] px-1.5 py-0.5 rounded shrink-0 mt-0.5 {% if ev.meta.diff_kind == 'formula' %}bg-violet-100 text-violet-800{% elif ev.meta.diff_kind in ('row_added','row_removed') %}bg-amber-100 text-amber-800{% elif (ev.meta.diff_kind or '').startswith('text_') %}bg-sky-100 text-sky-800{% else %}bg-gray-100 text-gray-700{% endif %}">{{ {'value':'値','formula':'数式','row_added':'行追加','row_removed':'行削除','header_changed':'ヘッダ','text_changed':'段落変更','text_added':'段落追加','text_removed':'段落削除','binary':'更新'}.get(ev.meta.diff_kind, ev.meta.diff_kind) }}</span>
+      <div class="min-w-0 flex-1">
+        <div class="text-sm">{{ ev.text }}</div>
+        <div class="text-xs text-gray-500 mt-1 flex flex-wrap gap-3"><code class="bg-gray-100 rounded px-1">{{ ev.ref }}</code>
+          {% if ev.meta.old is not none and ev.meta.diff_kind not in ('row_added','row_removed') %}<span><span class="line-through text-gray-400">{{ ev.meta.old }}</span> → <b>{{ ev.meta.new }}</b></span>{% endif %}
+          {% if ev.meta.formula_cell and ev.meta.diff_kind == 'value' %}<span class="text-gray-400">計算結果の変化（判定対象外）</span>{% elif r.judged and not r.findings %}<span class="text-emerald-700">✓ 決定と矛盾なし</span>{% elif not r.judged %}<span class="text-gray-400">未判定</span>{% endif %}</div>
+        {% for f in r.findings %}<a href="/findings?status=all#finding-{{ f.id }}" class="block mt-2 text-xs rounded-lg px-3 py-2 {% if f.kind == 'contradiction' %}bg-red-50 text-red-800{% else %}bg-gray-50 text-gray-700{% endif %} hover:underline">⚠ {{ KIND_LABEL.get(f.kind, f.kind) }} · {{ f.summary }} <span class="opacity-60">confidence {{ '%.2f' % f.confidence }}</span></a>{% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

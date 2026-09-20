@@ -41,6 +41,17 @@
   </div>
   {% endif %}
   {% if f.reason %}<div class="text-sm mt-3 bg-gray-50 rounded-lg p-3"><span class="text-gray-500">判定理由:</span> {{ f.reason }}</div>{% endif %}
+  {% set ex = c.payload.explain if c.payload and c.payload.explain else none %}
+  {% if ex %}
+  <details class="mt-2 text-xs text-gray-600"><summary class="cursor-pointer text-gray-500 hover:text-gray-800">なぜこれを疑ったか（判定の内訳）</summary>
+    <div class="mt-1 bg-gray-50 rounded-lg p-3 grid grid-cols-2 gap-x-4 gap-y-1">
+      <div>候補の決定: <b>{{ (ex.candidates or [])|length }}</b> 件（タスク直結 {{ ex.direct }} / 埋め込み {{ ex.embedding_hits }}、語彙ゲートで除外 {{ ex.gated_out }}）</div>
+      <div>対象語: {{ (ex.gate_keywords or [])|join('・') or '—' }}</div>
+      <div>時系列ガードで除外: <b>{{ ex.skipped_guard }}</b> · LLM 判定: <b>{{ ex.judged }}</b> 回</div>
+      <div>文脈: 会話 {{ ex.utterances }} 件 · その後の決定 {{ ex.later }} · 他の決定 {{ ex.others }}{% if ex.same_subject is not none %} · 対象一致 {{ '○' if ex.same_subject else '×' }}{% endif %}</div>
+      {% if ex.task %}<div class="col-span-2">直結したタスク: {{ ex.task }}</div>{% endif %}
+    </div></details>
+  {% endif %}
   <div class="flex items-center gap-3 mt-3">
     <span class="text-xs text-gray-500">判定モデル: {{ f.model_used or 'ルールベース（LLM 不使用）' }}</span>
     {% if f.status in ('pending', 'notified') %}

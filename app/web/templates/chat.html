@@ -30,15 +30,15 @@
     </form>
     <nav class="flex-1 overflow-y-auto px-2 space-y-0.5 text-sm scrollbar-thin">
       {% for c in channels %}
-      <a href="/chat?channel={{ c }}" class="flex items-center justify-between px-2 py-1.5 rounded-lg {% if c == channel %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
-        <span># {{ c }}</span><span class="text-xs text-gray-400">{{ counts.get(c, 0) }}</span></a>
+      <a href="/chat?channel={{ c }}" class="flex items-center justify-between px-2 py-1.5 rounded-lg {% if c == channel %}bg-white font-medium shadow-sm{% elif unread.get(c) %}text-gray-900 font-semibold hover:bg-gray-200{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
+        <span># {{ c }}</span>{% if unread.get(c) and c != channel %}<span class="text-[10px] bg-indigo-600 text-white rounded-full px-1.5 py-0.5">{{ unread.get(c) }}</span>{% else %}<span class="text-xs text-gray-400">{{ counts.get(c, 0) }}</span>{% endif %}</a>
       {% endfor %}
       <div class="px-2 pt-4 pb-1 text-xs font-semibold text-gray-500 flex items-center justify-between">ダイレクトメッセージ
         <button @click="$dispatch('open-new-dm')" class="text-gray-400 hover:text-gray-700 text-base leading-none" title="新しいメッセージ">＋</button></div>
       {% for c in conversations %}
       <a href="/chat?channel={{ c.name }}" class="flex items-center gap-2 px-2 py-1.5 rounded-lg {% if c.name == channel %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}">
         {% if c.kind == 'dm' %}<span class="w-2 h-2 rounded-full bg-emerald-400"></span>{% else %}<span class="text-[10px] px-1 rounded bg-gray-300 text-gray-700">{{ c.members|length }}</span>{% endif %}
-        <span class="truncate">{{ c.title }}</span><span class="ml-auto text-xs text-gray-400">{{ counts.get(c.name, 0) }}</span></a>
+        <span class="truncate {% if unread.get(c.name) and c.name != channel %}font-semibold text-gray-900{% endif %}">{{ c.title }}</span>{% if unread.get(c.name) and c.name != channel %}<span class="ml-auto text-[10px] bg-indigo-600 text-white rounded-full px-1.5 py-0.5">{{ unread.get(c.name) }}</span>{% else %}<span class="ml-auto text-xs text-gray-400">{{ counts.get(c.name, 0) }}</span>{% endif %}</a>
       {% else %}<div class="px-2 text-xs text-gray-400">{% if me %}まだありません{% else %}名前を入力するとDMが表示されます{% endif %}</div>{% endfor %}
       <div class="px-2 pt-4 pb-1 text-xs font-semibold text-gray-500 flex items-center justify-between">チーム
         <a href="/tags" class="text-gray-400 hover:text-gray-700" title="タグ・チームを管理">⚙</a></div>
@@ -178,14 +178,37 @@ const ME = {{ me|tojson }};
 function chatPage() {
   return {
     newCh: false, last: {{ (messages[-1].posted_at if messages else '')|tojson }},
+    ws: null,
     init() {
       const l = this.$refs.list; if (l) l.scrollTop = l.scrollHeight;
-      {% if not q %}setInterval(() => this.poll(), 4000);{% endif %}
+      {% if not q %}this.connect(); setInterval(() => this.poll(), 15000);{% endif %}
     },
+    connect() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      this.ws = new WebSocket(`${proto}://${location.host}/ws/chat`);
+      this.ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.type === 'message' && m.channel === '{{ channel }}') this.poll(); else if (m.type === 'message') this.markUnread(m.channel); };
+      this.ws.onclose = () => setTimeout(() => this.connect(), 3000);
+      setInterval(() => { if (this.ws && this.ws.readyState === 1) this.ws.send('ping'); }, 25000);
+    },
+    markUnread(ch) { const a = document.querySelector(`a[href="/chat?channel=${ch}"]`); if (a) a.classList.add('font-semibold', 'text-gray-900'); },
     async poll() {
+      // 新着だけを取得して末尾に追記（入力中の内容は保持される）
       const r = await fetch(`/api/chat/messages?channel={{ channel }}&after=${encodeURIComponent(this.last)}`);
       const j = await r.json();
-      if (j.messages.length) { location.reload(); }   // 新着があれば描画し直す（サーバー描画を正とする）
+      if (!j.messages.length) return;
+      const box = document.getElementById('live');
+      for (const m of j.messages) {
+        this.last = m.posted_at;
+        const el = document.createElement('div'); el.className = 'flex gap-3 px-4 py-2 hover:bg-gray-50 rounded-lg';
+        const task = m.task ? `<a href="/tasks/${m.task.id}" class="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">⇢ ${m.task.title} <span class="opacity-60">${m.task.method}</span></a>` : '';
+        el.innerHTML = `<div class="w-8 h-8 rounded-full shrink-0 grid place-items-center text-xs font-semibold text-white ${m.actor === 'エージェント' ? 'bg-gray-800' : 'bg-indigo-500'}" data-person="${m.actor}">${m.actor.slice(0,1)}</div>
+          <div class="min-w-0 flex-1"><div class="flex items-baseline gap-2"><span class="font-semibold text-sm">${m.actor}</span><span class="text-xs text-gray-400">${m.posted_at.slice(5,16).replace('T',' ')}</span>${task}</div><div class="text-sm mt-0.5 leading-relaxed break-words">${m.html}</div></div>`;
+        box.before(el);
+      }
+      const l = this.$refs.list; if (l) l.scrollTop = l.scrollHeight;
+      // 紐付け・タグなどの付随情報は少し後にサーバー描画で反映（入力中でなければ）
+      const inp = document.querySelector('form[action="/chat"] input[name="text"]');
+      if (!inp || !inp.value) setTimeout(() => { if (!inp || !inp.value) location.reload(); }, 6000);
     },
   };
 }

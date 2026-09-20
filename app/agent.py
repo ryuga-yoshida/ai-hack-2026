@@ -2,6 +2,7 @@
 
 全て増分処理。sync_state と processed で新規分だけを回す。
 """
+import json
 import logging
 import sqlite3
 import time
@@ -362,7 +363,12 @@ def stage_detect(conn, stats: TickResult, now: datetime | None = None) -> None:
         if f:
             stats.findings.append(f)
             stats.actions[decide_action(conn, f)] += 1
-        db.mark_processed(conn, "detect", ch.id, {"finding": f.id if f else None})
+            try:
+                conn.execute("UPDATE findings SET payload=? WHERE id=?", (json.dumps({"explain": dict(detector.explain)}, ensure_ascii=False), f.id))
+                conn.commit()
+            except Exception:
+                pass
+        db.mark_processed(conn, "detect", ch.id, {"finding": f.id if f else None, "explain": dict(detector.explain)})
 
     for f in detector.detect_stalled(conn, now=now):
         stats.findings.append(f)
@@ -391,9 +397,46 @@ def stage_calendar(conn, stats: TickResult, now: datetime | None = None) -> None
         url = f"{config.APP_BASE_URL}/meet/{mid}"
         text = (f"⏰ {mins}分後に「{ev['title']}」です（{ev['start']:%H:%M}〜、{ev.get('location') or 'オンライン'}）。"
                 f"会議室を用意しました → {url}  参加: {'・'.join(ev['attendees'])}")
+        agenda = propose_agenda(conn, ev["attendees"], now)
+        if agenda:
+            text += "\n\n📋 今日話すべきこと（エージェントの提案）\n" + "\n".join(f"・{a}" for a in agenda)
         chat.post_message(conn, ev.get("channel") or "general", "エージェント", text)
         calendar.update(conn, ev["id"], reminded_at=db.now_iso())
         say(f"calendar: 「{ev['title']}」の {mins} 分前。会議室 {mid} を用意して #{ev.get('channel') or 'general'} にリマインド")
+
+
+def propose_agenda(conn, attendees: list[str], now: datetime | None = None, limit: int = 6) -> list[str]:
+    """参加者に関係する 未対応の検知・期限が近い/停滞タスク・保留事項 から議題案を作る（LLM 不使用）"""
+    from datetime import timedelta
+    now = now or datetime.now()
+    items: list[str] = []
+    att = set(attendees)
+    for r in conn.execute("SELECT * FROM findings WHERE status IN ('notified','pending') AND kind IN ('contradiction','orphan_change') ORDER BY confidence DESC"):
+        f = db.row_to_finding(r)
+        who = {decision_actor(conn, f), change_actor(conn, f)}
+        task = db.get_task(conn, f.task_id) if f.task_id else None
+        if task and task.assignee:
+            who.add(task.assignee)
+        if who & att:
+            items.append(f"未対応の検知: {f.summary[:70]}…" if len(f.summary) > 70 else f"未対応の検知: {f.summary}")
+    for t in db.list_tasks(conn):
+        if t.status == "done" or t.assignee not in att:
+            continue
+        if t.due_date and t.due_date <= (now + timedelta(days=3)).date():
+            items.append(f"期限{'切れ' if t.due_date < now.date() else '間近'}のタスク: {t.title}（{t.assignee}・{t.due_date:%m/%d}）")
+    for r in conn.execute("SELECT f.summary, t.title, t.assignee FROM findings f JOIN tasks t ON t.id = f.task_id WHERE f.kind='stalled' AND f.status IN ('notified','pending')"):
+        if r["assignee"] in att:
+            items.append(f"動きのないタスク: {r['title']}（{r['assignee']}）")
+    r = conn.execute("SELECT summary FROM meeting_summaries ORDER BY created_at DESC LIMIT 1").fetchone()
+    if r:
+        import json as _json
+        for o in (_json.loads(r["summary"]).get("open_issues") or [])[:3]:
+            items.append(f"前回の保留: {o}")
+    seen, out = set(), []
+    for i in items:
+        if i not in seen:
+            seen.add(i); out.append(i)
+    return out[:limit]
 
 
 # ---------- ループ本体 ----------

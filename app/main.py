@@ -666,9 +666,14 @@ def thread_rows(conn: sqlite3.Connection, root_id: str) -> dict | None:
 def _ingest_chat(conn: sqlite3.Connection) -> None:
     """投稿を即座に Event 化する（巡回を待たない）。コストゼロの紐付け（明示・文脈・スレッド）もその場で行い、
     残り（埋め込み・LLM）は巡回に任せる"""
-    from app import linker
+    from app import linker, rtc
     adapter = chat.ChatAdapter(conn)
     events = adapter.fetch(db.last_synced(conn, adapter.name))
+    for ev in events:
+        try:
+            rtc.notify_chat(str(ev.meta.get("channel", "")), ev.id)
+        except Exception:
+            pass
     db.save_events(conn, events)
     db.update_sync_state(conn, adapter.name)
     for ev in events:
@@ -693,18 +698,29 @@ def _active_meeting(conn: sqlite3.Connection, channel: str) -> dict | None:
     return dict(r) if r else None
 
 
+def _unread_counts(conn: sqlite3.Connection, me: str) -> dict[str, int]:
+    seen = {r["key"][len(f"chat_seen:{me}:"):]: r["value"] for r in conn.execute("SELECT key, value FROM settings WHERE key LIKE ?", (f"chat_seen:{me}:%",))}
+    out = {}
+    for r in conn.execute("SELECT channel, COUNT(*) n FROM chat_messages WHERE deleted=0 AND actor != ? AND posted_at > COALESCE((SELECT value FROM settings WHERE key = 'chat_seen:' || ? || ':' || channel), '') GROUP BY channel", (me, me)):
+        out[r["channel"]] = r["n"]
+    return out
+
+
 @app.get("/chat", response_class=HTMLResponse)
 def chat_page(request: Request, channel: str = "general", thread: str = "", q: str = "", view: str = ""):
     conn = get_conn()
     me = get_me(request)
     ch = chat.get_channel(conn, channel)
+    unread = _unread_counts(conn, me) if me else {}
+    if me:
+        db.set_setting(conn, f"chat_seen:{me}:{channel}", db.now_iso())
     results = [_message_dict(conn, r) for r in chat.search_messages(conn, q)] if q else []
     mentions = []
     if view == "mentions" and me:
         for r in conn.execute("SELECT * FROM chat_messages WHERE deleted=0 AND text LIKE '%@%' ORDER BY posted_at DESC LIMIT 100"):
             if me in tagmod.expand_mentions(conn, r["text"], PEOPLE):
                 mentions.append(_message_dict(conn, r))
-    return render("chat.html", request, conn, channel=channel, ch=ch, **_sidebar(conn, me),
+    return render("chat.html", request, conn, channel=channel, ch=ch, **_sidebar(conn, me), unread=unread,
                   messages=message_rows(conn, channel), thread=thread_rows(conn, thread) if thread else None,
                   q=q, results=results, me=me, view=view, mentions=mentions,
                   meeting=_active_meeting(conn, channel), channel_tags=tagmod.tags_for(conn, "channel", channel))
@@ -1216,6 +1232,19 @@ def share_minutes(request: Request, meeting_id: str, channel: str = Form("genera
     return RedirectResponse(f"/meet/{meeting_id}/minutes", status_code=303)
 
 
+@app.on_event("startup")
+async def _bind_loop():
+    import asyncio
+    from app import rtc
+    rtc.bind_loop(asyncio.get_running_loop())
+
+
+@app.websocket("/ws/chat")
+async def chat_ws(websocket: WebSocket):
+    from app import rtc
+    await rtc.chat_ws(websocket)
+
+
 @app.websocket("/ws/meet/{meeting_id}")
 async def meet_ws(websocket: WebSocket, meeting_id: str, name: str = "参加者"):
     from app import rtc
@@ -1511,6 +1540,34 @@ def artifact_edit(request: Request, key: str):
     return render("artifact_edit.html", request, conn, base=key, fname=Path(key).name,
                   latest=str(latest.relative_to(LIB())), version=series[-1][0], me=get_me(request),
                   channels=chat.list_channels(conn))
+
+
+@app.get("/artifacts/diff/{rel:path}", response_class=HTMLResponse)
+def artifact_diff(request: Request, rel: str):
+    """この版で何が変わったか（人間向け）。差分エンジンの出力と、それに対する検知を並べる"""
+    from app.connectors.excel import version_series
+    conn = get_conn()
+    root = LIB()
+    path = (root / _safe_rel(rel)).resolve()
+    if not path.is_file() or root.resolve() not in path.parents:
+        raise HTTPException(404)
+    m = re.match(r"^(?P<base>.+)_v(?P<ver>\d+)(?P<ext>\.[A-Za-z0-9]+)$", path.name)
+    key = str(path.parent.relative_to(root) / m["base"]) if str(path.parent.relative_to(root)) != "." else m["base"]
+    series = version_series(root, ext=None).get(key + m["ext"].lower(), [])
+    prev = next((p_ for n, p_ in reversed(series) if n < int(m["ver"])), None)
+    changes = [db.row_to_event(r) for r in conn.execute(
+        "SELECT * FROM events WHERE kind='artifact_change' AND json_extract(meta,'$.file')=? ORDER BY rowid", (path.name,))]
+    rows = []
+    for ch in changes:
+        fs = []
+        for r in conn.execute("SELECT * FROM findings WHERE evidence LIKE ? AND status != 'dismissed'", (f"%{ch.id}%",)):
+            fs.append(db.row_to_finding(r))
+        pr = conn.execute("SELECT result FROM processed WHERE stage='detect' AND key=?", (ch.id,)).fetchone()
+        rows.append({"ev": ch, "findings": fs, "judged": bool(pr)})
+    versions = json.loads((root / "versions.json").read_text(encoding="utf-8")) if (root / "versions.json").exists() else {}
+    info = versions.get(str(path.relative_to(root)), {})
+    return render("artifact_diff.html", request, conn, name=m["base"] + m["ext"], ver=int(m["ver"]), prev=prev.name if prev else None,
+                  rows=rows, info=info, rel=str(path.relative_to(root)), key=key)
 
 
 @app.get("/artifacts/text/{rel:path}")

@@ -57,7 +57,7 @@
       <tbody>{% for v in a.versions|reverse %}
         <tr class="border-t border-gray-100"><td class="py-1.5">v{{ v.n }} <span class="text-gray-400">{{ v.file }}</span></td><td>{{ v.actor or '—' }}</td><td>{{ v.at|dt }}</td>
           <td class="text-right text-gray-500">{{ (v.size / 1024)|round(1) }} KB</td>
-          <td class="text-right">{% if v.changes %}{{ v.changes }} 件{% else %}<span class="text-gray-400">{{ '初版' if v.n == 1 else '未処理' }}</span>{% endif %}</td>
+          <td class="text-right">{% if v.changes %}<a href="/artifacts/diff/{{ v.rel }}" class="text-indigo-600 hover:underline" title="この版で何が変わったか">{{ v.changes }} 件</a>{% else %}<span class="text-gray-400">{{ '初版' if v.n == 1 else '未処理' }}</span>{% endif %}</td>
           <td class="text-right">{% if v.findings %}<a href="/findings?status=all&file={{ v.file }}" class="text-red-600 font-semibold hover:underline" title="この版の検知だけを見る">⚠ {{ v.findings }}</a>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
           <td class="text-right"><a href="/artifacts/file/{{ v.rel }}" class="text-gray-400 hover:text-gray-700" title="この版をダウンロード">↓</a></td></tr>
       {% endfor %}</tbody>

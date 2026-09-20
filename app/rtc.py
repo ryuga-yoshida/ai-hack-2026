@@ -78,3 +78,40 @@ async def handle(ws: WebSocket, room: str, name: str) -> None:
 
 def room_members(room: str) -> list[str]:
     return list(rooms.get(room, {}).keys())
+
+
+# ---------- チャットの更新通知（WebSocket push） ----------
+
+chat_subscribers: set[WebSocket] = set()
+
+
+async def chat_ws(ws: WebSocket) -> None:
+    await ws.accept()
+    chat_subscribers.add(ws)
+    try:
+        while True:
+            await ws.receive_text()   # クライアントからの ping を待つだけ
+    except Exception:
+        pass
+    finally:
+        chat_subscribers.discard(ws)
+
+
+def notify_chat(channel: str, msg_id: str) -> None:
+    """投稿があったことを購読者に知らせる（同期コードから呼ぶ）"""
+    import asyncio
+    payload = json.dumps({"type": "message", "channel": channel, "id": msg_id})
+    for ws in list(chat_subscribers):
+        try:
+            loop = getattr(ws, "_loop", None) or asyncio.get_event_loop()
+            asyncio.run_coroutine_threadsafe(ws.send_text(payload), _main_loop) if _main_loop else None
+        except Exception:
+            chat_subscribers.discard(ws)
+
+
+_main_loop = None
+
+
+def bind_loop(loop) -> None:
+    global _main_loop
+    _main_loop = loop
