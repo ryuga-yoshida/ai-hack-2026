@@ -57,6 +57,22 @@ CREATE TABLE IF NOT EXISTS meeting_notes (
     updated_by    TEXT,
     updated_at    TEXT
 );
+CREATE TABLE IF NOT EXISTS meeting_captions (
+    id            TEXT PRIMARY KEY,
+    meeting_id    TEXT NOT NULL,
+    speaker       TEXT NOT NULL,
+    text          TEXT NOT NULL,
+    at            TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS meeting_videos (
+    id            TEXT PRIMARY KEY,
+    meeting_id    TEXT NOT NULL,
+    speaker       TEXT NOT NULL,
+    path          TEXT NOT NULL,
+    mime          TEXT NOT NULL,
+    size          INTEGER NOT NULL,
+    rec_started_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS meeting_chat (
     id            TEXT PRIMARY KEY,
     meeting_id    TEXT NOT NULL,
@@ -99,6 +115,34 @@ def add_chat(conn: sqlite3.Connection, meeting_id: str, name: str, text: str) ->
     conn.execute("INSERT INTO meeting_chat (id, meeting_id, name, text, at) VALUES (?,?,?,?,?)",
                  (new_id(), meeting_id, name, text, datetime.now().replace(microsecond=0).isoformat()))
     conn.commit()
+
+
+def add_caption(conn: sqlite3.Connection, meeting_id: str, speaker: str, text: str) -> None:
+    conn.execute("INSERT INTO meeting_captions (id, meeting_id, speaker, text, at) VALUES (?,?,?,?,?)",
+                 (new_id(), meeting_id, speaker, text, datetime.now().replace(microsecond=0).isoformat()))
+    conn.commit()
+
+
+def captions(conn: sqlite3.Connection, meeting_id: str) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT * FROM meeting_captions WHERE meeting_id=? ORDER BY at, rowid", (meeting_id,))]
+
+
+def add_video(conn: sqlite3.Connection, meeting_id: str, speaker: str, data: bytes, mime: str, rec_started_at: datetime) -> str:
+    from app import config
+    vid = new_id()
+    d = config.DB_PATH.parent / "recordings" / meeting_id
+    d.mkdir(parents=True, exist_ok=True)
+    ext = ".mp4" if "mp4" in mime else ".webm"
+    path = d / f"{speaker}_{vid}{ext}"
+    path.write_bytes(data)
+    conn.execute("INSERT INTO meeting_videos (id, meeting_id, speaker, path, mime, size, rec_started_at) VALUES (?,?,?,?,?,?,?)",
+                 (vid, meeting_id, speaker, str(path), mime, len(data), rec_started_at.replace(microsecond=0).isoformat()))
+    conn.commit()
+    return vid
+
+
+def videos(conn: sqlite3.Connection, meeting_id: str) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT * FROM meeting_videos WHERE meeting_id=? ORDER BY rec_started_at", (meeting_id,))]
 
 
 def chat_log(conn: sqlite3.Connection, meeting_id: str) -> list[dict]:

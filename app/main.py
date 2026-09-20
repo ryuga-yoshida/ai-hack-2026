@@ -67,7 +67,8 @@ async def authorize_and_audit(request: Request, call_next):
         conn = db.connect()
         role = role_of(conn, me)
         denied = None
-        if role == "viewer" and not path.startswith(VIEWER_ALLOWED):
+        is_meeting_upload = path.startswith("/meet/") and path.endswith(("/audio", "/video", "/notes"))   # 会議参加者の録音・録画・メモは誰でも
+        if role == "viewer" and not path.startswith(VIEWER_ALLOWED) and not is_meeting_upload:
             denied = "閲覧者ロールでは変更できません"
         elif role == "member" and _admin_required(path):
             denied = "この操作は管理者のみ行えます"
@@ -2007,6 +2008,8 @@ def meet_room(request: Request, meeting_id: str, me: str = ""):
     return render("meet_room.html", request, conn, m=m, me=me, notes=meet.get_notes(conn, meeting_id),
                   chat_log=meet.chat_log(conn, meeting_id) if not m.get("readonly") else [],
                   tracks=meet.tracks(conn, meeting_id) if not m.get("readonly") else [],
+                  videos=meet.videos(conn, meeting_id) if not m.get("readonly") else [],
+                  captions=meet.captions(conn, meeting_id) if not m.get("readonly") else [],
                   participants=participants, lines=lines, extracted=meeting_extracted(conn, meeting_id))
 
 
@@ -2040,8 +2043,10 @@ def meet_delete(meeting_id: str):
     conn = get_conn()
     if not conn.execute("SELECT 1 FROM meetings WHERE id=?", (meeting_id,)).fetchone():
         raise HTTPException(404)
-    for tbl in ("meeting_tracks", "meeting_participants", "meeting_notes", "meeting_chat"):
+    import shutil
+    for tbl in ("meeting_tracks", "meeting_participants", "meeting_notes", "meeting_chat", "meeting_captions", "meeting_videos"):
         conn.execute(f"DELETE FROM {tbl} WHERE meeting_id=?", (meeting_id,))
+    shutil.rmtree(config.DB_PATH.parent / "recordings" / meeting_id, ignore_errors=True)
     conn.execute("DELETE FROM meeting_summaries WHERE meeting_id=?", (meeting_id,))
     conn.execute("UPDATE cal_events SET meeting_id=NULL WHERE meeting_id=?", (meeting_id,))
     conn.execute("DELETE FROM meetings WHERE id=?", (meeting_id,))
@@ -2238,6 +2243,27 @@ async def meet_audio(meeting_id: str, speaker: str = Form(""), rec_started_at: s
     mime = (audio.content_type or "audio/webm").split(";")[0]
     tid = meet.add_track(conn, meeting_id, speaker.strip(), mime, data, started)
     return {"ok": True, "track": tid, "bytes": len(data)}
+
+
+@app.post("/meet/{meeting_id}/video")
+async def meet_video(meeting_id: str, speaker: str = Form(""), rec_started_at: str = Form(...), video: UploadFile = File(...)):
+    """話者ごとの映像（低ビットレート）。文字起こしには使わず、会議後の再生用"""
+    conn = get_conn()
+    data = await video.read(200 * 1024 * 1024 + 1)
+    if len(data) > 200 * 1024 * 1024:
+        raise HTTPException(413, "録画が大きすぎます（上限 200MB）")
+    started = datetime.fromisoformat(rec_started_at.replace("Z", "+00:00")).astimezone().replace(tzinfo=None)
+    vid = meet.add_video(conn, meeting_id, speaker.strip(), data, (video.content_type or "video/webm").split(";")[0], started)
+    return {"ok": True, "video": vid, "bytes": len(data)}
+
+
+@app.get("/meet/{meeting_id}/video/{video_id}")
+def meet_video_get(meeting_id: str, video_id: str):
+    conn = get_conn()
+    r = conn.execute("SELECT path, mime FROM meeting_videos WHERE id=? AND meeting_id=?", (video_id, meeting_id)).fetchone()
+    if not r or not Path(r["path"]).exists():
+        raise HTTPException(404)
+    return FileResponse(r["path"], media_type=r["mime"])
 
 
 def _finalize_job(meeting_id: str) -> None:

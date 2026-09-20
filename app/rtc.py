@@ -66,6 +66,16 @@ async def handle(ws: WebSocket, room: str, name: str) -> None:
                     conn = db.connect(); meet.add_chat(conn, room, name, text); conn.close()
                 except Exception as e:
                     log.warning("meeting chat save failed: %s", e)
+            elif t == "caption":
+                text = str(msg.get("text", ""))[:500]
+                await broadcast(room, {"type": "caption", "name": name, "text": text, "final": bool(msg.get("final"))}, exclude=name)
+                if msg.get("final") and text.strip():
+                    try:
+                        from app import db
+                        from app.connectors import meet
+                        conn = db.connect(); meet.add_caption(conn, room, name, text.strip()); conn.close()
+                    except Exception as e:
+                        log.warning("caption save failed: %s", e)
             elif t == "reaction":
                 await broadcast(room, {"type": "reaction", "name": name, "emoji": str(msg.get("emoji", "👍"))[:4]})
             elif t == "notes":
