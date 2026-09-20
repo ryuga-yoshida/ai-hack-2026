@@ -12,6 +12,8 @@
   <select name="channel" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">{% for c in channels %}<option value="{{ c }}">#{{ c }}</option>{% endfor %}</select>
   <button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">💬 チャットに共有</button>
 </form>
+<form method="post" action="/meet/{{ head.id }}/minutes/to_wiki" class="no-print"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="Wiki の「議事録」スペースにページとして保存">📄 Wiki に保存</button></form>
+<form method="post" action="/meet/{{ head.id }}/minutes/mail" class="no-print" onsubmit="return confirm('参加者全員に議事録をメールで送りますか？')"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">✉ 参加者にメール</button></form>
 <a href="/meet/{{ head.id }}/minutes?regen=1" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 no-print" title="サマリーを作り直す（mid モデル）">↻ 再生成</a>
 <button onclick="window.print()" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700 no-print">🖨 印刷 / PDF</button>
 {% endblock %}

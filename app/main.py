@@ -160,6 +160,8 @@ def render(name: str, request: Request, conn: sqlite3.Connection | None = None, 
     if conn is not None:
         ctx.update(nav_context(conn))
     ctx.setdefault("me", get_me(request))
+    if conn is not None and ctx["me"]:
+        ctx.setdefault("my_presence", presence_of(conn, ctx["me"]))
     ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar").replace("wiki_edit", "wiki").replace("wiki_diff", "wiki"))
     return templates.TemplateResponse(request, name, ctx)
 
@@ -222,25 +224,51 @@ def notifications_for(conn: sqlite3.Connection, me: str, limit: int = 100) -> li
     return out[:limit]
 
 
+def _notif_read_ids(conn: sqlite3.Connection, me: str) -> set[str]:
+    r = conn.execute("SELECT value FROM settings WHERE key=?", (f"notif_read:{me}",)).fetchone()
+    return set(json.loads(r["value"])) if r else set()
+
+
 @app.get("/notifications", response_class=HTMLResponse)
-def notifications_page(request: Request):
+def notifications_page(request: Request, kind: str = "", unread: str = ""):
     conn = get_conn()
     me = get_me(request)
     items = notifications_for(conn, me)
     seen = conn.execute("SELECT value FROM settings WHERE key=?", (f"notif_seen:{me}",)).fetchone()
     seen_at = seen["value"] if seen else ""
-    resp = render("notifications.html", request, conn, items=items, seen_at=seen_at)
-    db.set_setting(conn, f"notif_seen:{me}", db.now_iso())
-    return resp
+    read_ids = _notif_read_ids(conn, me)
+    for n in items:
+        n["unread"] = (n["at"] or "") > seen_at and n["id"] not in read_ids
+    counts = {k: sum(1 for n in items if n["kind"] == k) for k in ("finding", "mention", "reminder")}
+    if kind:
+        items = [n for n in items if n["kind"] == kind]
+    if unread:
+        items = [n for n in items if n["unread"]]
+    return render("notifications.html", request, conn, items=items, seen_at=seen_at, kind=kind, unread=unread, counts=counts,
+                  n_unread=sum(1 for n in notifications_for(conn, me) if (n["at"] or "") > seen_at and n["id"] not in read_ids))
+
+
+@app.post("/notifications/read")
+def notifications_read(request: Request, id: str = Form(""), all: str = Form("")):
+    conn = get_conn()
+    me = get_me(request)
+    if all:
+        db.set_setting(conn, f"notif_seen:{me}", db.now_iso())
+        db.set_setting(conn, f"notif_read:{me}", "[]")
+    elif id:
+        ids = _notif_read_ids(conn, me) | {id}
+        db.set_setting(conn, f"notif_read:{me}", json.dumps(sorted(ids)))
+    return RedirectResponse(request.headers.get("referer") or "/notifications", status_code=303)
 
 
 @app.get("/api/notifications/count")
 def notifications_count(request: Request):
     conn = get_conn()
     me = get_me(request)
+    read_ids = _notif_read_ids(conn, me) if me else set()
     seen = conn.execute("SELECT value FROM settings WHERE key=?", (f"notif_seen:{me}",)).fetchone()
     seen_at = seen["value"] if seen else ""
-    return {"count": sum(1 for n in notifications_for(conn, me) if (n["at"] or "") > seen_at)}
+    return {"count": sum(1 for n in notifications_for(conn, me) if (n["at"] or "") > seen_at and n["id"] not in read_ids)}
 
 
 # ---------- サインイン / プロフィール ----------
@@ -277,7 +305,8 @@ def profile_page(request: Request):
             "notifs": len(notifications_for(conn, me)),
             "teams": [t["name"] for t in tagmod.teams(conn) if me in t["members"]],
         }
-    return render("profile.html", request, conn, me=me, stats=stats, info=config.PERSON_INFO.get(me, {}))
+    return render("profile.html", request, conn, me=me, stats=stats, info=config.PERSON_INFO.get(me, {}),
+                  presence=presence_of(conn, me) if me else None, PRESENCE=PRESENCE)
 
 
 @app.get("/api/people/{name}")
@@ -291,13 +320,77 @@ def person_card(name: str):
         "SELECT COUNT(*) FROM findings f JOIN tasks t ON t.id = f.task_id WHERE t.assignee=? AND f.status IN ('notified','pending')", (name,)).fetchone()[0]
     return {"name": name, "teams": [t["name"] for t in tagmod.teams(conn) if name in t["members"]],
             "open_tasks": open_tasks, "overdue": overdue, "last_active": last, "open_findings": findings,
-            "email": f"{name}@aoba-beverage.example"}
+            "email": f"{name}@aoba-beverage.example", "presence": presence_of(conn, name), **config.PERSON_INFO.get(name, {})}
 
 
 @app.post("/profile")
 def profile_set(request: Request, name: str = Form(...), next: str = Form("")):
     resp = RedirectResponse(next or "/profile", status_code=303)
     return set_me(resp, name)
+
+
+PRESENCE = [("available", "在席", "bg-emerald-500"), ("busy", "取り込み中", "bg-red-500"), ("meeting", "会議中", "bg-red-500"),
+            ("away", "離席中", "bg-amber-400"), ("offline", "退勤", "bg-gray-400")]
+
+
+def presence_of(conn: sqlite3.Connection, name: str) -> dict:
+    r = conn.execute("SELECT value FROM settings WHERE key=?", (f"presence:{name}",)).fetchone()
+    d = json.loads(r["value"]) if r else {}
+    # 会議中は自動
+    if conn.execute("SELECT 1 FROM meeting_participants p JOIN meetings m ON m.id = p.meeting_id WHERE p.name=? AND m.status='recording' LIMIT 1", (name,)).fetchone():
+        d = {**d, "state": "meeting"}
+    st = d.get("state", "available")
+    label, color = next(((l, c) for k, l, c in PRESENCE if k == st), ("在席", "bg-emerald-500"))
+    return {"state": st, "label": label, "color": color, "message": d.get("message", "")}
+
+
+@app.post("/profile/presence")
+def profile_presence(request: Request, state: str = Form("available"), message: str = Form("")):
+    conn = get_conn()
+    me = get_me(request)
+    db.set_setting(conn, f"presence:{me}", json.dumps({"state": state if state in {k for k, _, _ in PRESENCE} else "available",
+                                                        "message": message.strip()[:80]}, ensure_ascii=False))
+    return RedirectResponse(request.headers.get("referer") or "/profile", status_code=303)
+
+
+@app.get("/api/presence")
+def presence_api():
+    conn = get_conn()
+    return {p: presence_of(conn, p) for p in people_list(conn)}
+
+
+@app.get("/api/palette")
+def palette_api(q: str = ""):
+    """コマンドパレット用: ページ・タスク・人・チャンネル・ファイル・Wiki を横断検索（軽量）"""
+    conn = get_conn()
+    q = q.strip().lower()
+    out = []
+    pages = [("ダッシュボード", "/"), ("検知結果", "/findings"), ("タスク", "/tasks"), ("チャット", "/chat"), ("メール", "/mail"),
+             ("予定表", "/calendar"), ("会議室", "/meet"), ("Wiki", "/wiki"), ("成果物", "/artifacts"), ("タグ・チーム", "/tags"),
+             ("エージェント", "/agent"), ("コスト", "/cost"), ("設定", "/settings"), ("通知", "/notifications"), ("プロフィール", "/profile")]
+    for label, href in pages:
+        if not q or q in label.lower():
+            out.append({"kind": "ページ", "label": label, "href": href})
+    if q:
+        for t in db.list_tasks(conn):
+            if q in t.title.lower():
+                out.append({"kind": "タスク", "label": t.title, "href": f"/tasks/{t.id}", "sub": STATUS_LABEL.get(t.status, "")})
+        for p in people_list(conn):
+            if q in p.lower():
+                out.append({"kind": "人", "label": p, "href": f"/chat/dm/{p}", "sub": "DM を開く"})
+        for c in chat.list_channels(conn):
+            if q in c.lower():
+                out.append({"kind": "チャンネル", "label": f"#{c}", "href": f"/chat?channel={c}"})
+        from app.connectors.excel import version_series
+        for k in version_series(LIB(), ext=None):
+            if q in k.lower():
+                out.append({"kind": "ファイル", "label": k, "href": f"/artifacts?q={k.rsplit('/', 1)[-1]}"})
+        for r in conn.execute("SELECT id, title FROM wiki_pages WHERE lower(title) LIKE ? LIMIT 10", (f"%{q}%",)):
+            out.append({"kind": "Wiki", "label": r["title"], "href": f"/wiki/{r['id']}"})
+        for r in conn.execute("SELECT id, title FROM cal_events WHERE lower(title) LIKE ? ORDER BY start_at DESC LIMIT 5", (f"%{q}%",)):
+            out.append({"kind": "予定", "label": r["title"], "href": f"/calendar/{r['id']}"})
+        out.append({"kind": "検索", "label": f"「{q}」を横断検索", "href": f"/search?q={q}"})
+    return {"items": out[:30]}
 
 
 # ---------- 共通: Finding カード ----------
@@ -1700,6 +1793,69 @@ def meeting_minutes(request: Request, meeting_id: str, regen: str = ""):
                   injected=injected, inj_leaked=inj_leaked,
                   findings=findings, participants=participants, counts=counts, start=start, duration=duration,
                   cal_ev=dict(cal_ev) if cal_ev else None, channels=chat.list_channels(conn))
+
+
+def _minutes_markdown(conn: sqlite3.Connection, meeting_id: str) -> tuple[str, str]:
+    """議事録サマリーを Markdown に（Wiki 保存・メール送付用）"""
+    from app import minutes as minutes_mod
+    src = _meeting_source(conn, meeting_id)
+    head, lines, transcript = src
+    summary = minutes_mod.summarize(conn, meeting_id, transcript)   # 保存済み or LLM キャッシュ（同じ文字起こしなら $0）
+    extracted = meeting_extracted(conn, meeting_id)
+    decisions = [e for e in extracted if e.kind == "decision"]
+    hints = [e for e in extracted if e.kind == "task_hint"]
+    people = []
+    for l in lines:
+        if l["actor"] not in people and l["actor"] != "全員":
+            people.append(l["actor"])
+    started = head.get("started_at", "")
+    md = [f"# {head['title']}", "", f"**日時**: {started[:16].replace('T', ' ')}  ", f"**参加者**: {'・'.join(people)}", ""]
+    if summary and summary.get("purpose"):
+        md += ["## 目的", summary["purpose"], ""]
+    if summary and summary.get("agenda"):
+        md += ["## 議題"] + [f"- **{a.get('title', '')}** {a.get('summary', '')}" if isinstance(a, dict) else f"- {a}" for a in summary["agenda"]] + [""]
+    md += ["## 決定事項"] + ([f"- {d.text}（{d.actor}）" for d in decisions] or ["- なし"]) + [""]
+    md += ["## タスク"] + ([f"- [ ] {h.text}（{h.actor}）" for h in hints] or ["- なし"]) + [""]
+    if summary and summary.get("open_issues"):
+        md += ["## 未決事項"] + [f"- {o}" for o in summary["open_issues"]] + [""]
+    if summary and summary.get("next"):
+        md += ["## 次回", str(summary["next"]), ""]
+    md += ["---", f"全文: {config.APP_BASE_URL}/meet/{meeting_id}"]
+    return head["title"], "\n".join(md)
+
+
+@app.post("/meet/{meeting_id}/minutes/to_wiki")
+def minutes_to_wiki(request: Request, meeting_id: str, space: str = Form("議事録")):
+    conn = get_conn()
+    if not _meeting_source(conn, meeting_id):
+        raise HTTPException(404)
+    title, md = _minutes_markdown(conn, meeting_id)
+    me = who(request)
+    head = _meeting_source(conn, meeting_id)[0]
+    page_title = f"{(head.get('started_at') or '')[:10]} {title}".strip()
+    existing = conn.execute("SELECT id FROM wiki_pages WHERE title=?", (page_title,)).fetchone()
+    if existing:
+        wikimod.update(conn, existing["id"], page_title, md, me, note="議事録から再生成")
+        pid = existing["id"]
+    else:
+        pid = wikimod.create(conn, page_title, md, me, space=space.strip() or "議事録")
+    return RedirectResponse(f"/wiki/{pid}", status_code=303)
+
+
+@app.post("/meet/{meeting_id}/minutes/mail")
+def minutes_mail(request: Request, meeting_id: str, recipients: list[str] = Form([])):
+    conn = get_conn()
+    if not _meeting_source(conn, meeting_id):
+        raise HTTPException(404)
+    title, md = _minutes_markdown(conn, meeting_id)
+    me = who(request)
+    head, lines, _ = _meeting_source(conn, meeting_id)
+    to = list(recipients) or [l["actor"] for l in lines if l["actor"] not in ("全員", me)]
+    to = list(dict.fromkeys(p for p in to if p != me))
+    tid = mailmod.send(conn, me, to, f"議事録: {title}", md.replace("# ", "").replace("**", ""),
+                       attachments=[{"url": f"{config.APP_BASE_URL}/meet/{meeting_id}/minutes", "name": "議事録サマリー"}])
+    _ingest_mail(conn)
+    return RedirectResponse(f"/mail?folder=sent&thread={tid}", status_code=303)
 
 
 @app.post("/meet/{meeting_id}/minutes/share")

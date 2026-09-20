@@ -15,6 +15,16 @@
       <div class="bg-gray-50 rounded-lg p-3"><div class="text-xs text-gray-500">チーム</div><div class="mt-1">{% for t in stats.teams %}<a href="/tags/{{ t }}" class="text-xs px-1.5 rounded bg-violet-100 text-violet-800 mr-1">@{{ t }}</a>{% else %}<span class="text-gray-400 text-xs">—</span>{% endfor %}</div></div>
     </div>
     {% endif %}
+    {% if presence %}
+    <form method="post" action="/profile/presence" class="border-t pt-4 space-y-2 text-sm">
+      <div class="font-semibold text-gray-800 text-xs">在席状態・ステータスメッセージ <span class="font-normal text-gray-400">（メンバー一覧やホバーカードに表示）</span></div>
+      <div class="flex gap-1 flex-wrap">
+        {% for k, l, c in PRESENCE %}<label class="flex items-center gap-1.5 border rounded-lg px-2.5 py-1.5 cursor-pointer {% if presence.state == k %}border-gray-900 bg-gray-50{% else %}border-gray-200{% endif %}"><input type="radio" name="state" value="{{ k }}" {% if presence.state == k %}checked{% endif %} class="hidden"><span class="w-2.5 h-2.5 rounded-full {{ c }}"></span>{{ l }}</label>{% endfor %}
+      </div>
+      <div class="flex gap-2"><input name="message" value="{{ presence.message }}" placeholder="例: 14時まで外出 / 商品D の企画書に集中中" maxlength="80" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5"><button class="border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">保存</button></div>
+      <div class="text-[11px] text-gray-400">会議室に参加中は自動で「会議中」になります。</div>
+    </form>
+    {% endif %}
     <div class="border-t pt-4 text-xs text-gray-500">別のアカウントで使うには「サインアウト」してからサインインし直してください。</div>
   </div>
   <aside class="bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-600 space-y-2">
