@@ -18579,5 +18579,83 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "summarize"
+ },
+ "c99291b5d7de94308fde82ff": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"展示会の出展は見送る\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"展示会の出展は今回は見送ることに決定します。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"検証結果を来週の定例で報告する\",\n      \"actor\": \"PERSON_3\",\n      \"quote\": \"検証結果を来週の定例で報告します。\",\n      \"confidence\": 1.0\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 709,
+   "completion_tokens": 1189,
+   "total_tokens": 1898,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 709,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 147,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1042
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "9909b016128ec49b27bea38b": {
+  "tier": "mid",
+  "content": "{\"task_id\": null, \"confidence\": 1.0, \"reason\": \"発言は「全社の避難訓練」に関するお知らせですが、提供された候補タスク（精算、商品Cの案内、検証結果の報告）のどれにも該当しないため。\"}",
+  "usage": {
+   "prompt_tokens": 299,
+   "completion_tokens": 262,
+   "total_tokens": 561,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 299,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 60,
+    "audio_tokens": 0,
+    "reasoning_tokens": 202
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
+ },
+ "8e1e34f0b27ed24e26b4fda4": {
+  "tier": "mid",
+  "content": "{\n  \"task_id\": null,\n  \"confidence\": 1.0,\n  \"reason\": \"発言「また階段か」は直前の「全社の避難訓練」に関するものですが、候補タスクの中に避難訓練に関連するタスクが含まれていないため。\"\n}",
+  "usage": {
+   "prompt_tokens": 297,
+   "completion_tokens": 492,
+   "total_tokens": 789,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 297,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 65,
+    "audio_tokens": 0,
+    "reasoning_tokens": 427
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "link"
  }
 }
