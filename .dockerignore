@@ -1,0 +1,12 @@
+.git
+.venv
+data/
+promo/
+docs/
+*.md
+!README.md
+.env
+fixtures/excel/.trash/
+fixtures/excel/チャット添付/
+__pycache__/
+*.pyc

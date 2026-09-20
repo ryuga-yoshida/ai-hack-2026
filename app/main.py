@@ -1,5 +1,6 @@
 """FastAPI エントリポイント。Jinja2 + Tailwind CDN + Alpine.js の UI。"""
 import json
+import os
 import re
 import sqlite3
 from datetime import date, datetime
@@ -2268,8 +2269,22 @@ def share_minutes(request: Request, meeting_id: str, channel: str = Form("genera
 @app.on_event("startup")
 async def _bind_loop():
     import asyncio
-    from app import rtc
+    from app import agent, persist, rtc
     rtc.bind_loop(asyncio.get_running_loop())
+    persist.restore()            # GCS_BUCKET があれば起動時に復元
+    persist.start_background()   # 定期バックアップ
+    conn = get_conn()
+    if conn.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0:
+        import threading
+        threading.Thread(target=agent.reset_demo, daemon=True).start()   # 空の環境 → 架空データを投入してキャッシュ再生
+    if os.getenv("AGENT_AUTOSTART", "0") == "1":
+        agent.set_enabled(True, int(os.getenv("AGENT_INTERVAL", "60")))
+
+
+@app.on_event("shutdown")
+async def _flush():
+    from app import persist
+    persist.backup(force=True)
 
 
 @app.websocket("/ws/chat")

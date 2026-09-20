@@ -9,3 +9,4 @@ pyyaml
 numpy
 python-multipart
 websockets
+google-cloud-storage
