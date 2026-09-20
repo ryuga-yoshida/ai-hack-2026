@@ -1566,7 +1566,7 @@ def artifact_diff(request: Request, rel: str):
         rows.append({"ev": ch, "findings": fs, "judged": bool(pr)})
     versions = json.loads((root / "versions.json").read_text(encoding="utf-8")) if (root / "versions.json").exists() else {}
     info = versions.get(str(path.relative_to(root)), {})
-    return render("artifact_diff.html", request, conn, name=m["base"] + m["ext"], ver=int(m["ver"]), prev=prev.name if prev else None,
+    return render("artifact_diff.html", request, conn, fname=m["base"] + m["ext"], ver=int(m["ver"]), prev=prev.name if prev else None,
                   rows=rows, info=info, rel=str(path.relative_to(root)), key=key)
 
 

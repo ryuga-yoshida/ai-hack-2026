@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}{{ name }} v{{ ver }} の差分{% endblock %}
-{% block heading %}<a href="/artifacts" class="text-gray-400 hover:text-gray-600 mr-2">成果物</a><span class="text-gray-300 mr-2">/</span>{{ name }} <span class="text-gray-400 font-normal text-sm ml-2">v{{ ver }} で変わったこと{% if prev %}（{{ prev }} との比較）{% endif %}</span>{% endblock %}
+{% block title %}{{ fname }} v{{ ver }} の差分{% endblock %}
+{% block heading %}<a href="/artifacts" class="text-gray-400 hover:text-gray-600 mr-2">成果物</a><span class="text-gray-300 mr-2">/</span>{{ fname }} <span class="text-gray-400 font-normal text-sm ml-2">v{{ ver }} で変わったこと{% if prev %}（{{ prev }} との比較）{% endif %}</span>{% endblock %}
 {% block actions %}<a href="/artifacts/file/{{ rel }}" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white">↓ この版をダウンロード</a>{% endblock %}
 {% block content %}
 <div class="max-w-4xl space-y-4">
