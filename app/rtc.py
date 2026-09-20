@@ -101,10 +101,11 @@ def notify_chat(channel: str, msg_id: str) -> None:
     """投稿があったことを購読者に知らせる（同期コードから呼ぶ）"""
     import asyncio
     payload = json.dumps({"type": "message", "channel": channel, "id": msg_id})
+    if _main_loop is None:
+        return
     for ws in list(chat_subscribers):
         try:
-            loop = getattr(ws, "_loop", None) or asyncio.get_event_loop()
-            asyncio.run_coroutine_threadsafe(ws.send_text(payload), _main_loop) if _main_loop else None
+            asyncio.run_coroutine_threadsafe(ws.send_text(payload), _main_loop)
         except Exception:
             chat_subscribers.discard(ws)
 
