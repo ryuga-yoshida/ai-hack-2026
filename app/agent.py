@@ -63,7 +63,7 @@ def request_tick(reason: str) -> bool:
 def _excel_signature() -> dict[str, float]:
     d = config.FIXTURES_DIR / "excel"
     return {str(p.relative_to(d)): p.stat().st_mtime for p in d.rglob("*")
-            if p.is_file() and p.name != "versions.json" and not p.name.startswith(".")} if d.exists() else {}
+            if p.is_file() and p.name != "versions.json" and not any(part.startswith(".") for part in p.relative_to(d).parts)} if d.exists() else {}
 
 
 _watch_sig: dict[str, float] = {}

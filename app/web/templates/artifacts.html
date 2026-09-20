@@ -4,68 +4,123 @@
   {% for c in crumbs %}<span class="text-gray-300 mx-2">/</span><a href="/artifacts?path={{ c.path }}" class="{% if not loop.last %}text-gray-400 hover:text-gray-600{% endif %}">{{ c.name }}</a>{% endfor %}{% endblock %}
 {% block actions %}
 <form method="get" action="/artifacts" class="flex items-center gap-2">
-  <input type="hidden" name="path" value="{{ folder }}">
+  <input type="hidden" name="path" value="{{ folder }}"><input type="hidden" name="view" value="{{ view }}">
+  <input name="q" value="{{ q }}" placeholder="ファイル名で検索（全フォルダ）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-48">
   <select name="tag" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
     <option value="">全タグ</option>{% for t in all_tags %}<option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>#{{ t.name }}</option>{% endfor %}
   </select>
+  <select name="sort" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+    {% for k, l in [('updated','更新順'),('name','名前順'),('size','サイズ順'),('versions','版数順'),('findings','検知順')] %}<option value="{{ k }}" {% if sort == k %}selected{% endif %}>{{ l }}</option>{% endfor %}
+  </select>
 </form>
+<div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+  <a href="/artifacts?path={{ folder }}&tag={{ tag }}&q={{ q }}&sort={{ sort }}&view=list" class="px-2.5 py-1.5 {% if view == 'list' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}" title="一覧">☰</a>
+  <a href="/artifacts?path={{ folder }}&tag={{ tag }}&q={{ q }}&sort={{ sort }}&view=cards" class="px-2.5 py-1.5 {% if view == 'cards' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}" title="詳細（版履歴つき）">▤</a>
+</div>
 <button @click="$dispatch('open-new')" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">＋ 新規作成</button>
 <button @click="$dispatch('open-folder')" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">＋ フォルダ</button>
 <button @click="$dispatch('open-upload')" class="text-sm bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700">↑ アップロード</button>
 {% endblock %}
 {% block content %}
-<div class="max-w-6xl space-y-4">
-  {% if not crumbs and not tag %}
-  <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900">
-    SharePoint のドキュメントライブラリの代わり。どんな種類のファイルも置け、版が自動で管理されます。<b>xlsx はセル差分</b>、<b>docx / pptx / md / txt は本文の段落差分</b>をエージェントが取り、決定事項と突き合わせます。ブラウザ編集・アップロード・監視フォルダ（OneDrive やデスクトップ）での保存のどれでも同じ。
+<div class="max-w-6xl space-y-4" x-data="lib()" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="dropFiles($event)">
+  <div x-show="dragging" x-cloak class="fixed inset-0 z-30 bg-indigo-600/20 border-4 border-dashed border-indigo-500 grid place-items-center pointer-events-none"><div class="bg-white rounded-xl px-6 py-4 text-lg font-semibold text-indigo-700 shadow-xl">ここにドロップして /{{ folder or 'ルート' }} にアップロード</div></div>
+  <form method="post" action="/artifacts/upload" enctype="multipart/form-data" class="hidden" x-ref="dropForm"><input type="hidden" name="path" value="{{ folder }}"><input type="file" name="file" x-ref="dropFile"></form>
+
+  {% if not crumbs and not tag and not q %}
+  <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 text-sm text-indigo-900 flex items-start gap-3">
+    <div class="flex-1">SharePoint のドキュメントライブラリの代わり。どんな種類のファイルも置け、版が自動で管理されます。<b>xlsx はセル差分</b>、<b>docx / pptx / md / txt は本文の段落差分</b>をエージェントが取り、決定事項と突き合わせます。ブラウザ編集・アップロード・ドラッグ＆ドロップ・監視フォルダ（OneDrive やデスクトップ）での保存のどれでも同じ。</div>
+    <a href="/artifacts?mine={{ me }}&view={{ view }}" class="shrink-0 text-xs border border-indigo-200 rounded-lg px-2 py-1 bg-white hover:bg-indigo-100">自分が更新したファイル</a>
   </div>
   {% endif %}
-  {% if tag %}<div class="text-sm text-gray-600">タグ <a href="/tags/{{ tag }}" class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">#{{ tag }}</a> で絞り込み中 <a href="/artifacts?path={{ folder }}" class="text-indigo-600 ml-2">解除</a></div>{% endif %}
+  {% if tag or q or mine %}<div class="text-sm text-gray-600 flex items-center gap-2 flex-wrap">
+    {% if tag %}タグ <a href="/tags/{{ tag }}" class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">#{{ tag }}</a>{% endif %}
+    {% if q %}「{{ q }}」の検索結果 {{ files|length }} 件{% endif %}{% if mine %}<b>{{ mine }}</b> が更新したファイル{% endif %}
+    <a href="/artifacts?path={{ folder }}&view={{ view }}" class="text-indigo-600 ml-1">解除</a></div>{% endif %}
 
-  {% if folders %}
+  {% if folders and not q and not mine %}
   <div class="grid grid-cols-4 gap-3">
     {% for f in folders %}
-    <a href="/artifacts?path={{ f.path }}&tag={{ tag }}" class="flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-3 hover:border-indigo-300 hover:shadow-sm">
-      <span class="text-2xl">📁</span><div><div class="font-medium text-sm">{{ f.name }}</div><div class="text-xs text-gray-500">{{ f.n_files }} ファイル</div></div></a>
+    <div class="group relative flex items-center gap-3 bg-white border border-gray-200 rounded-xl p-3 hover:border-indigo-300 hover:shadow-sm" x-data="{ menu: false }">
+      <a href="/artifacts?path={{ f.path }}&tag={{ tag }}&view={{ view }}" class="flex items-center gap-3 flex-1 min-w-0"><span class="text-2xl">📁</span><div class="min-w-0"><div class="font-medium text-sm truncate">{{ f.name }}</div><div class="text-xs text-gray-500">{{ f.n_files }} ファイル</div></div></a>
+      <button @click="menu = !menu" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 px-1">⋯</button>
+      <div x-show="menu" x-cloak @click.outside="menu = false" class="absolute right-2 top-12 z-20 w-56 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1">
+        <form method="post" action="/artifacts/folder/rename" class="px-3 py-1.5 flex gap-1"><input type="hidden" name="path" value="{{ f.path }}"><input name="new_name" value="{{ f.name }}" class="flex-1 text-xs border border-gray-300 rounded px-2 py-1"><button class="text-xs border border-gray-300 rounded px-2">改名</button></form>
+        <form method="post" action="/artifacts/folder/delete" onsubmit="return confirm('フォルダ「{{ f.name }}」と中のファイル（全版）をごみ箱へ移しますか？')"><input type="hidden" name="path" value="{{ f.path }}"><button class="w-full text-left px-3 py-1.5 text-red-600 hover:bg-red-50">フォルダを削除</button></form>
+      </div>
+    </div>
     {% endfor %}
   </div>
   {% endif %}
 
+  {% if view == 'list' %}
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500 text-left"><tr><th class="px-4 py-2">名前</th><th class="px-3 py-2">更新</th><th class="px-3 py-2">更新者</th><th class="px-3 py-2 text-right">版</th><th class="px-3 py-2 text-right">サイズ</th><th class="px-3 py-2 text-right">検知</th><th class="px-3 py-2">タグ / タスク</th><th class="px-3 py-2"></th></tr></thead>
+      <tbody>
+      {% for a in files %}
+      <tr class="border-t border-gray-100 hover:bg-gray-50 group" x-data="{ menu: false }">
+        <td class="px-4 py-2"><div class="flex items-center gap-2 min-w-0"><span class="w-7 h-7 rounded grid place-items-center font-bold text-[10px] shrink-0 {{ a.color }}">{{ a.icon }}</span>
+          <div class="min-w-0"><a href="{% if a.editable %}/artifacts/edit/{{ a.key[:-5] }}{% elif a.ext in ('.docx', '.md', '.txt') %}/artifacts/write/{{ a.key }}{% else %}/artifacts/file/{{ a.latest.rel }}{% endif %}" class="font-medium hover:underline block truncate">{{ a.name }}</a>{% if (q or tag or mine) and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-[11px] text-gray-400 hover:underline">📁 {{ a.folder }}</a>{% endif %}</div></div></td>
+        <td class="px-3 py-2 text-xs text-gray-500 whitespace-nowrap" title="{{ a.latest.at|dt }}">{{ a.latest.at|rel }}</td>
+        <td class="px-3 py-2 text-xs" data-person="{{ a.latest.actor }}">{{ a.latest.actor or '—' }}</td>
+        <td class="px-3 py-2 text-right text-xs"><a href="/artifacts?path={{ a.folder }}&view=cards#f-{{ a.key }}" class="hover:underline">v{{ a.latest.n }}</a></td>
+        <td class="px-3 py-2 text-right text-xs text-gray-500">{{ (a.latest.size / 1024)|round(1) }} KB</td>
+        <td class="px-3 py-2 text-right text-xs">{% if a.n_findings %}<a href="/findings?status=all&file={{ a.latest.file }}" class="text-red-600 font-semibold">⚠ {{ a.n_findings }}</a>{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
+        <td class="px-3 py-2"><div class="flex flex-wrap gap-1 items-center">{% for t in a.tags %}<a href="/artifacts?path={{ folder }}&tag={{ '' if t.name == tag else t.name }}&view=list" class="text-[10px] px-1.5 rounded {% if t.name == tag %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %}">#{{ t.name }}</a>{% endfor %}{% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="text-[10px] px-1.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[160px]">⇢ {{ t.title }}</a>{% endfor %}{% with tp_type='artifact', tp_id=a.key %}{% include "_tag_picker.html" %}{% endwith %}</div></td>
+        <td class="px-3 py-2 text-right relative">
+          <button @click="menu = !menu" class="text-gray-400 hover:text-gray-700 px-1.5 py-0.5 rounded hover:bg-gray-100">⋯</button>
+          <div x-show="menu" x-cloak @click.outside="menu = false" class="absolute right-2 top-9 z-20 w-64 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1 text-left">
+            {% with a=a %}{% include "_artifact_menu.html" %}{% endwith %}
+          </div>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="8" class="px-4 py-10 text-center text-gray-400">{% if q %}該当するファイルはありません{% else %}このフォルダにはファイルがありません。ドラッグ＆ドロップでアップロードできます。{% endif %}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
   {% for a in files %}
-  <div class="bg-white border border-gray-200 rounded-xl p-5" x-data="{ open: false }">
+  <div class="bg-white border border-gray-200 rounded-xl p-5" x-data="{ open: false, menu: false, preview: false }" id="f-{{ a.key }}">
     <div class="flex items-center gap-3">
       <span class="w-9 h-9 rounded-lg grid place-items-center font-bold text-xs {{ a.color }}">{{ a.icon }}</span>
       <div class="min-w-0">
-        <div class="font-semibold flex items-center gap-2 flex-wrap">{% if tag and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-xs text-gray-400 font-normal">📁 {{ a.folder }} /</a>{% endif %}{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · {{ a.latest.actor or '—' }} · {{ a.latest.at|dt }}</span>
+        <div class="font-semibold flex items-center gap-2 flex-wrap">{% if (tag or q or mine) and a.folder %}<a href="/artifacts?path={{ a.folder }}" class="text-xs text-gray-400 font-normal">📁 {{ a.folder }} /</a>{% endif %}{{ a.name }} <span class="text-xs text-gray-400 font-normal">v{{ a.latest.n }} · <span data-person="{{ a.latest.actor }}">{{ a.latest.actor or '—' }}</span> · {{ a.latest.at|rel }}</span>
           {% for t in a.tags %}<form method="post" action="/tags/{{ t.name }}/unlink" class="inline"><input type="hidden" name="target_type" value="artifact"><input type="hidden" name="target_id" value="{{ a.key }}">
             <span class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded {% if t.name == tag %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %} font-normal"><a href="/artifacts?path={{ folder }}&tag={{ '' if t.name == tag else t.name }}" title="{{ '絞り込みを解除' if t.name == tag else 'このタグで絞り込む' }}">#{{ t.name }}{% if t.name == tag %} ×{% endif %}</a><button class="opacity-50 hover:opacity-100" title="タグを外す">×</button></span></form>{% endfor %}
           {% with tp_type='artifact', tp_id=a.key %}{% include "_tag_picker.html" %}{% endwith %}
         </div>
-        <div class="text-xs text-gray-500 truncate">{{ a.latest.url }}</div>
+        <div class="text-xs text-gray-500 truncate">{{ a.share_url }}</div>
       </div>
       <div class="ml-auto flex items-center gap-2 text-xs shrink-0">
         {% if a.editable %}<a href="/artifacts/edit/{{ a.key[:-5] }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ ブラウザで編集</a>{% endif %}
         {% if a.ext in ('.docx', '.md', '.txt') %}<a href="/artifacts/write/{{ a.key }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">✎ 編集</a>{% endif %}
         {% if a.textual %}<button @click="open = !open; if (open && !$refs.pv.dataset.loaded) { fetch('/artifacts/text/{{ a.latest.rel }}').then(r => r.json()).then(j => { $refs.pv.innerHTML = j.paragraphs.map(p => '<p>' + p.replace(/</g,'&lt;') + '</p>').join('') || '<p class=\'text-gray-400\'>本文なし</p>'; $refs.pv.dataset.loaded = 1; }); }" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">👁 本文</button>{% endif %}
-        <a href="/artifacts/file/{{ a.latest.rel }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">↓ ダウンロード</a>
+        {% if a.image or a.pdf %}<button @click="preview = !preview" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">👁 プレビュー</button>{% endif %}
+        <a href="/artifacts/file/{{ a.latest.rel }}" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">↓</a>
+        <div class="relative"><button @click="menu = !menu" class="border border-gray-300 rounded-lg px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-700">⋯</button>
+          <div x-show="menu" x-cloak @click.outside="menu = false" class="absolute right-0 top-8 z-20 w-64 bg-white border border-gray-200 rounded-lg shadow-lg text-sm py-1 text-left">{% with a=a %}{% include "_artifact_menu.html" %}{% endwith %}</div></div>
         {% for t in a.tasks %}<a href="/tasks/{{ t.id }}" class="px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 truncate max-w-[200px]">⇢ {{ t.title }}</a>{% endfor %}
       </div>
     </div>
     <div x-show="open" x-cloak x-ref="pv" class="mt-3 text-sm bg-gray-50 rounded-lg p-3 space-y-1 max-h-64 overflow-y-auto"></div>
+    {% if a.image %}<div x-show="preview" x-cloak class="mt-3"><img src="/artifacts/file/{{ a.latest.rel }}" class="max-h-96 rounded-lg border border-gray-200"></div>{% endif %}
+    {% if a.pdf %}<div x-show="preview" x-cloak class="mt-3"><iframe src="/artifacts/file/{{ a.latest.rel }}" class="w-full h-[480px] rounded-lg border border-gray-200"></iframe></div>{% endif %}
     <table class="w-full text-sm mt-3">
-      <thead class="text-xs text-gray-500 text-left"><tr><th class="py-1">版</th><th>更新者</th><th>日時</th><th class="text-right">サイズ</th><th class="text-right">差分</th><th class="text-right">検知</th><th></th></tr></thead>
+      <thead class="text-xs text-gray-500 text-left"><tr><th class="py-1">版</th><th>更新者</th><th>日時</th><th>メモ</th><th class="text-right">サイズ</th><th class="text-right">差分</th><th class="text-right">検知</th><th></th></tr></thead>
       <tbody>{% for v in a.versions|reverse %}
-        <tr class="border-t border-gray-100"><td class="py-1.5">v{{ v.n }} <span class="text-gray-400">{{ v.file }}</span></td><td>{{ v.actor or '—' }}</td><td>{{ v.at|dt }}</td>
+        <tr class="border-t border-gray-100 group"><td class="py-1.5">v{{ v.n }} <span class="text-gray-400">{{ v.file }}</span></td><td data-person="{{ v.actor }}">{{ v.actor or '—' }}</td><td>{{ v.at|dt }}</td><td class="text-xs text-gray-500">{{ v.note }}</td>
           <td class="text-right text-gray-500">{{ (v.size / 1024)|round(1) }} KB</td>
           <td class="text-right">{% if v.changes %}<a href="/artifacts/diff/{{ v.rel }}" class="text-indigo-600 hover:underline" title="この版で何が変わったか">{{ v.changes }} 件</a>{% else %}<span class="text-gray-400">{{ '初版' if v.n == 1 else '未処理' }}</span>{% endif %}</td>
           <td class="text-right">{% if v.findings %}<a href="/findings?status=all&file={{ v.file }}" class="text-red-600 font-semibold hover:underline" title="この版の検知だけを見る">⚠ {{ v.findings }}</a>{% else %}<span class="text-gray-400">—</span>{% endif %}</td>
-          <td class="text-right"><a href="/artifacts/file/{{ v.rel }}" class="text-gray-400 hover:text-gray-700" title="この版をダウンロード">↓</a></td></tr>
+          <td class="text-right whitespace-nowrap"><a href="/artifacts/file/{{ v.rel }}" class="text-gray-400 hover:text-gray-700" title="この版をダウンロード">↓</a>
+            {% if not loop.first %}<form method="post" action="/artifacts/restore/{{ v.rel }}" class="inline" onsubmit="return confirm('v{{ v.n }} の内容を新しい版として復元しますか？')"><button class="ml-2 text-gray-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100" title="この版に戻す">↶ 復元</button></form>{% endif %}</td></tr>
       {% endfor %}</tbody>
     </table>
   </div>
   {% else %}
-  {% if not folders %}<div class="bg-white border border-dashed border-gray-300 rounded-xl p-10 text-center text-sm text-gray-500">このフォルダにはファイルがありません。</div>{% endif %}
+  {% if not folders %}<div class="bg-white border border-dashed border-gray-300 rounded-xl p-10 text-center text-sm text-gray-500">このフォルダにはファイルがありません。ドラッグ＆ドロップでアップロードできます。</div>{% endif %}
   {% endfor %}
+  {% endif %}
 </div>
 
 <div x-data="{ open: false }" @open-upload.window="open = true" x-cloak>
@@ -76,8 +131,8 @@
       <input type="hidden" name="path" value="{{ folder }}">
       <input type="file" name="file" required class="w-full text-sm">
       <p class="text-xs text-gray-500">同じ名前のファイルがあれば次の版（vN）になります。xlsx / docx / pptx / pdf / 画像 / md / txt など何でも可。</p>
+      <input name="note" placeholder="版のメモ（例: 第3四半期の実績を反映）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       <select name="channel" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">チャットに共有しない</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} にリンクを共有</option>{% endfor %}</select>
-      <input name="note" placeholder="共有メッセージ（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
       <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">アップロード</button></div>
     </form>
   </div>
@@ -111,4 +166,47 @@
     </form>
   </div>
 </div>
+<!-- 共有 / 改名・移動 モーダル -->
+<div x-data="{ open: false, key: '', name: '' }" @open-share.window="open = true; key = $event.detail.key; name = $event.detail.name" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/artifacts/share" class="bg-white rounded-xl shadow-xl p-6 w-[420px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">チャットで共有 <span class="text-xs text-gray-400 font-normal" x-text="name"></span></h3>
+      <input type="hidden" name="key" :value="key">
+      <select name="channel" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white">{% for c in channels %}<option value="{{ c }}">#{{ c }}</option>{% endfor %}</select>
+      <input name="note" placeholder="メッセージ（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+      <p class="text-xs text-gray-500">リンク付きで投稿されます。発言がタスクに紐付くと、このファイルもそのタスクの成果物として登録されます。</p>
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">投稿</button></div>
+    </form>
+  </div>
+</div>
+<div x-data="{ open: false, key: '', name: '', folder: '' }" @open-rename.window="open = true; key = $event.detail.key; name = $event.detail.name; folder = $event.detail.folder" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/artifacts/rename" class="bg-white rounded-xl shadow-xl p-6 w-[420px] pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">名前の変更 / 移動</h3>
+      <input type="hidden" name="key" :value="key">
+      <div><label class="text-xs text-gray-500">ファイル名</label><input name="new_name" x-model="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></div>
+      <div><label class="text-xs text-gray-500">フォルダ</label><select name="new_folder" x-model="folder" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"><option value="">（ルート）</option>{% for f in all_folders %}<option value="{{ f }}">{{ f }}</option>{% endfor %}</select></div>
+      <p class="text-xs text-gray-500">全ての版がまとめて移動し、タグ・タスクの参照も付け替わります。</p>
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">適用</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function lib() {
+  return {
+    dragging: false,
+    dropFiles(e) {
+      this.dragging = false;
+      const f = e.dataTransfer && e.dataTransfer.files; if (!f || !f.length) return;
+      const dt = new DataTransfer(); dt.items.add(f[0]);
+      this.$refs.dropFile.files = dt.files; this.$refs.dropForm.submit();
+      Alpine.$data(document.body).toast(f[0].name + ' をアップロード中…' + (f.length > 1 ? '（1件ずつ）' : ''));
+    },
+  };
+}
+</script>
 {% endblock %}

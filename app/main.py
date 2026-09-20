@@ -1803,14 +1803,20 @@ def _safe_rel(path: str) -> Path:
     return rel
 
 
-def library_rows(conn: sqlite3.Connection, folder: str = "", tag: str = "") -> dict:
-    """folder 直下のサブフォルダとファイル（版をまとめたもの）"""
+def library_rows(conn: sqlite3.Connection, folder: str = "", tag: str = "", q: str = "", sort: str = "updated",
+                 mine: str = "") -> dict:
+    """folder 直下のサブフォルダとファイル（版をまとめたもの）。q があればフォルダをまたいで名前検索"""
     from app.connectors.excel import version_series
     root = LIB()
     rel = _safe_rel(folder)
     cur = (root / rel) if str(rel) != "." else root
     versions = json.loads((root / "versions.json").read_text(encoding="utf-8")) if (root / "versions.json").exists() else {}
     tagged = set(tagmod.targets_for(conn, tag)["artifact"]) if tag else None
+    if q or mine:
+        tagged = tagged if tagged is not None else set()
+        cross = True
+    else:
+        cross = False
     folders = []
     if cur.exists():
         for d in sorted(x for x in cur.iterdir() if x.is_dir() and not x.name.startswith(".")):
@@ -1820,12 +1826,14 @@ def library_rows(conn: sqlite3.Connection, folder: str = "", tag: str = "") -> d
     for key, series in version_series(root, ext=None).items():
         k = Path(key)
         # タグで絞り込むときはフォルダをまたいで全ファイルから探す
-        if tagged is None and (str(k.parent) if str(k.parent) != "." else "") != (str(rel) if str(rel) != "." else ""):
+        if not cross and tagged is None and (str(k.parent) if str(k.parent) != "." else "") != (str(rel) if str(rel) != "." else ""):
             continue
         display = key                      # タグの対象 id はライブラリ相対パス（例: 商品企画/売上見込.xlsx）
         legacy = k.name                    # 旧来の id（ファイル名のみ）
         tags = tagmod.tags_for(conn, "artifact", display) or tagmod.tags_for(conn, "artifact", legacy)
-        if tagged is not None and display not in tagged and legacy not in tagged:
+        if tag and display not in tagged and legacy not in tagged:
+            continue
+        if q and q.lower() not in key.lower():
             continue
         vs = []
         for n, path in series:
@@ -1836,8 +1844,10 @@ def library_rows(conn: sqlite3.Connection, folder: str = "", tag: str = "") -> d
                 "SELECT 1 FROM events e WHERE e.kind='artifact_change' AND json_extract(e.meta,'$.file')=? AND f.evidence LIKE '%' || e.id || '%')",
                 (path.name,)).fetchone()[0]
             vs.append({"n": n, "file": path.name, "rel": str(path.relative_to(root)), "actor": info.get("actor"),
-                       "at": info.get("at") or datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
+                       "at": info.get("at") or datetime.fromtimestamp(path.stat().st_mtime).isoformat(), "note": info.get("note", ""),
                        "url": info.get("url"), "size": path.stat().st_size, "changes": changes, "findings": findings})
+        if mine and not any(v["actor"] == mine for v in vs):
+            continue
         ext = k.suffix.lower()
         stem = k.stem
         tasks = [t for t in db.list_tasks(conn) if any(a in (k.name, display) or a.rsplit(".", 1)[0] == stem for a in t.artifacts)]
@@ -1845,8 +1855,15 @@ def library_rows(conn: sqlite3.Connection, folder: str = "", tag: str = "") -> d
         files.append({"key": key, "name": k.name, "stem": stem, "ext": ext, "icon": icon, "color": color, "versions": vs,
                       "folder": str(k.parent) if str(k.parent) != "." else "",
                       "latest": vs[-1], "tasks": tasks, "tags": tags, "editable": ext == ".xlsx",
-                      "textual": ext in (".docx", ".pptx", ".md", ".txt", ".csv")})
-    files.sort(key=lambda a: a["latest"]["at"], reverse=True)
+                      "textual": ext in (".docx", ".pptx", ".md", ".txt", ".csv"), "image": ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"),
+                      "pdf": ext == ".pdf", "n_findings": sum(v["findings"] for v in vs), "n_changes": sum(v["changes"] for v in vs),
+                      "share_url": f"{config.APP_BASE_URL}/artifacts/file/{vs[-1]['rel']}"})
+    keyf = {"name": lambda a: a["key"].lower(), "size": lambda a: -a["latest"]["size"], "versions": lambda a: -len(a["versions"]),
+            "findings": lambda a: -a["n_findings"]}.get(sort)
+    if keyf:
+        files.sort(key=keyf)
+    else:
+        files.sort(key=lambda a: a["latest"]["at"], reverse=True)
     crumbs = []
     acc = Path(".")
     for part in ([] if str(rel) == "." else rel.parts):
@@ -1856,10 +1873,165 @@ def library_rows(conn: sqlite3.Connection, folder: str = "", tag: str = "") -> d
 
 
 @app.get("/artifacts", response_class=HTMLResponse)
-def artifacts_page(request: Request, path: str = "", tag: str = ""):
+def artifacts_page(request: Request, path: str = "", tag: str = "", q: str = "", sort: str = "updated", view: str = "", mine: str = ""):
     conn = get_conn()
-    return render("artifacts.html", request, conn, **library_rows(conn, path, tag), tag=tag,
-                  all_tags=tagmod.all_tags(conn), me=get_me(request), channels=chat.list_channels(conn))
+    view = view or request.cookies.get("lib_view", "list")
+    resp = render("artifacts.html", request, conn, **library_rows(conn, path, tag, q.strip(), sort, mine), tag=tag, q=q, sort=sort, view=view, mine=mine,
+                  all_tags=tagmod.all_tags(conn), me=get_me(request), channels=chat.list_channels(conn), all_folders=_all_folders())
+    resp.set_cookie("lib_view", view, max_age=86400 * 365)
+    return resp
+
+
+def _all_folders() -> list[str]:
+    root = LIB()
+    return sorted(str(d.relative_to(root)) for d in root.rglob("*") if d.is_dir() and not d.name.startswith(".") and ".versions" not in d.parts)
+
+
+def _series_paths(key: str) -> list[Path]:
+    from app.connectors.excel import version_series
+    return [p_ for _, p_ in version_series(LIB(), ext=None).get(key, [])]
+
+
+def _rewrite_versions(fn) -> None:
+    root = LIB()
+    vp = root / "versions.json"
+    versions = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else {}
+    versions = fn(versions)
+    vp.write_text(json.dumps(versions, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@app.post("/artifacts/rename")
+def artifact_rename(request: Request, key: str = Form(...), new_name: str = Form(""), new_folder: str = Form(None)):
+    """ファイル名の変更 / フォルダ移動（全版をまとめて）。タグ・タスクの参照も付け替える"""
+    import shutil
+    root = LIB()
+    k = Path(key)
+    paths = _series_paths(key)
+    if not paths:
+        raise HTTPException(404)
+    new_stem = re.sub(r"[/\\]", "", new_name.strip()) or k.stem
+    new_stem = new_stem[:-len(k.suffix)] if new_stem.lower().endswith(k.suffix.lower()) else new_stem
+    folder = _safe_rel(new_folder) if new_folder is not None else k.parent
+    new_key = str(folder / (new_stem + k.suffix)) if str(folder) != "." else new_stem + k.suffix
+    if new_key == key:
+        return RedirectResponse(f"/artifacts?path={k.parent if str(k.parent) != '.' else ''}", status_code=303)
+    if _series_paths(new_key):
+        raise HTTPException(409, "同じ名前のファイルがあります")
+    (root / folder).mkdir(parents=True, exist_ok=True)
+    mapping = {}
+    for p_ in paths:
+        m = re.match(r"^(.*)_v(\d+)$", p_.stem)
+        dest = root / folder / f"{new_stem}_v{m.group(2)}{p_.suffix}"
+        shutil.move(str(p_), str(dest))
+        mapping[str(p_.relative_to(root))] = str(dest.relative_to(root))
+    _rewrite_versions(lambda v: {mapping.get(kk, kk): vv for kk, vv in v.items()})
+    conn = get_conn()
+    conn.execute("UPDATE tag_links SET target_id=? WHERE target_type='artifact' AND target_id IN (?, ?)", (new_key, key, k.name))
+    for t in db.list_tasks(conn):
+        if any(a in (key, k.name) for a in t.artifacts):
+            t.artifacts = [new_key if a in (key, k.name) else a for a in t.artifacts]
+            db.save_task(conn, t)
+    conn.commit()
+    return RedirectResponse(f"/artifacts?path={folder if str(folder) != '.' else ''}", status_code=303)
+
+
+@app.post("/artifacts/delete")
+def artifact_delete(request: Request, key: str = Form(...)):
+    """ファイル（全版）をごみ箱（.trash）へ。versions.json からも外す"""
+    import shutil
+    root = LIB()
+    paths = _series_paths(key)
+    if not paths:
+        raise HTTPException(404)
+    trash = root / ".trash" / datetime.now().strftime("%Y%m%d%H%M%S")
+    trash.mkdir(parents=True, exist_ok=True)
+    rels = []
+    for p_ in paths:
+        rels.append(str(p_.relative_to(root)))
+        (trash / p_.parent.relative_to(root)).mkdir(parents=True, exist_ok=True)
+        shutil.move(str(p_), str(trash / p_.relative_to(root)))
+    _rewrite_versions(lambda v: {kk: vv for kk, vv in v.items() if kk not in rels})
+    conn = get_conn()
+    conn.execute("DELETE FROM tag_links WHERE target_type='artifact' AND target_id IN (?, ?)", (key, Path(key).name)); conn.commit()
+    parent = Path(key).parent
+    return RedirectResponse(f"/artifacts?path={parent if str(parent) != '.' else ''}", status_code=303)
+
+
+@app.post("/artifacts/restore/{rel:path}")
+def artifact_restore(request: Request, rel: str, channel: str = Form("")):
+    """古い版の内容を新しい版として復元する"""
+    root = LIB()
+    src = root / _safe_rel(rel)
+    if not src.exists():
+        raise HTTPException(404)
+    m = re.match(r"^(.*)_v(\d+)$", src.stem)
+    rel_path = str(src.parent.relative_to(root) / (m.group(1) + src.suffix)) if src.parent != root else m.group(1) + src.suffix
+    conn = get_conn()
+    actor = who(request)
+    try:
+        _register_version(conn, rel_path, src.read_bytes(), actor, f"v{m.group(2)} の内容に戻しました", channel)
+    except HTTPException as e:
+        if e.status_code != 409:
+            raise
+    parent = src.parent.relative_to(root)
+    return RedirectResponse(f"/artifacts?path={parent if str(parent) != '.' else ''}", status_code=303)
+
+
+@app.post("/artifacts/share")
+def artifact_share(request: Request, key: str = Form(...), channel: str = Form(...), note: str = Form("")):
+    """ファイルのリンクをチャットに投稿"""
+    conn = get_conn()
+    paths = _series_paths(key)
+    if not paths:
+        raise HTTPException(404)
+    actor = who(request)
+    url = f"{config.APP_BASE_URL}/artifacts/file/{paths[-1].relative_to(LIB())}"
+    mid = chat.post_message(conn, channel, actor, f"{note.strip() or Path(key).name + ' を共有します'} {url}",
+                            attachments=[{"url": url, "name": Path(key).name}])
+    _ingest_chat(conn)
+    from app import rtc
+    rtc.notify_chat(channel, mid)
+    return RedirectResponse(f"/chat?channel={channel}", status_code=303)
+
+
+@app.post("/artifacts/folder/rename")
+def folder_rename(path: str = Form(...), new_name: str = Form(...)):
+    import shutil
+    root = LIB()
+    rel = _safe_rel(path)
+    src = root / rel
+    if str(rel) == "." or not src.is_dir():
+        raise HTTPException(404)
+    new_name = re.sub(r"[/\\]", "", new_name.strip())
+    dest = src.parent / new_name
+    if dest.exists():
+        raise HTTPException(409, "同じ名前のフォルダがあります")
+    shutil.move(str(src), str(dest))
+    old, new = str(rel), str(dest.relative_to(root))
+    _rewrite_versions(lambda v: {(new + kk[len(old):] if kk.startswith(old + "/") else kk): vv for kk, vv in v.items()})
+    conn = get_conn()
+    for r in conn.execute("SELECT rowid, target_id FROM tag_links WHERE target_type='artifact' AND target_id LIKE ?", (old + "/%",)).fetchall():
+        conn.execute("UPDATE tag_links SET target_id=? WHERE rowid=?", (new + r["target_id"][len(old):], r["rowid"]))
+    conn.commit()
+    parent = dest.parent.relative_to(root)
+    return RedirectResponse(f"/artifacts?path={parent if str(parent) != '.' else ''}", status_code=303)
+
+
+@app.post("/artifacts/folder/delete")
+def folder_delete(path: str = Form(...)):
+    import shutil
+    root = LIB()
+    rel = _safe_rel(path)
+    src = root / rel
+    if str(rel) == "." or not src.is_dir():
+        raise HTTPException(404)
+    trash = root / ".trash" / datetime.now().strftime("%Y%m%d%H%M%S")
+    trash.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(trash / rel.name))
+    prefix = str(rel) + "/"
+    _rewrite_versions(lambda v: {kk: vv for kk, vv in v.items() if not kk.startswith(prefix)})
+    parent = rel.parent
+    return RedirectResponse(f"/artifacts?path={parent if str(parent) != '.' else ''}", status_code=303)
 
 
 @app.post("/artifacts/new")
@@ -2001,7 +2173,7 @@ def _register_version(conn: sqlite3.Connection, rel_path: str, data: bytes | Non
             tmp = Path(td) / Path(rel_path).name
             sheet_export.save_xlsx(sheets, tmp)
             data = tmp.read_bytes()
-    dest = register_version(data or b"", rel_path, actor.strip())
+    dest = register_version(data or b"", rel_path, actor.strip(), note=note.strip())
     if dest is None:
         raise HTTPException(409, "内容が最新の版と同じです")
     root = LIB()

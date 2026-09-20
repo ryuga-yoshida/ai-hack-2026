@@ -23,7 +23,7 @@ def version_series(dir_: Path, ext: str | None = ".xlsx") -> dict[str, list[tupl
     if not dir_.exists():
         return out
     for p in sorted(dir_.rglob("*")):
-        if not p.is_file() or p.name.startswith((".", "~$")) or ".versions" in p.parts:
+        if not p.is_file() or p.name.startswith((".", "~$")) or any(part.startswith(".") for part in p.relative_to(dir_).parts):
             continue
         m = _VER.match(p.name)
         if not m:
@@ -86,7 +86,7 @@ class ExcelAdapter:
 # ---------- 監視フォルダからの取り込み（OneDrive / デスクトップの Excel） ----------
 
 def register_version(data: bytes, rel_path: str, actor: str, dest_dir: Path | None = None,
-                     url: str | None = None) -> Path | None:
+                     url: str | None = None, note: str = "") -> Path | None:
     """任意のファイルを <フォルダ>/<名前>_vN<拡張子> として版フォルダに保存し versions.json に記録する。
     rel_path はライブラリ直下からの相対パス（例: 商品企画/売上見込.xlsx）。
     直前の版と内容が同じなら何もしない"""
@@ -106,7 +106,7 @@ def register_version(data: bytes, rel_path: str, actor: str, dest_dir: Path | No
     versions = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else {}
     prev = next((versions.get(str(s[1].relative_to(dest_dir))) or versions.get(s[1].name) for s in reversed(series)), None) or {}
     versions[str(dest.relative_to(dest_dir))] = {
-        "actor": actor, "at": datetime.now().replace(microsecond=0).isoformat(),
+        "actor": actor, "at": datetime.now().replace(microsecond=0).isoformat(), **({"note": note} if note else {}),
         "url": url or prev.get("url") or "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/" + str(rel.parent / (stem + ext)).replace(" ", "%20")}
     vp.write_text(json.dumps(versions, ensure_ascii=False, indent=2), encoding="utf-8")
     return dest
