@@ -23,7 +23,7 @@
         <div class="text-xs text-gray-500 mb-2">デモ用アカウント（架空の社員・クリックで入力）{% if demo_password %} · パスワードは <code class="bg-gray-100 px-1 rounded">{{ demo_password }}</code>{% endif %}</div>
         <div class="grid grid-cols-1 gap-1">
         {% for a in accounts %}
-        <button type="button" onclick="document.querySelector('[name=email]').value = {{ a.email|tojson }}; {% if demo_password %}document.querySelector('[name=password]').value = {{ demo_password|tojson }}; document.getElementById('loginForm').requestSubmit();{% else %}document.querySelector('[name=password]').focus();{% endif %}" class="w-full flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2 hover:border-indigo-400 hover:bg-indigo-50 text-left">
+        <button type="button" onclick="document.querySelector('[name=email]').value = {{ a.email|tojson|forceescape }}; {% if demo_password %}document.querySelector('[name=password]').value = {{ demo_password|tojson|forceescape }}; document.getElementById('loginForm').requestSubmit();{% else %}document.querySelector('[name=password]').focus();{% endif %}" class="w-full flex items-center gap-3 border border-gray-200 rounded-xl px-3 py-2 hover:border-indigo-400 hover:bg-indigo-50 text-left">
           <span class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 grid place-items-center text-sm font-semibold">{{ a.name[:1] }}</span>
           <span class="min-w-0"><span class="block text-sm font-medium">{{ a.name }}</span><span class="block text-xs text-gray-500 truncate">{{ a.email }}{% if a.role %} · {{ a.role }}{% endif %}</span></span>
         </button>
