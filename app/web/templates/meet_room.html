@@ -33,6 +33,17 @@
       <div class="h-16 flex items-center justify-center gap-3 border-t border-gray-800">
         <button id="micBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="マイク">{{ icon('mic') }}</button>
         <button id="camBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="カメラ">{{ icon('camera') }}</button>
+        <div class="relative" x-data="{ open: false }"><button @click="open = !open" id="bgBtn" class="h-11 rounded-full bg-gray-700 hover:bg-gray-600 px-4 text-sm flex items-center gap-2" title="背景（ぼかし・バーチャル背景）">{{ icon('sparkles') }} 背景</button>
+          <div x-show="open" x-cloak @click.outside="open = false" class="absolute bottom-14 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-700 rounded-xl p-2 grid grid-cols-4 gap-2 z-20 w-80 text-xs">
+            <button @click="setFx('none'); open = false" class="fx-opt rounded-lg border border-gray-600 h-14 hover:border-white" data-fx="none">なし</button>
+            <button @click="setFx('blur'); open = false" class="fx-opt rounded-lg border border-gray-600 h-14 hover:border-white" data-fx="blur" style="background: radial-gradient(circle, #6b7280 0%, #1f2937 100%); filter: blur(0)">ぼかし</button>
+            <button @click="setFx('office'); open = false" class="fx-opt rounded-lg border border-gray-600 h-14 hover:border-white" data-fx="office" style="background: linear-gradient(135deg, #1e1b4b, #4f46e5)">オフィス</button>
+            <button @click="setFx('warm'); open = false" class="fx-opt rounded-lg border border-gray-600 h-14 hover:border-white" data-fx="warm" style="background: linear-gradient(135deg, #78350f, #f59e0b)">ウォーム</button>
+            <button @click="setFx('green'); open = false" class="fx-opt rounded-lg border border-gray-600 h-14 hover:border-white" data-fx="green" style="background: linear-gradient(135deg, #064e3b, #10b981)">グリーン</button>
+            <button @click="setFx('mono'); open = false" class="fx-opt rounded-lg border border-gray-600 h-14 hover:border-white" data-fx="mono" style="background: #111827">ダーク</button>
+            <label class="fx-opt rounded-lg border border-dashed border-gray-500 h-14 hover:border-white grid place-items-center cursor-pointer col-span-2">画像を選ぶ<input type="file" accept="image/*" class="hidden" @change="loadBgImage($event.target.files[0]); open = false"></label>
+            <div class="col-span-4 text-[10px] text-gray-400 px-1">人物の切り出しはこの端末の中で行います（MediaPipe・送信なし）</div>
+          </div></div>
         <button id="screenBtn" class="h-11 rounded-full bg-gray-700 hover:bg-gray-600 px-4 text-sm flex items-center gap-2" title="画面共有">{{ icon('screen') }} 画面共有</button>
         <button id="handBtn" class="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 grid place-items-center" title="挙手">{{ icon('hand') }}</button>
         <button id="ccBtn" class="h-11 rounded-full bg-gray-700 hover:bg-gray-600 px-4 text-sm flex items-center gap-2" title="ライブ字幕（ブラウザの音声認識・API 課金なし）">CC 字幕</button>
@@ -147,6 +158,7 @@
 {% endif %}
 {% endblock %}
 {% block scripts %}
+{% if m.status == 'recording' and me %}<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/selfie_segmentation.js" crossorigin="anonymous"></script>{% endif %}
 <script>
 const meetingId = "{{ m.id }}", me = {{ me|tojson }}, status = "{{ m.status }}";
 const $ = id => document.getElementById(id);
@@ -178,6 +190,55 @@ function renderParticipants() {
   layout();
 }
 let micOn = true, camOn = true, screenOn = false, screenStream = null, camTrack = null, handOn = false;
+
+// ---------- 背景効果（MediaPipe Selfie Segmentation・端末内で処理） ----------
+let rawStream = null, fxVideo = null, fxCanvas = null, fxCtx = null, fxMode = 'none', seg = null, segBusy = false, bgImage = null, fxTimer = null;
+const BG_GRADIENTS = { office: ['#1e1b4b', '#4f46e5'], warm: ['#78350f', '#f59e0b'], green: ['#064e3b', '#10b981'], mono: ['#111827', '#111827'] };
+function setupFx() {
+  const vtrack = localStream.getVideoTracks()[0];
+  if (!vtrack) return;
+  rawStream = localStream;
+  fxVideo = document.createElement('video'); fxVideo.muted = true; fxVideo.playsInline = true; fxVideo.srcObject = new MediaStream([vtrack]); fxVideo.play().catch(() => {});
+  const s = vtrack.getSettings(); fxCanvas = document.createElement('canvas'); fxCanvas.width = s.width || 640; fxCanvas.height = s.height || 360; fxCtx = fxCanvas.getContext('2d');
+  const out = fxCanvas.captureStream(30);
+  localStream = new MediaStream([out.getVideoTracks()[0], ...rawStream.getAudioTracks()]);
+  const tick = async () => {
+    if (ended) return;
+    if (fxVideo.readyState >= 2) {
+      if (fxMode === 'none' || !seg) { fxCtx.drawImage(fxVideo, 0, 0, fxCanvas.width, fxCanvas.height); }
+      else if (!segBusy) { segBusy = true; try { await seg.send({ image: fxVideo }); } catch (e) {} segBusy = false; }
+    }
+    fxTimer = setTimeout(tick, fxMode === 'none' ? 33 : 40);
+  };
+  tick();
+}
+function drawBackground(ctx, w, h, image) {
+  if (fxMode === 'blur') { ctx.save(); ctx.filter = 'blur(14px)'; ctx.drawImage(image, -16, -16, w + 32, h + 32); ctx.restore(); ctx.fillStyle = '#1f2937'; ctx.fillRect(0, 0, w, h); return; }
+  if (fxMode === 'image' && bgImage) { const r = Math.max(w / bgImage.width, h / bgImage.height); const bw = bgImage.width * r, bh = bgImage.height * r; ctx.drawImage(bgImage, (w - bw) / 2, (h - bh) / 2, bw, bh); return; }
+  const g = BG_GRADIENTS[fxMode] || BG_GRADIENTS.mono; const grad = ctx.createLinearGradient(0, 0, w, h); grad.addColorStop(0, g[0]); grad.addColorStop(1, g[1]); ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+}
+function ensureSeg() {
+  if (seg || typeof SelfieSegmentation === 'undefined') return !!seg;
+  seg = new SelfieSegmentation({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/${f}` });
+  seg.setOptions({ modelSelection: 1, selfieMode: false });
+  seg.onResults(res => {
+    const w = fxCanvas.width, h = fxCanvas.height, ctx = fxCtx;
+    ctx.save(); ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(res.segmentationMask, 0, 0, w, h);          // 人物マスク
+    ctx.globalCompositeOperation = 'source-in'; ctx.drawImage(res.image, 0, 0, w, h);   // 人物だけ残す
+    ctx.globalCompositeOperation = 'destination-over'; drawBackground(ctx, w, h, res.image);   // 背景を敷く
+    ctx.restore();
+  });
+  return true;
+}
+window.setFx = function (mode) {
+  if (!fxCanvas) { addToast('カメラがないため背景は使えません'); return; }
+  if (mode !== 'none' && !ensureSeg()) { addToast('背景処理の読み込みに失敗しました（オンライン接続が必要）'); return; }
+  fxMode = mode; document.querySelectorAll('.fx-opt').forEach(b => b.classList.toggle('ring-2', b.dataset.fx === mode));
+  $('bgBtn').classList.toggle('bg-emerald-600', mode !== 'none');
+  try { localStorage.setItem('meet-fx', mode); } catch (e) {}
+};
+window.loadBgImage = function (file) { if (!file) return; const img = new Image(); img.onload = () => { bgImage = img; setFx('image'); }; img.src = URL.createObjectURL(file); };
 function sendState() { ws && ws.readyState === 1 && ws.send(JSON.stringify({ type: 'state', mic: micOn, cam: camOn, screen: screenOn, hand: handOn })); renderParticipants(); }
 function sendReaction(emoji) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'reaction', emoji })); showReaction(me, emoji); }
 function showReaction(name, emoji) {
@@ -203,6 +264,7 @@ async function start() {
     try { localStream = await navigator.mediaDevices.getUserMedia({ audio: true }); camOn = false; $('localOff').classList.remove('hidden'); addToast('カメラなしで参加します'); }
     catch (e2) { $('status').textContent = 'マイク取得失敗: ' + e2.message; $('recInfo').textContent = 'マイクが使えません（ブラウザの許可を確認）。閲覧のみで参加します'; localStream = new MediaStream(); camOn = false; micOn = false; $('localOff').classList.remove('hidden'); connect(); return; }
   }
+  setupFx();   // カメラ映像を canvas 経由にして、背景ぼかし／バーチャル背景を差し替え可能にする
   $('localVideo').srcObject = localStream;
   // 自分のマイクを録音（終了時に全員分を統合して文字起こし）
   const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(c => MediaRecorder.isTypeSupported(c)) || '';
@@ -222,6 +284,7 @@ async function start() {
   $('status').textContent = '● 録音中'; $('status').className = 'ml-3 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-normal';
   setInterval(() => { const s = Math.floor((Date.now() - tick0) / 1000); $('timer').textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }, 1000);
   connect();
+  try { const m = localStorage.getItem('meet-fx'); if (m && m !== 'none' && m !== 'image') setTimeout(() => setFx(m), 800); } catch (e) {}
 }
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -274,14 +337,14 @@ async function finish(endForAll) {
   $('status').textContent = '録音をアップロード中…';
   await uploadTrack();
   for (const n of Object.keys(peers)) removePeer(n);
-  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  if (localStream) localStream.getTracks().forEach(t => t.stop()); if (rawStream) rawStream.getTracks().forEach(t => t.stop()); clearTimeout(fxTimer);
   if (endForAll) { await fetch(`/meet/${meetingId}/finalize`, { method: 'POST' }); }
   else { await new Promise(r => setTimeout(r, 1500)); }   // 終了者の finalize を待つ
   location.href = `/meet/${meetingId}`;
 }
 $('endBtn').onclick = () => { if (confirm('全員の会議を終了して議事録を作ります。よろしいですか？')) finish(true); };
-$('leaveBtn').onclick = async () => { ended = true; await uploadTrack(); for (const n of Object.keys(peers)) removePeer(n); if (localStream) localStream.getTracks().forEach(t => t.stop()); if (ws) ws.close(); addToast('退出しました。あなたの録音は議事録に含まれます'); location.href = '/meet'; };
-$('micBtn').onclick = () => { if (!localStream || !localStream.getAudioTracks().length) return; micOn = !micOn; localStream.getAudioTracks().forEach(t => t.enabled = micOn); $('micBtn').textContent = micOn ? '' : ''; $('micBtn').classList.toggle('bg-red-600', !micOn); sendState(); };
+$('leaveBtn').onclick = async () => { ended = true; await uploadTrack(); for (const n of Object.keys(peers)) removePeer(n); if (localStream) localStream.getTracks().forEach(t => t.stop()); if (rawStream) rawStream.getTracks().forEach(t => t.stop()); clearTimeout(fxTimer); if (ws) ws.close(); addToast('退出しました。あなたの録音は議事録に含まれます'); location.href = '/meet'; };
+$('micBtn').onclick = () => { if (!localStream || !localStream.getAudioTracks().length) return; micOn = !micOn; localStream.getAudioTracks().forEach(t => t.enabled = micOn); $('micBtn').classList.toggle('bg-red-600', !micOn); sendState(); };
 $('camBtn').onclick = () => { if (!localStream || !localStream.getVideoTracks().length) return; camOn = !camOn; localStream.getVideoTracks().forEach(t => t.enabled = camOn); $('camBtn').classList.toggle('bg-red-600', !camOn); $('localOff').classList.toggle('hidden', camOn); sendState(); };
 async function startShare() {
   if (!navigator.mediaDevices.getDisplayMedia) { addToast('このブラウザは画面共有に対応していません'); return; }
