@@ -116,17 +116,17 @@
             {% include "_mention_menu.html" %}
           </div>
           <div class="flex items-center gap-0.5 px-2 pb-1.5 text-gray-500">
-            <button type="button" @click="wrap('**')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs font-bold" title="太字 (**text**)">B</button>
-            <button type="button" @click="wrap('~~')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs line-through" title="取り消し線">S</button>
-            <button type="button" @click="wrap('`')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs font-mono" title="コード">&lt;/&gt;</button>
-            <button type="button" @click="prefix('> ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs" title="引用">❝</button>
-            <button type="button" @click="prefix('- ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-xs" title="箇条書き">•</button>
+            <button type="button" @click="wrap('**')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-bold" data-tip="太字 (**text**)">B</button>
+            <button type="button" @click="wrap('~~')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs line-through" data-tip="取り消し線">S</button>
+            <button type="button" @click="wrap('`')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs font-mono" data-tip="コード">&lt;/&gt;</button>
+            <button type="button" @click="prefix('> ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="引用">❝</button>
+            <button type="button" @click="prefix('- ')" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-xs" data-tip="箇条書き">•</button>
             <span class="w-px h-4 bg-gray-200 mx-1"></span>
-            <div class="relative"><button type="button" @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-sm" title="絵文字">😊</button>
+            <div class="relative"><button type="button" @click="emo = !emo" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="絵文字">😊</button>
               <div x-show="emo" x-cloak @click.outside="emo = false" class="absolute left-0 bottom-8 bg-white border border-gray-200 rounded-lg shadow-lg p-2 grid grid-cols-8 gap-0.5 z-20 w-64">
                 <template x-for="e in emojis" :key="e"><button type="button" @click="insert(e); emo = false" class="text-lg hover:bg-gray-100 rounded" x-text="e"></button></template></div></div>
-            <button type="button" @click="$refs.file.click()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-sm" title="ファイルを添付（成果物ライブラリに保存され、版管理と検知の対象になります）">📎</button>
-            <button type="button" @click="attach = !attach" class="px-1.5 py-0.5 rounded hover:bg-gray-100 text-sm" :class="attach && 'bg-gray-100'" title="リンクを添付">🔗</button>
+            <button type="button" @click="$refs.file.click()" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" data-tip="ファイルを添付（成果物ライブラリに保存され、版管理と検知の対象になります）">📎</button>
+            <button type="button" @click="attach = !attach" class="px-1.5 py-0.5 rounded hover:bg-gray-100 hover:text-gray-900 text-sm" :class="attach && 'bg-gray-100'" data-tip="リンクを添付">🔗</button>
             <span class="flex-1"></span>
             <span class="text-[11px] text-gray-400 mr-2">{{ me }} として投稿</span>
             <button class="text-sm bg-indigo-600 text-white rounded-lg px-4 py-1.5 hover:bg-indigo-700">送信 ↵</button>
@@ -138,7 +138,7 @@
         </div>
       </form>
       <form method="post" action="/chat/upload" enctype="multipart/form-data" class="hidden" x-ref="upform">
-        <input type="hidden" name="channel" value="{{ channel }}"><input type="file" name="file" x-ref="file" @change="if ($refs.file.files.length) { $refs.uptext.value = $refs.ta.value; $refs.upform.submit(); Alpine.$data(document.body).toast('アップロード中…'); }">
+        <input type="hidden" name="channel" value="{{ channel }}"><input type="file" name="file" x-ref="file" @change="if ($refs.file.files.length) { $refs.uptext.value = ta().value; $refs.upform.submit(); Alpine.$data(document.body).toast('アップロード中…'); }">
         <input type="hidden" name="text" x-ref="uptext">
       </form>
     </div>
@@ -309,10 +309,11 @@ function composer(channel) {
     },
     typing() { const ws = window.chatWs && window.chatWs(); if (ws && ws.readyState === 1 && Date.now() - this.lastSent > 2000) { this.lastSent = Date.now(); ws.send(JSON.stringify({ type: 'typing', channel, actor: ME })); } },
     stopTyping() { this.lastSent = 0; },
+    ta() { return this.$root.querySelector('textarea[name=text]'); },
     grow(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; },
-    insert(t) { const ta = this.$refs.ta; const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + t + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + t.length; ta.focus(); this.grow(ta); },
-    wrap(mark) { const ta = this.$refs.ta; const s = ta.selectionStart, e = ta.selectionEnd; const sel = ta.value.slice(s, e) || 'テキスト'; ta.value = ta.value.slice(0, s) + mark + sel + mark + ta.value.slice(e); ta.selectionStart = s + mark.length; ta.selectionEnd = s + mark.length + sel.length; ta.focus(); },
-    prefix(p) { const ta = this.$refs.ta; const s = ta.selectionStart; const ls = ta.value.lastIndexOf('\n', s - 1) + 1; ta.value = ta.value.slice(0, ls) + p + ta.value.slice(ls); ta.selectionStart = ta.selectionEnd = s + p.length; ta.focus(); this.grow(ta); },
+    insert(t) { const ta = this.ta(); const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.slice(0, s) + t + ta.value.slice(e); ta.selectionStart = ta.selectionEnd = s + t.length; ta.focus(); this.grow(ta); },
+    wrap(mark) { const ta = this.ta(); const s = ta.selectionStart, e = ta.selectionEnd; const sel = ta.value.slice(s, e) || 'テキスト'; ta.value = ta.value.slice(0, s) + mark + sel + mark + ta.value.slice(e); ta.selectionStart = s + mark.length; ta.selectionEnd = s + mark.length + sel.length; ta.focus(); },
+    prefix(p) { const ta = this.ta(); const s = ta.selectionStart; const ls = ta.value.lastIndexOf('\n', s - 1) + 1; ta.value = ta.value.slice(0, ls) + p + ta.value.slice(ls); ta.selectionStart = ta.selectionEnd = s + p.length; ta.focus(); this.grow(ta); },
   };
 }
 async function toTask(id) {

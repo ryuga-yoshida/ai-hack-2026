@@ -43,17 +43,17 @@
   </div>
   <div class="opacity-0 group-hover:opacity-100 flex items-start gap-0.5 text-gray-400 shrink-0" x-data="{ emo: false }">
     <div class="relative">
-      <button @click="emo = !emo" class="p-1 hover:text-gray-700" title="リアクション">☺</button>
+      <button @click="emo = !emo" class="p-1 hover:text-gray-700" data-tip="リアクション">☺</button>
       <div x-show="emo" x-cloak @click.outside="emo = false" class="absolute right-0 top-7 bg-white border border-gray-200 rounded-lg shadow p-1 flex gap-1 z-10">
         {% for e in ['👍','✅','👀','🙏','🎉','❗'] %}<button @click="react('{{ m.id }}', '{{ e }}'); emo = false" class="px-1 hover:bg-gray-100 rounded">{{ e }}</button>{% endfor %}
       </div>
     </div>
-    {% if not compact %}<a href="/chat?channel={{ m.channel }}&thread={{ m.id }}" class="p-1 hover:text-gray-700" title="スレッドで返信">↩</a>{% endif %}
-    <button type="button" @click="toTask('{{ m.id }}')" class="p-1 hover:text-gray-700" title="この発言からタスクを作る">☑</button>
-    <form method="post" action="/chat/{{ m.id }}/pin"><button class="p-1 hover:text-gray-700 {% if m.pinned %}text-amber-600{% endif %}" title="{{ 'ピン留めを外す' if m.pinned else 'ピン留め' }}">📌</button></form>
-    <form method="post" action="/chat/{{ m.id }}/save"><button class="p-1 hover:text-gray-700 {% if saved_ids is defined and m.id in saved_ids %}text-indigo-600{% endif %}" title="あとで見る（保存）">🔖</button></form>
-    <button type="button" @click="navigator.clipboard.writeText(location.origin + '/chat?channel={{ m.channel }}#msg-{{ m.id }}').then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="p-1 hover:text-gray-700" title="リンクをコピー">🔗</button>
-    {% if m.actor == me %}<button @click="editing = true" class="p-1 hover:text-gray-700" title="編集">✎</button>{% endif %}
-    {% if m.actor == me %}<form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="p-1 hover:text-red-600" title="削除">🗑</button></form>{% endif %}
+    {% if not compact %}<a href="/chat?channel={{ m.channel }}&thread={{ m.id }}" class="p-1 hover:text-gray-700" data-tip="スレッドで返信">↩</a>{% endif %}
+    <button type="button" @click="toTask('{{ m.id }}')" class="p-1 hover:text-gray-700" data-tip="この発言からタスクを作る">☑</button>
+    <form method="post" action="/chat/{{ m.id }}/pin"><button class="p-1 hover:text-gray-700 {% if m.pinned %}text-amber-600{% endif %}" data-tip="{{ 'ピン留めを外す' if m.pinned else 'ピン留め' }}">📌</button></form>
+    <form method="post" action="/chat/{{ m.id }}/save"><button class="p-1 hover:text-gray-700 {% if saved_ids is defined and m.id in saved_ids %}text-indigo-600{% endif %}" data-tip="あとで見る（保存）">🔖</button></form>
+    <button type="button" @click="navigator.clipboard.writeText(location.origin + '/chat?channel={{ m.channel }}#msg-{{ m.id }}').then(() => Alpine.$data(document.body).toast('リンクをコピーしました'))" class="p-1 hover:text-gray-700" data-tip="リンクをコピー">🔗</button>
+    {% if m.actor == me %}<button @click="editing = true" class="p-1 hover:text-gray-700" data-tip="編集">✎</button>{% endif %}
+    {% if m.actor == me %}<form method="post" action="/chat/{{ m.id }}/delete" onsubmit="return confirm('削除しますか？')"><button class="p-1 hover:text-red-600" data-tip="削除">🗑</button></form>{% endif %}
   </div>
 </div>
