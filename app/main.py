@@ -27,7 +27,7 @@ async def require_signin(request: Request, call_next):
     path = request.url.path
     if request.method == "GET" and not request.cookies.get("me") and not (
         path.startswith(("/login", "/api/", "/ws/", "/static", "/artifacts/file/", "/meet/")) or path == "/tick"
-    ) and "text/html" in request.headers.get("accept", "text/html"):
+    ) and "application/json" not in request.headers.get("accept", ""):
         return RedirectResponse(f"/login?next={quote(str(request.url.path) + ('?' + request.url.query if request.url.query else ''))}", status_code=303)
     return await call_next(request)
 
