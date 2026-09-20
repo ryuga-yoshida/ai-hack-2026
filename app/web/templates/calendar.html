@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}予定表{% endblock %}
-{% block heading %}予定表 <span class="text-gray-400 font-normal ml-2">{{ base.strftime('%Y年%m月') }}</span>{% endblock %}
+{% block heading %}予定表 <span class="text-gray-400 font-normal ml-2">{% if view == 'day' %}{{ base.strftime('%Y年%m月%d日') }}（{{ ['月','火','水','木','金','土','日'][base.weekday()] }}）{% elif view == 'agenda' %}{{ base.strftime('%m/%d') }} からの30日{% else %}{{ base.strftime('%Y年%m月') }}{% endif %}</span>{% endblock %}
 {% block actions %}
 <form method="get" action="/calendar" class="flex items-center gap-1">
   <input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="d" value="{{ base.isoformat() }}">
@@ -10,8 +10,9 @@
   </select>
 </form>
 <div class="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
-  <a href="/calendar?view=week&d={{ base.isoformat() }}&person={{ person }}" class="px-3 py-1.5 {% if view == 'week' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">週</a>
-  <a href="/calendar?view=month&d={{ base.isoformat() }}&person={{ person }}" class="px-3 py-1.5 {% if view == 'month' %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">月</a>
+  {% for k, l in [('day','日'),('week','週'),('month','月'),('agenda','予定一覧')] %}
+  <a href="/calendar?view={{ k }}&d={{ base.isoformat() }}&person={{ person }}" class="px-3 py-1.5 {% if view == k %}bg-gray-900 text-white{% else %}bg-white hover:bg-gray-50{% endif %}">{{ l }}</a>
+  {% endfor %}
 </div>
 <a href="/calendar?view={{ view }}&d={{ prev }}&person={{ person }}" class="text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white">‹</a>
 <a href="/calendar?view={{ view }}&d={{ today }}&person={{ person }}" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white">今日</a>
@@ -20,15 +21,15 @@
 {% endblock %}
 {% block content %}
 {% if person %}<div class="mb-3 text-sm text-gray-600"><b>{{ person }}</b> の予定（参加者または主催者）と期限を表示中 <a href="/calendar?view={{ view }}&d={{ base.isoformat() }}" class="text-indigo-600 ml-2">全員に戻す</a></div>{% endif %}
-{% if view == 'week' %}
-{% set H0 = hours[0] %}{% set HPX = 52 %}
-<div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
-  <div class="grid" style="grid-template-columns: 56px repeat(7, 1fr);">
+{% if view in ('week', 'day') %}
+{% set H0 = hours[0] %}{% set HPX = 52 if view == 'week' else 64 %}
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden" x-data="calDrag({{ HPX }}, {{ H0 }})">
+  <div class="grid" style="grid-template-columns: 56px repeat({{ days|length }}, 1fr);">
     <div class="bg-gray-50 border-b border-gray-200"></div>
     {% for d in days %}
     <div class="bg-gray-50 border-b border-l border-gray-200 px-2 py-1.5 text-xs flex items-center gap-2">
       <span class="{% if d.today %}bg-indigo-600 text-white rounded-full w-6 h-6 grid place-items-center font-semibold{% else %}text-gray-500{% endif %}">{{ d.date.day }}</span>
-      <span class="text-gray-500">{{ ['月','火','水','木','金','土','日'][loop.index0] }}</span>
+      <span class="text-gray-500">{{ ['月','火','水','木','金','土','日'][d.date.weekday()] }}</span>{% if view == 'day' %}<a href="/calendar?view=week&d={{ d.date.isoformat() }}&person={{ person }}" class="text-gray-400 hover:underline">週で見る</a>{% endif %}
       <button @click="$dispatch('open-event', { date: '{{ d.date.isoformat() }}' })" class="ml-auto text-gray-300 hover:text-indigo-600" title="予定を追加">＋</button>
     </div>
     {% endfor %}
@@ -36,25 +37,27 @@
     <div class="text-[10px] text-gray-400 px-1 py-1 border-b border-gray-200 text-right">期限</div>
     {% for d in days %}
     <div class="border-b border-l border-gray-200 p-1 min-h-[28px] space-y-0.5">
+      {% for e in d.events if e.all_day %}<a href="/calendar/{{ e.id }}" class="block rounded px-1.5 py-0.5 text-[10px] bg-gray-100 border border-gray-300 text-gray-800 truncate" title="終日">{{ e.title }}</a>{% endfor %}
       {% for t in d.due %}<a href="/tasks/{{ t.id }}" class="block rounded px-1.5 py-0.5 text-[10px] bg-amber-50 border border-amber-200 text-amber-900 truncate" title="タスクの期限">⏳ {{ t.title }}</a>{% endfor %}
     </div>
     {% endfor %}
   </div>
-  <div class="grid relative" style="grid-template-columns: 56px repeat(7, 1fr); height: {{ HPX * hours|length }}px;">
+  <div class="grid relative" style="grid-template-columns: 56px repeat({{ days|length }}, 1fr); height: {{ HPX * hours|length }}px;">
     <!-- 時刻の透かし -->
     <div class="relative">
       {% for h in hours %}<div class="absolute right-2 text-[10px] text-gray-300 select-none" style="top: {{ (loop.index0 * HPX) - 6 }}px">{{ '%02d:00' % h }}</div>{% endfor %}
     </div>
     {% for d in days %}
-    <div class="relative border-l border-gray-100 cursor-pointer" @click="$dispatch('open-event', { date: '{{ d.date.isoformat() }}' })">
+    <div class="relative border-l border-gray-100 cursor-pointer" data-date="{{ d.date.isoformat() }}" @click="$dispatch('open-event', { date: '{{ d.date.isoformat() }}', start: minuteToTime(($event.offsetY / {{ HPX }}) * 60) })" @dragover.prevent @drop.prevent="drop($event, '{{ d.date.isoformat() }}')">
+      {% if d.today and now_min >= 0 and now_min <= hours|length * 60 %}<div class="absolute left-0 right-0 border-t-2 border-red-500 z-10 pointer-events-none" style="top: {{ now_min * HPX / 60 }}px"><span class="absolute -left-1 -top-1.5 w-2.5 h-2.5 rounded-full bg-red-500"></span></div>{% endif %}
       {% for h in hours %}<div class="absolute left-0 right-0 border-t {% if h == 12 %}border-gray-200{% else %}border-gray-100{% endif %}" style="top: {{ loop.index0 * HPX }}px"></div>
       <div class="absolute left-0 right-0 border-t border-dashed border-gray-100 opacity-60" style="top: {{ loop.index0 * HPX + HPX // 2 }}px"></div>{% endfor %}
       {% if d.today %}{% set nowm = (now_min if now_min is defined else -1) %}{% endif %}
-      {% for e in d.events %}
+      {% for e in d.events if not e.all_day %}
       {% set sm = (e.start.hour - H0) * 60 + e.start.minute %}{% set em = (e.end.hour - H0) * 60 + e.end.minute %}
       {% set top = (sm if sm > 0 else 0) * HPX / 60 %}{% set height = ((em if em < hours|length * 60 else hours|length * 60) - (sm if sm > 0 else 0)) * HPX / 60 %}
-      <a href="/calendar/{{ e.id }}" @click.stop class="absolute left-1 right-1 rounded-md px-2 py-1 text-xs leading-snug overflow-hidden border shadow-sm hover:shadow-md {% if e.meeting_status == 'done' %}bg-emerald-50 border-emerald-200 text-emerald-900{% elif e.meeting_status == 'recording' %}bg-red-50 border-red-200 text-red-800{% elif e.kind == 'appointment' %}bg-gray-50 border-gray-300 text-gray-800{% else %}bg-indigo-50 border-indigo-200 text-indigo-900{% endif %}" style="top: {{ top }}px; height: {{ [height, 22]|max }}px;">
-        <div class="font-medium truncate">{% if e.kind != 'appointment' %}📹 {% endif %}{{ e.start.strftime('%H:%M') }} {{ e.title }}</div>
+      <a href="/calendar/{{ e.id }}" @click.stop draggable="true" @dragstart="drag($event, '{{ e.id }}', '{{ e.start.isoformat() }}', '{{ e.end.isoformat() }}')" class="absolute left-1 right-1 rounded-md px-2 py-1 text-xs leading-snug overflow-hidden border shadow-sm hover:shadow-md cursor-grab {% if e.meeting_status == 'done' %}bg-emerald-50 border-emerald-200 text-emerald-900{% elif e.meeting_status == 'recording' %}bg-red-50 border-red-200 text-red-800{% elif e.kind == 'appointment' %}bg-gray-50 border-gray-300 text-gray-800{% else %}bg-indigo-50 border-indigo-200 text-indigo-900{% endif %}" style="top: {{ top }}px; height: {{ [height, 22]|max }}px;">
+        <div class="font-medium truncate">{% if e.kind != 'appointment' %}📹 {% endif %}{% if e.series_id %}🔁 {% endif %}{{ e.start.strftime('%H:%M') }} {{ e.title }}{% if e.rsvp.get(me) == 'declined' %} <span class="text-gray-400">(欠席)</span>{% endif %}</div>
         {% if height >= 40 %}<div class="text-[10px] text-gray-500 truncate">{{ e.attendees|join('・') }}</div>{% endif %}
         {% if height >= 56 %}{% if e.meeting_status == 'done' %}<div class="text-[10px] text-emerald-700">📝 議事録あり{% if e.n_decisions %} · 決定 {{ e.n_decisions }}{% endif %}</div>{% elif e.meeting_status == 'recording' %}<div class="text-[10px] text-red-700">● 進行中</div>{% endif %}{% endif %}
       </a>
@@ -62,6 +65,28 @@
     </div>
     {% endfor %}
   </div>
+</div>
+{% elif view == 'agenda' %}
+<div class="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+  {% set ns = namespace(any=false) %}
+  {% for d in days if d.events or d.due %}{% set ns.any = true %}
+  <div class="flex gap-4 px-5 py-3">
+    <div class="w-24 shrink-0 text-sm {% if d.today %}text-indigo-700 font-semibold{% else %}text-gray-600{% endif %}">{{ d.date.strftime('%m/%d') }} <span class="text-gray-400">({{ ['月','火','水','木','金','土','日'][d.date.weekday()] }})</span>{% if d.today %}<div class="text-[10px]">今日</div>{% endif %}</div>
+    <div class="flex-1 space-y-1.5">
+      {% for e in d.events %}
+      <a href="/calendar/{{ e.id }}" class="flex items-center gap-3 text-sm rounded-lg px-3 py-1.5 border {% if e.meeting_status == 'done' %}bg-emerald-50 border-emerald-200{% elif e.kind == 'appointment' %}bg-gray-50 border-gray-200{% else %}bg-indigo-50 border-indigo-200{% endif %} hover:shadow-sm">
+        <span class="text-xs text-gray-500 w-24 shrink-0">{{ '終日' if e.all_day else e.start.strftime('%H:%M') + '〜' + e.end.strftime('%H:%M') }}</span>
+        <span class="font-medium">{% if e.kind != 'appointment' %}📹 {% endif %}{% if e.series_id %}🔁 {% endif %}{{ e.title }}</span>
+        <span class="text-xs text-gray-500 truncate">{{ e.attendees|join('・') }}</span>
+        {% if e.location %}<span class="text-xs text-gray-400">📍 {{ e.location }}</span>{% endif %}
+        {% if e.meeting_status == 'done' %}<span class="ml-auto text-[10px] text-emerald-700">📝 議事録あり</span>{% endif %}
+      </a>
+      {% endfor %}
+      {% for t in d.due %}<a href="/tasks/{{ t.id }}" class="flex items-center gap-3 text-sm rounded-lg px-3 py-1.5 border bg-amber-50 border-amber-200 text-amber-900"><span class="text-xs w-24 shrink-0">期限</span>⏳ {{ t.title }}<span class="text-xs text-gray-500">{{ t.assignee or '' }}</span></a>{% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% if not ns.any %}<div class="px-5 py-10 text-center text-sm text-gray-400">この期間に予定はありません</div>{% endif %}
 </div>
 {% else %}
 <div class="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-xl overflow-hidden">
@@ -85,21 +110,30 @@
 {% endif %}
 <div class="mt-3 text-xs text-gray-500">エージェントは予定の <b>15分前</b> に会議室を用意して、関連チャンネルにリマインドを投稿します（自動巡回 ON のとき）。</div>
 
-<div x-data="{ open: false, date: '{{ today }}' }" @open-event.window="open = true; date = $event.detail.date || '{{ today }}'" x-cloak>
+<div x-data="eventForm()" @open-event.window="open = true; date = $event.detail.date || '{{ today }}'; if ($event.detail.start) { start = $event.detail.start; end = addMin(start, 60); } $nextTick(() => checkBusy())" x-cloak>
   <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
   <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
     <form method="post" action="/calendar" class="bg-white rounded-xl shadow-xl p-6 w-[520px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="open = false">
       <h3 class="font-semibold">新しい予定</h3>
       <input name="title" required placeholder="タイトル" class="w-full border border-gray-300 rounded-lg px-3 py-2">
       <div class="grid grid-cols-3 gap-2">
-        <input type="date" name="date" :value="date" required class="border border-gray-300 rounded-lg px-2 py-1.5">
-        <input type="time" name="start" value="10:00" required class="border border-gray-300 rounded-lg px-2 py-1.5">
-        <input type="time" name="end" value="10:30" required class="border border-gray-300 rounded-lg px-2 py-1.5">
+        <input type="date" name="date" x-model="date" required class="border border-gray-300 rounded-lg px-2 py-1.5" @change="checkBusy()">
+        <input type="time" name="start" x-model="start" required class="border border-gray-300 rounded-lg px-2 py-1.5" :disabled="allDay" @change="checkBusy()">
+        <input type="time" name="end" x-model="end" required class="border border-gray-300 rounded-lg px-2 py-1.5" :disabled="allDay" @change="checkBusy()">
+      </div>
+      <div class="flex items-center gap-3 text-xs">
+        <label class="flex items-center gap-1"><input type="checkbox" name="all_day" value="1" x-model="allDay" class="rounded">終日</label>
+        <select name="repeat" x-model="repeat" class="border border-gray-300 rounded-lg px-2 py-1 bg-white"><option value="none">繰り返さない</option><option value="daily">毎日</option><option value="weekly">毎週</option><option value="biweekly">隔週</option><option value="monthly">毎月</option></select>
+        <span x-show="repeat !== 'none'" class="flex items-center gap-1"><input type="number" name="count" value="4" min="1" max="52" class="w-14 border border-gray-300 rounded-lg px-2 py-1">回</span>
+      </div>
+      <div x-show="busy.length" x-cloak class="text-xs bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-900">
+        <div class="font-semibold">⚠ この時間に別の予定がある人がいます</div>
+        <template x-for="b in busy" :key="b.title + b.start"><div><span x-text="b.people.join('・')"></span>: <span x-text="b.title"></span> <span class="text-gray-500" x-text="b.start + '〜' + b.end"></span></div></template>
       </div>
       <label class="flex items-center gap-2 text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 cursor-pointer">
         <input type="checkbox" name="with_meeting" value="1" checked class="rounded">
         <span><b>オンライン会議室を用意する</b><span class="block text-xs text-gray-500">エージェントが15分前に会議室を作り、参加者へ案内。外すと「予定」だけ（締切・外出など）</span></span></label>
-      <div><label class="text-xs text-gray-500">参加者</label>{% with pp_name='attendees', pp_selected=[], pp_multi=true, pp_placeholder='参加者を検索して追加' %}{% include "_people_picker.html" %}{% endwith %}</div>
+      <div @change="checkBusy()" @click="setTimeout(() => checkBusy(), 100)"><label class="text-xs text-gray-500">参加者</label>{% with pp_name='attendees', pp_selected=[], pp_multi=true, pp_placeholder='参加者を検索して追加' %}{% include "_people_picker.html" %}{% endwith %}</div>
       <div class="grid grid-cols-2 gap-2">
         <input name="location" placeholder="場所（任意）" class="border border-gray-300 rounded-lg px-3 py-1.5">
         <select name="channel" class="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">関連チャンネルなし</option>{% for c in channels %}<option value="{{ c }}">#{{ c }} に通知</option>{% endfor %}</select>
@@ -110,4 +144,40 @@
     </form>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+function pad(n) { return String(n).padStart(2, '0'); }
+function minuteToTime(m) { m = Math.max(0, Math.round(m / 15) * 15) + {{ hours[0] }} * 60; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+function eventForm() {
+  return {
+    open: false, date: '{{ today }}', start: '10:00', end: '11:00', allDay: false, repeat: 'none', busy: [],
+    addMin(t, m) { const [h, mi] = t.split(':').map(Number); const x = h * 60 + mi + m; return pad(Math.floor(x / 60) % 24) + ':' + pad(x % 60); },
+    async checkBusy() {
+      const people = [...this.$el.querySelectorAll('input[name=attendees]')].map(i => i.value).filter(Boolean);
+      if (!people.length || !this.date || this.allDay) { this.busy = []; return; }
+      const r = await fetch(`/api/calendar/busy?date=${this.date}&start=${this.start}&end=${this.end}&people=${encodeURIComponent(people.join(','))}`);
+      this.busy = (await r.json()).busy;
+    },
+  };
+}
+function calDrag(HPX, H0) {
+  return {
+    drag(e, id, start, end) { e.dataTransfer.setData('text/plain', JSON.stringify({ id, start, end, offsetY: e.offsetY })); },
+    async drop(e, date) {
+      let d; try { d = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (_) { return; }
+      if (!d || !d.id) return;
+      const col = e.currentTarget; const rect = col.getBoundingClientRect();
+      const y = e.clientY - rect.top - (d.offsetY || 0);
+      const mins = Math.max(0, Math.round((y / HPX) * 60 / 15) * 15) + H0 * 60;
+      const dur = (new Date(d.end) - new Date(d.start)) / 60000;
+      const st = `${date}T${pad(Math.floor(mins / 60))}:${pad(mins % 60)}:00`;
+      const en = new Date(new Date(st).getTime() + dur * 60000);
+      const enS = `${en.getFullYear()}-${pad(en.getMonth() + 1)}-${pad(en.getDate())}T${pad(en.getHours())}:${pad(en.getMinutes())}:00`;
+      const r = await fetch(`/api/calendar/${d.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ start_at: st, end_at: enS }) });
+      if (r.ok) { Alpine.$data(document.body).toast('予定を移動しました'); location.reload(); } else alert('移動できませんでした');
+    },
+  };
+}
+</script>
 {% endblock %}

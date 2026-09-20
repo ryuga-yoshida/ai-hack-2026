@@ -6,7 +6,10 @@
 <form method="post" action="/calendar/{{ e.id }}/start" class="flex gap-2">
   <button class="text-sm bg-emerald-600 text-white rounded-lg px-3 py-1.5 hover:bg-emerald-700">📹 {{ '会議に参加' if meeting else '会議を始める' }}</button></form>
 {% endif %}
-<form method="post" action="/calendar/{{ e.id }}/delete" onsubmit="return confirm('この予定を削除しますか？')"><button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white text-gray-600 hover:text-red-600">削除</button></form>
+<button @click="$dispatch('open-edit')" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">✎ 編集</button>
+<form method="post" action="/calendar/{{ e.id }}/delete" onsubmit="return confirm('この予定を削除しますか？')" class="flex gap-1">
+  {% if e.series_id %}<select name="scope" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="one">この回だけ</option><option value="series">これ以降すべて</option></select>{% endif %}
+  <button class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white text-gray-600 hover:text-red-600">削除</button></form>
 {% endblock %}
 {% block content %}
 <div class="grid grid-cols-3 gap-6">
@@ -14,7 +17,14 @@
     <div class="bg-white border border-gray-200 rounded-xl p-5 text-sm space-y-2">
       <div class="text-lg font-semibold">{{ e.title }} <span class="text-xs font-normal px-1.5 py-0.5 rounded {% if e.kind == 'appointment' %}bg-gray-100 text-gray-600{% else %}bg-indigo-100 text-indigo-700{% endif %}">{{ '予定' if e.kind == 'appointment' else 'オンライン会議' }}</span></div>
       <div class="text-gray-600">🗓 {{ e.start.strftime('%Y/%m/%d (%a) %H:%M') }} 〜 {{ e.end.strftime('%H:%M') }}{% if e.location %} · 📍 {{ e.location }}{% endif %}</div>
-      <div class="text-gray-600">👥 {% for a in e.attendees %}<span data-person="{{ a }}" class="hover:underline">{{ a }}</span>{% if not loop.last %}・{% endif %}{% else %}—{% endfor %}{% if e.organizer %} <span class="text-gray-400">（主催: {{ e.organizer }}）</span>{% endif %}</div>
+      <div class="text-gray-600 flex items-center gap-1 flex-wrap">👥 {% for a in e.attendees %}<span data-person="{{ a }}" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs {% if e.rsvp.get(a) == 'accepted' %}bg-emerald-100 text-emerald-800{% elif e.rsvp.get(a) == 'declined' %}bg-red-100 text-red-700 line-through{% elif e.rsvp.get(a) == 'tentative' %}bg-amber-100 text-amber-800{% else %}bg-gray-100 text-gray-700{% endif %}">{{ a }}{% if e.rsvp.get(a) %} {{ {'accepted':'✓','declined':'✕','tentative':'?'}[e.rsvp[a]] }}{% endif %}</span>{% else %}—{% endfor %}{% if e.organizer %} <span class="text-gray-400 text-xs">（主催: {{ e.organizer }}）</span>{% endif %}</div>
+      {% if e.series_id %}<div class="text-xs text-gray-500">🔁 繰り返し予定（全 {{ series|length }} 回） {% for s_ in series %}<a href="/calendar/{{ s_.id }}" class="{% if s_.id == e.id %}font-semibold text-indigo-700{% else %}hover:underline{% endif %}">{{ s_.start.strftime('%m/%d') }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+      {% if me in e.attendees or me == e.organizer %}
+      <form method="post" action="/calendar/{{ e.id }}/rsvp" class="flex items-center gap-1 pt-2 text-xs">
+        <span class="text-gray-500 mr-1">出欠:</span>
+        {% for k, l in [('accepted','出席'),('tentative','仮'),('declined','欠席')] %}<button name="answer" value="{{ k }}" class="px-2 py-1 rounded-lg border {% if e.rsvp.get(me) == k %}bg-gray-900 text-white border-gray-900{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}">{{ l }}</button>{% endfor %}
+      </form>
+      {% endif %}
       {% if e.channel %}<div class="text-gray-600">💬 <a href="/chat?channel={{ e.channel }}" class="text-indigo-600 hover:underline">#{{ e.channel }}</a></div>{% endif %}
       {% if e.description %}<div class="pt-2 border-t text-gray-700">{{ e.description }}</div>{% endif %}
       {% if e.reminded_at %}<div class="text-xs text-gray-400">エージェントが {{ e.reminded_at|dt }} にリマインド済み</div>{% endif %}
@@ -35,5 +45,29 @@
     <ul class="space-y-2">{% for x in extracted %}<li class="flex gap-2"><span class="text-[10px] px-1.5 rounded shrink-0 h-fit mt-0.5 {% if x.kind == 'decision' %}bg-rose-100 text-rose-700{% else %}bg-gray-200 text-gray-700{% endif %}">{{ '決定' if x.kind == 'decision' else 'タスク' }}</span><div>{{ x.text }}<div class="text-[11px] text-gray-400">{{ x.actor }}</div></div></li>{% endfor %}</ul>
     {% else %}<p class="text-xs text-gray-400">{% if meeting and meeting.status == 'done' %}まだ抽出されていません（次の巡回で）{% else %}会議後に自動で抽出されます{% endif %}</p>{% endif %}
   </aside>
+</div>
+
+<div x-data="{ open: false }" @open-edit.window="open = true" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
+    <form method="post" action="/calendar/{{ e.id }}/update" class="bg-white rounded-xl shadow-xl p-6 w-[520px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">予定を編集</h3>
+      <input name="title" value="{{ e.title }}" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+      <div class="grid grid-cols-3 gap-2">
+        <input type="date" name="date" value="{{ e.start.date().isoformat() }}" required class="border border-gray-300 rounded-lg px-2 py-1.5">
+        <input type="time" name="start" value="{{ e.start.strftime('%H:%M') }}" required class="border border-gray-300 rounded-lg px-2 py-1.5">
+        <input type="time" name="end" value="{{ e.end.strftime('%H:%M') }}" required class="border border-gray-300 rounded-lg px-2 py-1.5">
+      </div>
+      <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="with_meeting" value="1" {% if e.kind != 'appointment' %}checked{% endif %} class="rounded">オンライン会議室を用意する</label>
+      <div><label class="text-xs text-gray-500">参加者</label>{% with pp_name='attendees', pp_selected=e.attendees, pp_multi=true, pp_placeholder='参加者を検索して追加' %}{% include "_people_picker.html" %}{% endwith %}</div>
+      <div class="grid grid-cols-2 gap-2">
+        <input name="location" value="{{ e.location or '' }}" placeholder="場所（任意）" class="border border-gray-300 rounded-lg px-3 py-1.5">
+        <select name="channel" class="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">関連チャンネルなし</option>{% for c in channels %}<option value="{{ c }}" {% if c == e.channel %}selected{% endif %}>#{{ c }}</option>{% endfor %}</select>
+      </div>
+      <textarea name="description" rows="2" placeholder="説明（任意）" class="w-full border border-gray-300 rounded-lg px-3 py-2">{{ e.description or '' }}</textarea>
+      {% if e.series_id %}<select name="scope" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="one">この回だけ変更</option><option value="series">これ以降の回もまとめて変更</option></select>{% endif %}
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="px-4 py-1.5 rounded-lg bg-indigo-600 text-white">保存</button></div>
+    </form>
+  </div>
 </div>
 {% endblock %}

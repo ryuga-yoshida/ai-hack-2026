@@ -6,7 +6,7 @@ from datetime import date, datetime
 from html import escape
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Query, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
@@ -1385,6 +1385,10 @@ def calendar_page(request: Request, view: str = "week", d: str = "", person: str
         first = base.replace(day=1)
         start = first - timedelta(days=first.weekday())
         end = start + timedelta(days=42)
+    elif view == "day":
+        start, end = base, base + timedelta(days=1)
+    elif view == "agenda":
+        start, end = base, base + timedelta(days=30)
     else:
         start = base - timedelta(days=base.weekday())
         end = start + timedelta(days=7)
@@ -1402,32 +1406,97 @@ def calendar_page(request: Request, view: str = "week", d: str = "", person: str
         day_evs = [e for e in evs if e["start"].date() <= day <= e["end"].date()]
         due = [t for t in db.list_tasks(conn) if t.due_date == day and (not person or t.assignee == person)]
         days.append({"date": day, "events": day_evs, "due": due, "today": day == date.today(), "in_month": day.month == base.month})
-    prev = (base - timedelta(days=7)) if view == "week" else (base.replace(day=1) - timedelta(days=1))
-    nxt = (base + timedelta(days=7)) if view == "week" else (base.replace(day=28) + timedelta(days=4))
+    step = {"week": timedelta(days=7), "day": timedelta(days=1), "agenda": timedelta(days=30)}.get(view)
+    prev = (base - step) if step else (base.replace(day=1) - timedelta(days=1))
+    nxt = (base + step) if step else (base.replace(day=28) + timedelta(days=4))
+    now = datetime.now()
     return render("calendar.html", request, conn, view=view, base=base, days=days, prev=prev.isoformat(), nxt=nxt.isoformat(),
                   me=get_me(request), channels=chat.list_channels(conn), today=date.today().isoformat(), person=person,
-                  hours=list(range(8, 20)))
+                  hours=list(range(8, 20)), now_min=(now.hour - 8) * 60 + now.minute)
 
 
 @app.post("/calendar")
 def calendar_create(request: Request, title: str = Form(...), date_: str = Form(..., alias="date"), start: str = Form(...),
                     end: str = Form(...), attendees: list[str] = Form([]), location: str = Form(""),
                     description: str = Form(""), channel: str = Form(""), organizer: str = Form(""),
-                    with_meeting: str = Form("")):
+                    with_meeting: str = Form(""), repeat: str = Form("none"), count: int = Form(4), all_day: str = Form("")):
     conn = get_conn()
+    if all_day:
+        start, end = "00:00", "23:59"
     st = datetime.fromisoformat(f"{date_}T{start}")
     en = datetime.fromisoformat(f"{date_}T{end}")
     if en <= st:
         en = st + __import__("datetime").timedelta(minutes=30)
     who_ = who(request, organizer)
-    eid = cal.create(conn, title.strip(), st, en, attendees=list(attendees), location=location.strip() or None,
-                     description=description.strip() or None, channel=channel.strip() or None, organizer=who_,
-                     kind="meeting" if with_meeting else "appointment")
+    kw = dict(title=title.strip(), attendees=list(attendees), location=location.strip() or None,
+              description=description.strip() or None, channel=channel.strip() or None, organizer=who_,
+              kind="meeting" if with_meeting and not all_day else "appointment", all_day=bool(all_day))
+    if repeat in ("daily", "weekly", "biweekly", "monthly"):
+        ids = cal.create_series(conn, repeat, count, start_at=st, end_at=en, **kw)
+    else:
+        ids = [cal.create(conn, start_at=st, end_at=en, **kw)]
     if channel.strip():
+        rep = {"daily": "毎日", "weekly": "毎週", "biweekly": "隔週", "monthly": "毎月"}.get(repeat)
         chat.post_message(conn, channel.strip(), who_,
-                          f"📅 予定を追加しました: {title.strip()} {st:%m/%d %H:%M}〜{en:%H:%M} 参加: {'・'.join(attendees)}")
+                          f"📅 予定を追加しました: {title.strip()} {st:%m/%d %H:%M}〜{en:%H:%M}{'（' + rep + '×' + str(len(ids)) + '回）' if rep else ''} 参加: {'・'.join(attendees)}")
         _ingest_chat(conn)
     return RedirectResponse(f"/calendar?view=week&d={date_}", status_code=303)
+
+
+@app.post("/calendar/{event_id}/update")
+def calendar_update(request: Request, event_id: str, title: str = Form(...), date_: str = Form(..., alias="date"), start: str = Form(...),
+                    end: str = Form(...), attendees: list[str] = Form([]), location: str = Form(""), description: str = Form(""),
+                    channel: str = Form(""), with_meeting: str = Form(""), scope: str = Form("one")):
+    conn = get_conn()
+    e = cal.get(conn, event_id)
+    if not e:
+        raise HTTPException(404)
+    st = datetime.fromisoformat(f"{date_}T{start}")
+    en = datetime.fromisoformat(f"{date_}T{end}")
+    if en <= st:
+        en = st + __import__("datetime").timedelta(minutes=30)
+    targets = [e]
+    if scope == "series" and e.get("series_id"):
+        targets = [cal._row(r) for r in conn.execute("SELECT * FROM cal_events WHERE series_id=? AND start_at >= ?", (e["series_id"], e["start_at"]))]
+    delta = st - e["start"]
+    for t in targets:
+        cal.update(conn, t["id"], title=title.strip(), start_at=db.to_iso(t["start"] + delta), end_at=db.to_iso(t["start"] + delta + (en - st)),
+                   attendees=list(attendees), location=location.strip() or None, description=description.strip() or None,
+                   channel=channel.strip() or None, kind="meeting" if with_meeting else "appointment")
+    return RedirectResponse(f"/calendar/{event_id}", status_code=303)
+
+
+class CalMove(BaseModel):
+    start_at: str
+    end_at: str
+
+
+@app.patch("/api/calendar/{event_id}")
+def calendar_move(event_id: str, body: CalMove):
+    """ドラッグで時間を動かす"""
+    conn = get_conn()
+    if not cal.get(conn, event_id):
+        raise HTTPException(404)
+    cal.update(conn, event_id, start_at=body.start_at, end_at=body.end_at)
+    return {"ok": True}
+
+
+@app.get("/api/calendar/busy")
+def calendar_busy(date_: str = Query("", alias="date"), start: str = "", end: str = "", people: str = "", exclude: str = ""):
+    conn = get_conn()
+    if not (date_ and start and end):
+        return {"busy": []}
+    st, en = datetime.fromisoformat(f"{date_}T{start}"), datetime.fromisoformat(f"{date_}T{end}")
+    rows = cal.busy(conn, st, en, [p for p in people.split(",") if p], exclude)
+    return {"busy": [{"title": r["title"], "people": r["people"], "start": r["start"].strftime("%H:%M"), "end": r["end"].strftime("%H:%M")} for r in rows]}
+
+
+@app.post("/calendar/{event_id}/rsvp")
+def calendar_rsvp(request: Request, event_id: str, answer: str = Form(...)):
+    conn = get_conn()
+    if answer in ("accepted", "declined", "tentative"):
+        cal.set_rsvp(conn, event_id, get_me(request), answer)
+    return RedirectResponse(f"/calendar/{event_id}", status_code=303)
 
 
 @app.get("/calendar/{event_id}", response_class=HTMLResponse)
@@ -1441,8 +1510,9 @@ def calendar_detail(request: Request, event_id: str):
         m = conn.execute("SELECT * FROM meetings WHERE id=?", (e["meeting_id"],)).fetchone()
         meeting = dict(m) if m else {"id": e["meeting_id"], "status": "done", "title": e["title"], "fixture": True}
     extracted = meeting_extracted(conn, e["meeting_id"]) if e.get("meeting_id") else []
+    series = [cal._row(r) for r in conn.execute("SELECT * FROM cal_events WHERE series_id=? ORDER BY start_at", (e["series_id"],))] if e.get("series_id") else []
     return render("calendar_detail.html", request, conn, e=e, meeting=meeting, extracted=extracted, me=get_me(request),
-                  channels=chat.list_channels(conn))
+                  channels=chat.list_channels(conn), series=series)
 
 
 @app.post("/calendar/{event_id}/start")
@@ -1465,9 +1535,13 @@ def calendar_start_meeting(request: Request, event_id: str, me: str = Form("")):
 
 
 @app.post("/calendar/{event_id}/delete")
-def calendar_delete(event_id: str):
+def calendar_delete(event_id: str, scope: str = Form("one")):
     conn = get_conn()
-    cal.delete(conn, event_id)
+    e = cal.get(conn, event_id)
+    if e and scope == "series" and e.get("series_id"):
+        conn.execute("DELETE FROM cal_events WHERE series_id=? AND start_at >= ?", (e["series_id"], e["start_at"])); conn.commit()
+    else:
+        cal.delete(conn, event_id)
     return RedirectResponse("/calendar", status_code=303)
 
 
