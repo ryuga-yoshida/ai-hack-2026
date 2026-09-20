@@ -13,7 +13,7 @@ from markupsafe import Markup
 from pydantic import BaseModel
 
 from app import config, db, tags as tagmod
-from app.connectors import calendar as cal, chat, mail as mailmod, meet
+from app.connectors import calendar as cal, chat, mail as mailmod, meet, wiki as wikimod
 from app.models import Event, Link, Task, new_id
 
 app = FastAPI(title="進行管理エージェント")
@@ -131,7 +131,7 @@ def render(name: str, request: Request, conn: sqlite3.Connection | None = None, 
     if conn is not None:
         ctx.update(nav_context(conn))
     ctx.setdefault("me", get_me(request))
-    ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar"))
+    ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar").replace("wiki_edit", "wiki").replace("wiki_diff", "wiki"))
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -1640,6 +1640,117 @@ async def upload_artifact(request: Request, file: UploadFile = File(...), actor:
     _register_version(conn, rel_path, await file.read(), actor, note, channel)
     resp = RedirectResponse(f"/artifacts?path={path}", status_code=303)
     return set_me(resp, actor)
+
+
+# ---------- Wiki（Confluence / Notion の代わり） ----------
+
+def _wiki_ctx(conn: sqlite3.Connection, page: dict | None = None) -> dict:
+    pages = wikimod.tree(conn)
+    spaces = sorted({p_["space"] for p_ in pages})
+    return {"pages": pages, "spaces": spaces, "page": page}
+
+
+@app.get("/wiki", response_class=HTMLResponse)
+def wiki_index(request: Request):
+    conn = get_conn()
+    pages = wikimod.tree(conn)
+    if pages:
+        latest = max(pages, key=lambda p_: p_["updated_at"])
+        return RedirectResponse(f"/wiki/{latest['id']}", status_code=303)
+    return render("wiki.html", request, conn, **_wiki_ctx(conn), html="", revs=[], tags=[], linked_tasks=[])
+
+
+@app.post("/wiki")
+def wiki_create(request: Request, title: str = Form(...), space: str = Form("general"), parent_id: str = Form("")):
+    conn = get_conn()
+    pid = wikimod.create(conn, title, f"# {title.strip()}\n\n", who(request), parent_id=parent_id or None, space=space.strip() or "general")
+    return RedirectResponse(f"/wiki/{pid}/edit", status_code=303)
+
+
+@app.get("/wiki/{page_id}", response_class=HTMLResponse)
+def wiki_page(request: Request, page_id: str):
+    conn = get_conn()
+    page = wikimod.get(conn, page_id)
+    if not page:
+        raise HTTPException(404)
+    revs = wikimod.revisions(conn, page_id)
+    changes = conn.execute("SELECT COUNT(*) FROM events WHERE source='wiki' AND json_extract(meta,'$.page_id')=?", (page_id,)).fetchone()[0]
+    findings = []
+    for r in conn.execute("SELECT * FROM findings WHERE status != 'dismissed'"):
+        f = db.row_to_finding(r)
+        if any(conn.execute("SELECT 1 FROM events WHERE id=? AND source='wiki' AND json_extract(meta,'$.page_id')=?", (eid, page_id)).fetchone() for eid in f.evidence):
+            findings.append(f)
+    linked_tasks = [t for t in db.list_tasks(conn) if f"wiki:{page_id}" in t.artifacts or page["title"] in t.artifacts]
+    children = [p_ for p_ in wikimod.tree(conn) if p_["parent_id"] == page_id]
+    return render("wiki.html", request, conn, **_wiki_ctx(conn, page), html=wikimod.render_markdown(page["body"]),
+                  revs=revs, tags=tagmod.tags_for(conn, "wiki", page_id), all_tags=tagmod.all_tags(conn),
+                  linked_tasks=linked_tasks, findings=findings, changes=changes, children=children,
+                  all_tasks=[t for t in db.list_tasks(conn) if t.status != "done"])
+
+
+@app.get("/wiki/{page_id}/edit", response_class=HTMLResponse)
+def wiki_edit(request: Request, page_id: str):
+    conn = get_conn()
+    page = wikimod.get(conn, page_id)
+    if not page:
+        raise HTTPException(404)
+    return render("wiki_edit.html", request, conn, **_wiki_ctx(conn, page), channels=chat.list_channels(conn))
+
+
+@app.post("/wiki/{page_id}/edit")
+def wiki_save(request: Request, page_id: str, title: str = Form(...), body: str = Form(""), note: str = Form(""),
+              channel: str = Form("")):
+    conn = get_conn()
+    changed = wikimod.update(conn, page_id, title, body.replace("\r\n", "\n"), who(request), note=note.strip() or None)
+    if changed:
+        if channel.strip():
+            chat.post_message(conn, channel.strip(), who(request), f"📖 Wiki「{title.strip()}」を更新しました{('（' + note.strip() + '）') if note.strip() else ''} {config.APP_BASE_URL}/wiki/{page_id}")
+            _ingest_chat(conn)
+        from app import agent
+        agent.request_tick(f"Wiki 更新（{title.strip()}）")
+    return RedirectResponse(f"/wiki/{page_id}", status_code=303)
+
+
+@app.get("/wiki/{page_id}/diff/{rev_id}", response_class=HTMLResponse)
+def wiki_diff(request: Request, page_id: str, rev_id: str):
+    from app.connectors.docs import diff_paragraphs
+    conn = get_conn()
+    page = wikimod.get(conn, page_id)
+    revs = wikimod.revisions(conn, page_id)
+    idx = next((i for i, r in enumerate(revs) if r["id"] == rev_id), None)
+    if not page or idx is None:
+        raise HTTPException(404)
+    cur = revs[idx]; prev = revs[idx - 1] if idx > 0 else None
+    diffs = diff_paragraphs(wikimod.paragraphs(prev["body"]) if prev else [], wikimod.paragraphs(cur["body"]))
+    evs = [db.row_to_event(r) for r in conn.execute("SELECT * FROM events WHERE source='wiki' AND json_extract(meta,'$.revision_id')=?", (rev_id,))]
+    fmap = {}
+    for ev in evs:
+        for r in conn.execute("SELECT * FROM findings WHERE evidence LIKE ? AND status != 'dismissed'", (f"%{ev.id}%",)):
+            fmap.setdefault(ev.ref, []).append(db.row_to_finding(r))
+    return render("wiki_diff.html", request, conn, **_wiki_ctx(conn, page), cur=cur, prev=prev, diffs=diffs, n=idx + 1,
+                  findings_by_ref=fmap, evs=evs)
+
+
+@app.post("/wiki/{page_id}/link_task")
+def wiki_link_task(page_id: str, task_id: str = Form(...)):
+    conn = get_conn()
+    t = db.get_task(conn, task_id)
+    page = wikimod.get(conn, page_id)
+    if not t or not page:
+        raise HTTPException(404)
+    if f"wiki:{page_id}" not in t.artifacts:
+        t.artifacts.append(f"wiki:{page_id}")
+        db.save_task(conn, t)
+    return RedirectResponse(f"/wiki/{page_id}", status_code=303)
+
+
+@app.post("/wiki/{page_id}/delete")
+def wiki_delete(page_id: str):
+    conn = get_conn()
+    conn.execute("UPDATE wiki_pages SET parent_id=NULL WHERE parent_id=?", (page_id,))
+    conn.execute("DELETE FROM wiki_pages WHERE id=?", (page_id,))
+    conn.commit()
+    return RedirectResponse("/wiki", status_code=303)
 
 
 # ---------- タグ・チーム ----------

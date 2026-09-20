@@ -8,7 +8,7 @@ import hashlib
 import sqlite3
 from datetime import datetime
 
-from app.connectors import calendar, chat, mail
+from app.connectors import calendar, chat, mail, wiki
 
 # (日時, チャンネル, 発言者, 発言)
 CHAT = [
@@ -73,6 +73,72 @@ CHAT = [
     ("2026-09-19 16:05", "general", "山田", "見込み表 v3 上げました https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/売上見込.xlsx"),
     ("2026-09-19 16:35", "general", "田中", "商品Dの企画書、初回ロット350とパッケージの件を反映しました https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/商品D_企画書.docx"),
 ]
+
+
+RULES_V1 = """# 売上見込表の運用ルール
+
+## 目的
+予算会議に出す売上見込を、部内で一つの表に集約する。
+
+## 更新の手順
+- 更新する人は山田（バックアップ: 高橋）
+- 更新前に必ず定例で内容を合意する
+- 更新後は #general にリンクを共有する
+
+## 数字の扱い
+- 実績が確定した四半期は実績値に置き換える
+- 見込みの上方修正は、得意先からの書面がある場合に限る
+"""
+RULES_V2 = """# 売上見込表の運用ルール
+
+## 目的
+予算会議に出す売上見込を、部内で一つの表に集約する。
+
+## 更新の手順
+- 更新する人は山田（バックアップ: 高橋）
+- 更新前に必ず定例で内容を合意する
+- 更新後は #general にリンクを共有する
+- 合計行の数式は末尾の行まで含める（9/8 定例で確認事項になった）
+
+## 数字の扱い
+- 実績が確定した四半期は実績値に置き換える
+- 見込みの上方修正は、得意先からの書面が2社以上ある場合に限る（9/15 定例で決定）
+- 第3四半期は据え置き。商品Aの第3四半期は1200のまま（9/15 定例で決定）
+"""
+PRODUCT_D_V1 = """# 商品D（青葉ゆず炭酸）
+
+## 概要
+秋冬向けの新商品。9/8 定例で売上見込表への追加を決定。
+
+## 販売計画
+- 第3四半期: 300ケース（初回ロット）
+- 第4四半期: 400ケース
+
+## 原価
+試算中（田中）。
+"""
+PRODUCT_D_V2 = """# 商品D（青葉ゆず炭酸）
+
+## 概要
+秋冬向けの新商品。9/8 定例で売上見込表への追加を決定。
+
+## 販売計画
+- 第3四半期: 350ケース（初回ロット。製造の都合で50ケース増、9/17 に決定）
+- 第4四半期: 400ケース
+
+## 原価
+原価率は想定より2ポイント高い（9/18 試算）。第4四半期の見直しは予算会議の後で判断する。
+
+## パッケージ
+初回ロットは印刷の色味が想定と異なる。次ロットから修正。
+"""
+MEETING_HOWTO = """# 定例会議の進め方
+
+- 毎週月曜 10:00〜10:30（会議室A）
+- 冒頭で前回の決定事項とタスクの状況を確認する
+- 決定事項は「〜に決定します」と明言する（議事録の抽出精度が上がる）
+- 決まらなかったことは「保留」「継続検討」と言う
+"""
 
 
 def _id(i: int) -> str:
@@ -140,3 +206,10 @@ def run(conn: sqlite3.Connection) -> None:
                         kind="appointment" if eid in ("cal-0926", "cal-0930") else "meeting")
         ne += 1
     print(f"seed: 予定 {ne} 件を投入（計 {len(EVENTS)} 件）")
+    if not conn.execute("SELECT 1 FROM wiki_pages WHERE id='wiki-rules'").fetchone():
+        wiki.create(conn, "売上見込表の運用ルール", RULES_V1, "高橋", at=datetime(2026, 9, 8, 15, 0), page_id="wiki-rules", space="商品企画部")
+        wiki.update(conn, "wiki-rules", "売上見込表の運用ルール", RULES_V2, "高橋", note="9/15 定例の決定を反映", at=datetime(2026, 9, 15, 13, 0))
+        wiki.create(conn, "商品D（青葉ゆず炭酸）", PRODUCT_D_V1, "田中", at=datetime(2026, 9, 9, 11, 0), page_id="wiki-productd", space="商品企画部", parent_id=None)
+        wiki.update(conn, "wiki-productd", "商品D（青葉ゆず炭酸）", PRODUCT_D_V2, "田中", note="原価試算とロット数を更新", at=datetime(2026, 9, 18, 17, 30))
+        wiki.create(conn, "定例会議の進め方", MEETING_HOWTO, "鈴木", at=datetime(2026, 9, 1, 10, 0), page_id="wiki-howto", space="商品企画部")
+        print("seed: Wiki 3 ページを投入")

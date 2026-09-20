@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ page.title }} 改訂{{ n }}の差分{% endblock %}
+{% block heading %}<a href="/wiki/{{ page.id }}" class="text-gray-400 hover:text-gray-600 mr-2">{{ page.title|truncate(30) }}</a><span class="text-gray-300 mr-2">/</span>改訂 {{ n }} の差分 <span class="text-gray-400 font-normal text-sm ml-2">{{ cur.actor }} · {{ cur.created_at|dt }}{% if cur.note %} · {{ cur.note }}{% endif %}</span>{% endblock %}
+{% block main_class %}p-0{% endblock %}
+{% block content %}
+<div class="flex h-[calc(100vh-3.5rem)]">
+  {% include "_wiki_sidebar.html" %}
+  <section class="flex-1 min-w-0 overflow-y-auto scrollbar-thin bg-white">
+    <div class="max-w-3xl mx-auto px-10 py-8 space-y-3">
+      {% for d in diffs %}
+      {% set ref = "wiki:" ~ page.id ~ "#" ~ cur.id ~ ":段落" ~ (d.index + 1) %}
+      <div class="border rounded-lg px-4 py-3 text-sm {% if findings_by_ref.get(ref) %}border-red-200{% else %}border-gray-200{% endif %}">
+        <span class="text-[10px] px-1.5 py-0.5 rounded {% if d.kind == 'changed' %}bg-sky-100 text-sky-800{% elif d.kind == 'added' %}bg-emerald-100 text-emerald-800{% else %}bg-red-100 text-red-800{% endif %}">{{ {'changed':'変更','added':'追加','removed':'削除'}[d.kind] }}</span>
+        {% if d.old %}<div class="mt-1 text-gray-500 line-through">{{ d.old }}</div>{% endif %}
+        {% if d.new %}<div class="mt-1">{{ d.new }}</div>{% endif %}
+        {% for f in findings_by_ref.get(ref, []) %}<a href="/findings?status=all#finding-{{ f.id }}" class="block mt-2 text-xs rounded-lg px-3 py-2 bg-red-50 text-red-800 hover:underline">⚠ {{ f.summary }}</a>{% endfor %}
+      </div>
+      {% else %}<div class="text-sm text-gray-400">段落単位の差分はありません（初版、または体裁のみの変更）。</div>{% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

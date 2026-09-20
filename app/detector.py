@@ -53,6 +53,8 @@ def _artifact_names(ref: str | None) -> set[str]:
     """'売上見込_v2.xlsx:売上見込!D5' → {'売上見込_v2.xlsx', '売上見込.xlsx', '売上見込'}"""
     if not ref:
         return set()
+    if ref.startswith("wiki:"):
+        return {ref.split("#", 1)[0]}
     fname = ref.split(":", 1)[0]
     stem = re.sub(r"_v\d+(?=\.[A-Za-z0-9]+$)", "", fname)
     return {fname, stem, stem.rsplit(".", 1)[0]}

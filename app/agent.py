@@ -14,6 +14,7 @@ from app.connectors.chat import ChatAdapter
 from app.connectors.docs import DocsAdapter
 from app.connectors.excel import ExcelAdapter
 from app.connectors.mail import MailAdapter
+from app.connectors.wiki import WikiAdapter
 from app.connectors.meet import MeetAdapter
 from app.llm import router
 from app.models import Event, Finding
@@ -196,7 +197,7 @@ class TickResult:
 
 
 def adapters(conn: sqlite3.Connection):
-    return [MeetAdapter(conn=conn), ChatAdapter(conn), MailAdapter(conn), ExcelAdapter(), DocsAdapter()]
+    return [MeetAdapter(conn=conn), ChatAdapter(conn), MailAdapter(conn), ExcelAdapter(), DocsAdapter(), WikiAdapter(conn)]
 
 
 # ---------- アクション決定（エージェントが自分で決める部分） ----------
