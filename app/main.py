@@ -973,7 +973,7 @@ def mail_send(request: Request, sender: str = Form(""), recipients: list[str] = 
 # ---------- 予定表（Outlook 予定表の代わり） ----------
 
 @app.get("/calendar", response_class=HTMLResponse)
-def calendar_page(request: Request, view: str = "week", d: str = ""):
+def calendar_page(request: Request, view: str = "week", d: str = "", person: str = ""):
     from datetime import timedelta
     conn = get_conn()
     base = date.fromisoformat(d) if d else date.today()
@@ -985,6 +985,8 @@ def calendar_page(request: Request, view: str = "week", d: str = ""):
         start = base - timedelta(days=base.weekday())
         end = start + timedelta(days=7)
     evs = cal.between(conn, datetime.combine(start, datetime.min.time()), datetime.combine(end, datetime.min.time()))
+    if person:
+        evs = [e for e in evs if person in e["attendees"] or e.get("organizer") == person]
     for e in evs:
         m = conn.execute("SELECT status FROM meetings WHERE id=?", (e["meeting_id"],)).fetchone() if e.get("meeting_id") else None
         fx = conn.execute("SELECT 1 FROM events WHERE source='meet' AND json_extract(meta,'$.meeting_id')=? LIMIT 1", (e["meeting_id"],)).fetchone() if e.get("meeting_id") else None
@@ -994,12 +996,13 @@ def calendar_page(request: Request, view: str = "week", d: str = ""):
     for i in range((end - start).days):
         day = start + timedelta(days=i)
         day_evs = [e for e in evs if e["start"].date() <= day <= e["end"].date()]
-        due = [t for t in db.list_tasks(conn) if t.due_date == day]
+        due = [t for t in db.list_tasks(conn) if t.due_date == day and (not person or t.assignee == person)]
         days.append({"date": day, "events": day_evs, "due": due, "today": day == date.today(), "in_month": day.month == base.month})
     prev = (base - timedelta(days=7)) if view == "week" else (base.replace(day=1) - timedelta(days=1))
     nxt = (base + timedelta(days=7)) if view == "week" else (base.replace(day=28) + timedelta(days=4))
     return render("calendar.html", request, conn, view=view, base=base, days=days, prev=prev.isoformat(), nxt=nxt.isoformat(),
-                  me=get_me(request), channels=chat.list_channels(conn), today=date.today().isoformat())
+                  me=get_me(request), channels=chat.list_channels(conn), today=date.today().isoformat(), person=person,
+                  hours=list(range(8, 20)))
 
 
 @app.post("/calendar")
