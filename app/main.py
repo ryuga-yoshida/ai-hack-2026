@@ -20,6 +20,77 @@ app = FastAPI(title="進行管理エージェント")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
 
 
+# ---------- ロール（admin / member / viewer）と監査 ----------
+
+ROLES = [("admin", "管理者", "設定・削除・エージェント操作・ロール変更ができる"),
+         ("member", "メンバー", "投稿・編集・タスク操作ができる（既定）"),
+         ("viewer", "閲覧者", "見るだけ。投稿・変更はできない")]
+ROLE_LABEL = {k: l for k, l, _ in ROLES}
+DEFAULT_ADMINS = {"鈴木"}   # 初期状態の管理者（設定画面で変更できる）
+
+# admin だけができる操作（プレフィックス一致）
+ADMIN_ONLY = ("/settings", "/api/agent/toggle", "/api/agent/reset", "/tags/", "/artifacts/delete", "/artifacts/folder/delete",
+              "/artifacts/rename", "/meet/", "/audit", "/api/roles")
+ADMIN_ONLY_EXACT_SUFFIX = ("/delete",)   # 各種の削除は admin
+# viewer でも許される変更系（サインイン・自分の設定・既読）
+VIEWER_ALLOWED = ("/login", "/logout", "/profile", "/notifications/read", "/api/notifications", "/tick")
+
+
+def role_of(conn: sqlite3.Connection, name: str) -> str:
+    if not name:
+        return "viewer"
+    r = conn.execute("SELECT value FROM settings WHERE key=?", (f"role:{name}",)).fetchone()
+    if r and r["value"] in ROLE_LABEL:
+        return r["value"]
+    return "admin" if name in DEFAULT_ADMINS else "member"
+
+
+def _admin_required(path: str) -> bool:
+    if path.startswith(("/meet/",)) and not (path.endswith("/delete")):
+        return False
+    if path.startswith(("/tags/",)) and not path.endswith(("/delete", "/merge", "/update")):
+        return False
+    return path.startswith(ADMIN_ONLY) or path.endswith(ADMIN_ONLY_EXACT_SUFFIX)
+
+
+@app.middleware("http")
+async def authorize_and_audit(request: Request, call_next):
+    """ロールによる変更操作の制限と、変更系リクエストの監査ログ。
+    - viewer: GET 以外は不可（サインイン等を除く）
+    - member: 削除・設定・エージェント操作・タグ管理は不可
+    - admin: 全部"""
+    method, path = request.method, request.url.path
+    mutating = method in ("POST", "PUT", "PATCH", "DELETE") and not path.startswith(("/ws/",))
+    me = get_me(request)
+    role = None
+    if mutating:
+        conn = db.connect()
+        role = role_of(conn, me)
+        denied = None
+        if role == "viewer" and not path.startswith(VIEWER_ALLOWED):
+            denied = "閲覧者ロールでは変更できません"
+        elif role == "member" and _admin_required(path):
+            denied = "この操作は管理者のみ行えます"
+        if denied:
+            conn.execute("INSERT INTO audit_logs (at, actor, role, method, path, status, detail, ip) VALUES (?,?,?,?,?,?,?,?)",
+                         (db.now_iso(), me, role, method, path, 403, denied, request.client.host if request.client else None))
+            conn.commit(); conn.close()
+            if "application/json" in request.headers.get("accept", "") or path.startswith("/api/"):
+                return JSONResponse({"detail": denied}, status_code=403)
+            return HTMLResponse(f"<script>alert({json.dumps(denied, ensure_ascii=False)}); history.back();</script>", status_code=403)
+        conn.close()
+    response = await call_next(request)
+    if mutating and not path.startswith(("/api/chat/messages", "/tick")):
+        try:
+            conn = db.connect()
+            conn.execute("INSERT INTO audit_logs (at, actor, role, method, path, status, detail, ip) VALUES (?,?,?,?,?,?,?,?)",
+                         (db.now_iso(), me, role, method, path, response.status_code, None, request.client.host if request.client else None))
+            conn.commit(); conn.close()
+        except Exception:
+            pass
+    return response
+
+
 @app.middleware("http")
 async def require_signin(request: Request, call_next):
     """未サインイン（プロフィール未設定）なら /login へ。API・WebSocket・静的ファイルは対象外。
@@ -172,6 +243,7 @@ def render(name: str, request: Request, conn: sqlite3.Connection | None = None, 
         ctx.update(nav_context(conn, ctx["me"]))
     if conn is not None and ctx["me"]:
         ctx.setdefault("my_presence", presence_of(conn, ctx["me"]))
+        ctx.setdefault("my_role", role_of(conn, ctx["me"]))
     ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar").replace("wiki_edit", "wiki").replace("wiki_diff", "wiki"))
     return templates.TemplateResponse(request, name, ctx)
 
@@ -339,7 +411,8 @@ def person_card(name: str):
         "SELECT COUNT(*) FROM findings f JOIN tasks t ON t.id = f.task_id WHERE t.assignee=? AND f.status IN ('notified','pending')", (name,)).fetchone()[0]
     return {"name": name, "teams": [t["name"] for t in tagmod.teams(conn) if name in t["members"]],
             "open_tasks": open_tasks, "overdue": overdue, "last_active": last, "open_findings": findings,
-            "email": f"{name}@aoba-beverage.example", "presence": presence_of(conn, name), **config.PERSON_INFO.get(name, {})}
+            "email": f"{name}@aoba-beverage.example", "presence": presence_of(conn, name), "access": ROLE_LABEL[role_of(conn, name)],
+            **config.PERSON_INFO.get(name, {})}
 
 
 @app.post("/profile")
@@ -2934,6 +3007,52 @@ def tag_members(name: str, members: list[str] = Form([])):
 
 # ---------- 設定 ----------
 
+@app.post("/settings/roles")
+def settings_roles(request: Request, name: str = Form(...), role: str = Form(...)):
+    conn = get_conn()
+    if role not in ROLE_LABEL:
+        raise HTTPException(422)
+    admins = [p_ for p_ in people_list(conn) if role_of(conn, p_) == "admin"]
+    if role != "admin" and admins == [name]:
+        raise HTTPException(409, "最後の管理者は降格できません")
+    db.set_setting(conn, f"role:{name}", role)
+    return RedirectResponse("/settings#roles", status_code=303)
+
+
+@app.get("/audit", response_class=HTMLResponse)
+def audit_page(request: Request, actor: str = "", q: str = "", status: str = ""):
+    conn = get_conn()
+    if role_of(conn, get_me(request)) != "admin":
+        raise HTTPException(403, "監査ログは管理者のみ閲覧できます")
+    cond, params = [], []
+    if actor:
+        cond.append("actor = ?"); params.append(actor)
+    if q:
+        cond.append("path LIKE ?"); params.append(f"%{q}%")
+    if status == "denied":
+        cond.append("status = 403")
+    where = ("WHERE " + " AND ".join(cond)) if cond else ""
+    rows = [dict(r) for r in conn.execute(f"SELECT * FROM audit_logs {where} ORDER BY id DESC LIMIT 300", params)]
+    actors = [r[0] for r in conn.execute("SELECT DISTINCT actor FROM audit_logs WHERE actor IS NOT NULL ORDER BY actor")]
+    counts = {"total": conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()[0],
+              "denied": conn.execute("SELECT COUNT(*) FROM audit_logs WHERE status=403").fetchone()[0]}
+    return render("audit.html", request, conn, rows=rows, actors=actors, actor=actor, q=q, status=status, counts=counts, ROLE_LABEL=ROLE_LABEL)
+
+
+@app.get("/audit/export.csv")
+def audit_export(request: Request):
+    import csv, io
+    from fastapi.responses import Response
+    conn = get_conn()
+    if role_of(conn, get_me(request)) != "admin":
+        raise HTTPException(403)
+    buf = io.StringIO(); w = csv.writer(buf)
+    w.writerow(["at", "actor", "role", "method", "path", "status", "detail", "ip"])
+    for r in conn.execute("SELECT at, actor, role, method, path, status, detail, ip FROM audit_logs ORDER BY id"):
+        w.writerow(list(r))
+    return Response(content="\ufeff" + buf.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": "attachment; filename=audit.csv"})
+
+
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
     from app import agent
@@ -2956,7 +3075,7 @@ def settings_page(request: Request):
               ("Wiki の書き換え", "実装しない"), ("ファイルの更新（外部ストレージ）", "実装しない"), ("Slack・メールへの外部送信", "実装しない")]
     return render("settings.html", request, conn, items=items, models=models, scopes=scopes, writes=writes,
                   agent_state=dict(agent.state), watch_dir=config.ARTIFACT_WATCH_DIR, gemini=bool(config.GEMINI_API_KEY),
-                  orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL)
+                  orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL, ROLES=ROLES, roles={p_: role_of(conn, p_) for p_ in people_list(conn)})
 
 
 @app.post("/settings")

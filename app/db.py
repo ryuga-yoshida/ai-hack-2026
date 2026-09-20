@@ -46,6 +46,20 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee);
 
+-- 監査ログ（誰が・いつ・何を変えたか。変更系リクエストを全て記録）
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    at       TEXT NOT NULL,
+    actor    TEXT,
+    role     TEXT,
+    method   TEXT NOT NULL,
+    path     TEXT NOT NULL,
+    status   INTEGER,
+    detail   TEXT,
+    ip       TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_audit_at ON audit_logs(at);
+
 -- タスクの付属物（仕様外の UI 用。判定ロジックは参照しない）
 CREATE TABLE IF NOT EXISTS task_checklist (
     id       TEXT PRIMARY KEY,

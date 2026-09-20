@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}監査ログ{% endblock %}
+{% block heading %}監査ログ <span class="text-gray-400 font-normal text-sm ml-2">変更操作 {{ counts.total }} 件 · 拒否 {{ counts.denied }} 件</span>{% endblock %}
+{% block actions %}
+<form method="get" action="/audit" class="flex items-center gap-1">
+  <select name="actor" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">全員</option>{% for a in actors %}<option value="{{ a }}" {% if a == actor %}selected{% endif %}>{{ a }}</option>{% endfor %}</select>
+  <input name="q" value="{{ q }}" placeholder="パスで絞り込み" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-40">
+  <select name="status" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white"><option value="">すべて</option><option value="denied" {% if status == 'denied' %}selected{% endif %}>拒否のみ</option></select>
+</form>
+<a href="/audit/export.csv" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">↓ CSV</a>
+{% endblock %}
+{% block content %}
+<div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-xs text-gray-500 text-left"><tr><th class="px-4 py-2">日時</th><th class="px-3 py-2">誰が</th><th class="px-3 py-2">ロール</th><th class="px-3 py-2">操作</th><th class="px-3 py-2">結果</th><th class="px-3 py-2">IP</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr class="border-t border-gray-100 {% if r.status == 403 %}bg-red-50{% endif %}">
+      <td class="px-4 py-1.5 text-xs text-gray-500 whitespace-nowrap">{{ r.at|dt }}</td>
+      <td class="px-3 py-1.5" data-person="{{ r.actor }}">{{ r.actor or '—' }}</td>
+      <td class="px-3 py-1.5 text-xs">{{ ROLE_LABEL.get(r.role, r.role or '') }}</td>
+      <td class="px-3 py-1.5 font-mono text-xs"><span class="px-1.5 rounded bg-gray-100 text-gray-700">{{ r.method }}</span> {{ r.path }}</td>
+      <td class="px-3 py-1.5 text-xs">{% if r.status == 403 %}<span class="text-red-700 font-semibold">拒否</span> <span class="text-gray-500">{{ r.detail }}</span>{% elif r.status and r.status < 400 %}<span class="text-emerald-700">OK</span>{% else %}<span class="text-amber-700">{{ r.status }}</span>{% endif %}</td>
+      <td class="px-3 py-1.5 text-xs text-gray-400">{{ r.ip or '' }}</td>
+    </tr>
+    {% else %}<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">まだ記録はありません</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="text-xs text-gray-500 mt-3">全ての変更系リクエスト（投稿・編集・削除・設定・エージェント操作）を、ロールの判定結果とともに記録します。閲覧は管理者のみ。</p>
+{% endblock %}

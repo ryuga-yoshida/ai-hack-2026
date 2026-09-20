@@ -2,7 +2,21 @@
 {% block title %}設定{% endblock %}
 {% block content %}
 <div class="grid grid-cols-3 gap-6">
-  <form method="post" action="/settings" class="col-span-2 space-y-4">
+  <div class="col-span-2 space-y-4">
+  <div class="bg-white border border-gray-200 rounded-xl p-5" id="roles">
+    <h2 class="font-semibold mb-1">ロール（権限）</h2>
+    <p class="text-xs text-gray-500 mb-3">{% for k, l, d in ROLES %}<b>{{ l }}</b>＝{{ d }}{% if not loop.last %} ／ {% endif %}{% endfor %}。変更操作は全て<a href="/audit" class="text-indigo-600 hover:underline">監査ログ</a>に残ります。本番では Entra ID のグループから同期します。</p>
+    <table class="w-full text-sm">
+      <thead class="text-xs text-gray-500 text-left"><tr><th class="py-1">メンバー</th><th>ロール</th><th></th></tr></thead>
+      <tbody>{% for p_, r in roles.items() %}
+      <tr class="border-t border-gray-100"><td class="py-1.5" data-person="{{ p_ }}">{{ p_ }}{% if p_ == me %} <span class="text-gray-400 text-xs">(あなた)</span>{% endif %}</td>
+        <td><form method="post" action="/settings/roles" class="flex gap-2 items-center"><input type="hidden" name="name" value="{{ p_ }}">
+          <select name="role" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1 bg-white" {% if my_role != 'admin' %}disabled{% endif %}>{% for k, l, d in ROLES %}<option value="{{ k }}" {% if k == r %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></form></td>
+        <td class="text-xs text-gray-400">{{ {'admin':'設定・削除・エージェント','member':'投稿・編集','viewer':'閲覧のみ'}[r] }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  </div>
+  <form method="post" action="/settings" class="space-y-4">
     <div class="bg-white border border-gray-200 rounded-xl p-5">
       <h2 class="font-semibold mb-1">エージェントの判断の閾値</h2>
       <p class="text-xs text-gray-500 mb-4">自律と信頼のバランス。全部自動通知にすると誤検知で信用を失い、全部人間確認にすると自律していない。</p>
