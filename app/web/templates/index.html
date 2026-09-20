@@ -75,6 +75,25 @@
 
   <div class="space-y-4">
     <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <div class="flex items-center justify-between mb-2"><h2 class="font-semibold text-sm">今日の予定</h2><a href="/calendar" class="text-xs text-indigo-600 hover:underline">予定表 →</a></div>
+      <ul class="text-sm space-y-1">{% for e in today_evs %}<li><a href="/calendar/{{ e.id }}" class="flex gap-2 hover:underline"><span class="text-gray-500 w-12">{{ e.start.strftime('%H:%M') }}</span><span class="truncate">{{ e.title }}</span></a></li>{% else %}<li class="text-gray-400 text-xs">予定はありません</li>{% endfor %}</ul>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <div class="flex items-center justify-between mb-2"><h2 class="font-semibold text-sm">自分のタスク <span class="text-gray-400 font-normal">{{ me }}</span></h2><a href="/tasks?view=list&assignee={{ me }}" class="text-xs text-indigo-600 hover:underline">すべて →</a></div>
+      <ul class="text-sm space-y-1.5">
+        {% for m in my_tasks %}{% set t = m.task %}
+        <li class="flex items-center gap-2"><span class="w-2 h-2 rounded-full shrink-0 {% if t.status == 'in_progress' %}bg-indigo-500{% elif t.status == 'blocked' %}bg-red-500{% else %}bg-gray-300{% endif %}"></span>
+          <a href="/tasks/{{ t.id }}" class="truncate hover:underline flex-1">{{ t.title }}</a>
+          {% if t.due_date %}<span class="text-xs {% if m.overdue %}text-red-600 font-semibold{% else %}text-gray-400{% endif %}">{{ t.due_date.strftime('%m/%d') }}</span>{% endif %}
+          {% if m.n_findings %}<span class="text-xs text-red-600">⚠</span>{% endif %}</li>
+        {% else %}<li class="text-gray-400 text-xs">未完了のタスクはありません</li>{% endfor %}
+      </ul>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <div class="flex items-center justify-between mb-2"><h2 class="font-semibold text-sm">自分宛の通知</h2><a href="/notifications" class="text-xs text-indigo-600 hover:underline">すべて →</a></div>
+      <ul class="text-xs space-y-1.5">{% for n in my_notifs %}<li><a href="{{ n.href }}" class="hover:underline"><span class="px-1 rounded bg-{{ n.tone }}-100 text-{{ n.tone }}-800 mr-1">{{ n.title|truncate(12) }}</span>{{ n.text|truncate(60) }}</a> <span class="text-gray-400">{{ n.at|rel }}</span></li>{% else %}<li class="text-gray-400">なし</li>{% endfor %}</ul>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
       <div class="flex items-center justify-between mb-2">
         <h2 class="font-semibold text-sm">エージェントの活動</h2>
         <a href="/agent" class="text-xs text-indigo-600 hover:underline">ログ →</a>

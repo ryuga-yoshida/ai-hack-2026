@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}検索{% endblock %}
+{% block heading %}検索{% if q %} <span class="text-gray-400 font-normal ml-2">「{{ q }}」 {{ total }} 件</span>{% endif %}{% endblock %}
+{% block content %}
+<form method="get" action="/search" class="max-w-3xl mb-6"><input name="q" value="{{ q }}" autofocus placeholder="タスク・チャット・メール・成果物・Wiki・議事録・検知を横断検索" class="w-full text-base border border-gray-300 rounded-xl px-4 py-3 shadow-sm"></form>
+{% if q %}
+<div class="max-w-3xl space-y-6">
+  {% for key, label, items in [('tasks','タスク',res.tasks),('findings','検知',res.findings),('messages','チャット',res.messages),('mails','メール',res.mails),('files','成果物',res.files),('wiki','Wiki',res.wiki),('meetings','会議',res.meetings)] %}
+  {% if items %}
+  <section>
+    <div class="text-xs font-semibold text-gray-500 tracking-wider mb-2">{{ label }} <span class="text-gray-400 font-normal">{{ items|length }}</span></div>
+    <div class="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+      {% for it in items %}
+      {% if key == 'tasks' %}<a href="/tasks/{{ it.id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50"><span class="text-[10px] px-1.5 rounded bg-gray-100 text-gray-600 mr-2">{{ STATUS_LABEL[it.status] }}</span>{{ it.title }} <span class="text-xs text-gray-400">{{ it.assignee or '' }}</span></a>
+      {% elif key == 'findings' %}<a href="/findings?status=all#finding-{{ it.id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50"><span class="text-[10px] px-1.5 rounded bg-red-100 text-red-700 mr-2">{{ KIND_LABEL.get(it.kind, it.kind) }}</span>{{ it.summary }}</a>
+      {% elif key == 'messages' %}<a href="/chat?channel={{ it.channel }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50"><span class="text-xs text-gray-400 mr-2"># {{ it.channel }} · {{ it.actor }} · {{ it.posted_at|dt }}</span><div>{{ it.text|truncate(120) }}</div></a>
+      {% elif key == 'mails' %}<a href="/mail?thread={{ it.thread_id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50"><span class="text-xs text-gray-400 mr-2">{{ it.sender }} · {{ it.sent_at|dt }}</span>{{ it.subject }}</a>
+      {% elif key == 'files' %}<a href="/artifacts?path={{ it.rsplit('/', 1)[0] if '/' in it else '' }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50">📎 {{ it }}</a>
+      {% elif key == 'wiki' %}<a href="/wiki/{{ it.id }}" class="block px-4 py-2.5 text-sm hover:bg-gray-50">📖 {{ it.title }} <span class="text-xs text-gray-400">{{ it.updated_at|dt }}</span></a>
+      {% elif key == 'meetings' %}<a href="/meet/{{ it.id }}/minutes" class="block px-4 py-2.5 text-sm hover:bg-gray-50">📝 {{ it.title }} <span class="text-xs text-gray-400">{{ it.at|dt }}</span></a>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% endfor %}
+  {% if not total %}<div class="text-sm text-gray-500">該当なし</div>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

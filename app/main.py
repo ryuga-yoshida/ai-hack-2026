@@ -99,7 +99,29 @@ def fmt_dt(v, with_date=True) -> str:
 
 templates.env.filters["linkify"] = linkify
 templates.env.filters["initials"] = initials
+def fmt_rel(v) -> str:
+    """相対時刻（3分前・2時間前・昨日 …）。古いものは日付"""
+    if not v:
+        return ""
+    if isinstance(v, str):
+        v = db.from_iso(v)
+    d = datetime.now() - v
+    sec = d.total_seconds()
+    if sec < 60:
+        return "たった今"
+    if sec < 3600:
+        return f"{int(sec // 60)}分前"
+    if sec < 86400 and v.date() == date.today():
+        return f"{int(sec // 3600)}時間前"
+    if v.date() == date.today() - __import__("datetime").timedelta(days=1):
+        return f"昨日 {v:%H:%M}"
+    if d.days < 7:
+        return f"{d.days}日前"
+    return v.strftime("%m/%d %H:%M")
+
+
 templates.env.filters["dt"] = fmt_dt
+templates.env.filters["rel"] = fmt_rel
 templates.env.filters["tag_colors"] = lambda tags: {t["name"]: t["color"] for t in tags}
 templates.env.globals.update(STATUSES=STATUSES, STATUS_LABEL=STATUS_LABEL, KIND_LABEL=KIND_LABEL,
                              EVENT_LABEL=EVENT_LABEL, FINDING_STATUS_LABEL=FINDING_STATUS_LABEL, PEOPLE=PEOPLE)
@@ -133,6 +155,29 @@ def render(name: str, request: Request, conn: sqlite3.Connection | None = None, 
     ctx.setdefault("me", get_me(request))
     ctx.setdefault("active", name.split(".")[0].replace("tag_detail", "tags").replace("task_detail", "tasks").replace("meet_room", "meet").replace("calendar_detail", "calendar").replace("wiki_edit", "wiki").replace("wiki_diff", "wiki"))
     return templates.TemplateResponse(request, name, ctx)
+
+
+# ---------- 横断検索 ----------
+
+@app.get("/search", response_class=HTMLResponse)
+def search_page(request: Request, q: str = ""):
+    conn = get_conn()
+    q = q.strip()
+    res = {"tasks": [], "messages": [], "mails": [], "files": [], "wiki": [], "meetings": [], "findings": []}
+    if q:
+        like = f"%{q}%"
+        res["tasks"] = [t for t in db.list_tasks(conn) if q in t.title or q in (t.description or "")][:20]
+        res["messages"] = [_message_dict(conn, r) for r in chat.search_messages(conn, q, 20)]
+        res["mails"] = [dict(r) for r in conn.execute("SELECT id, thread_id, sender, subject, sent_at FROM mails WHERE subject LIKE ? OR body LIKE ? ORDER BY sent_at DESC LIMIT 20", (like, like))]
+        from app.connectors.excel import version_series
+        res["files"] = [k for k in version_series(LIB(), ext=None) if q.lower() in k.lower()][:20]
+        res["wiki"] = [dict(r) for r in conn.execute("SELECT id, title, updated_at FROM wiki_pages WHERE title LIKE ? OR body LIKE ? ORDER BY updated_at DESC LIMIT 20", (like, like))]
+        res["meetings"] = [dict(r) for r in conn.execute(
+            "SELECT DISTINCT json_extract(meta,'$.meeting_id') id, json_extract(meta,'$.meeting_title') title, MIN(occurred_at) at "
+            "FROM events WHERE source='meet' AND kind='utterance' AND text LIKE ? GROUP BY id ORDER BY at DESC LIMIT 20", (like,))]
+        res["findings"] = [db.row_to_finding(r) for r in conn.execute("SELECT * FROM findings WHERE summary LIKE ? OR reason LIKE ? ORDER BY created_at DESC LIMIT 20", (like, like))]
+    total = sum(len(v) for v in res.values())
+    return render("search.html", request, conn, q=q, res=res, total=total)
 
 
 # ---------- 通知（自分宛） ----------
@@ -290,8 +335,16 @@ def dashboard(request: Request):
     cards_all = finding_cards(conn, "WHERE status IN ('notified','pending')")
     stalled = [c for c in cards_all if c["finding"].kind == "stalled"]
     cards = [c for c in cards_all if c["finding"].kind != "stalled"][:6]
+    me = get_me(request)
+    from datetime import timedelta
+    my_tasks = sorted([task_meta(conn, t) for t in db.list_tasks(conn) if t.assignee == me and t.status != "done"],
+                      key=lambda m: (m["task"].due_date is None, str(m["task"].due_date or ""), m["updated_at"]))[:8]
+    today_evs = [e for e in cal.between(conn, datetime.combine(date.today(), datetime.min.time()),
+                                        datetime.combine(date.today() + timedelta(days=1), datetime.min.time())) if not me or me in e["attendees"] or e.get("organizer") == me]
+    my_notifs = notifications_for(conn, me, limit=5) if me else []
     return render("index.html", request, conn, autonomy=agent.autonomy_stats(conn), stalled=stalled,
-                  config_stalled_days=config.STALLED_DAYS,
+                  config_stalled_days=config.STALLED_DAYS, my_tasks=my_tasks, today_evs=today_evs, my_notifs=my_notifs,
+                  today=date.today(),
                   cards=cards,
                   counts=counts, kinds=kinds, task_counts=task_counts, events_n=events_n, sources=sources,
                   cost=cost.summary(conn), logs=db.recent_logs(conn, limit=12))

@@ -6,7 +6,7 @@
     <span class="text-xs px-2 py-0.5 rounded-md border {% if f.severity == 'high' %}border-red-300 text-red-700{% elif f.severity == 'medium' %}border-amber-300 text-amber-700{% else %}border-gray-300 text-gray-600{% endif %}">{{ f.severity }}</span>
     <span class="text-xs text-gray-500">confidence <b class="text-gray-800">{{ '%.2f' % f.confidence }}</b></span>
     <span class="text-xs px-2 py-0.5 rounded-full {% if f.status == 'notified' %}bg-indigo-100 text-indigo-700{% elif f.status == 'pending' %}bg-amber-50 text-amber-700{% elif f.status == 'acknowledged' %}bg-emerald-50 text-emerald-700{% else %}bg-gray-100 text-gray-500{% endif %}">{{ FINDING_STATUS_LABEL[f.status] }}</span>
-    <span class="text-xs text-gray-400 ml-auto">{{ c.created_at|dt }}</span>
+    <span class="text-xs text-gray-400 ml-auto" title="{{ c.created_at|dt }}">{{ c.created_at|rel }}</span>
   </div>
   <div class="font-medium mt-2 leading-relaxed">{{ f.summary }}</div>
   {% if c.task %}<a href="/tasks/{{ c.task.id }}" class="inline-flex items-center gap-1 text-xs text-indigo-600 hover:underline mt-1">

@@ -21,7 +21,7 @@
 <body class="h-full bg-gray-50 text-gray-900 antialiased" x-data="shell()" x-init="init()">
 <div class="flex h-full min-h-screen">
   <!-- サイドバー -->
-  <aside class="w-60 shrink-0 bg-white border-r border-gray-200 flex flex-col">
+  <aside class="w-60 shrink-0 bg-white border-r border-gray-200 flex-col" :class="sidebar ? 'flex' : 'hidden'" x-cloak>
     <a href="/" class="flex items-center gap-2 px-5 h-14 border-b border-gray-200">
       <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white grid place-items-center text-sm font-bold">A</span>
       <span class="font-semibold text-sm">進行管理エージェント</span>
@@ -81,8 +81,10 @@
 
   <!-- メイン -->
   <div class="flex-1 min-w-0 flex flex-col">
-    <header class="h-14 bg-white border-b border-gray-200 flex items-center px-6 gap-4">
+    <header class="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
+      <button @click="sidebar = !sidebar; try { localStorage.setItem('sidebar', sidebar ? '1' : '0') } catch (e) {}" class="w-8 h-8 grid place-items-center rounded-lg text-gray-500 hover:bg-gray-100" title="サイドバー">☰</button>
       <h1 class="font-semibold">{% block heading %}{{ self.title() }}{% endblock %}</h1>
+      <form method="get" action="/search" class="ml-4 hidden md:block"><input id="globalSearch" name="q" placeholder="検索（/）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-52 focus:w-72 transition-all"></form>
       <div class="ml-auto flex items-center gap-2">
         {% block actions %}{% endblock %}
         <a href="/notifications" class="relative w-9 h-9 grid place-items-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50" title="通知">
@@ -192,8 +194,20 @@ function mentionInput() {
 function shell() {
   return {
     agent: {{ agent_state|tojson if agent_state is defined else '{}' }},
-    toasts: [], notif: 0,
-    init() { this.refresh(); setInterval(() => this.refresh(), 5000); },
+    toasts: [], notif: 0, sidebar: (function () { try { return localStorage.getItem('sidebar') !== '0'; } catch (e) { return true; } })(),
+    init() {
+      this.refresh(); setInterval(() => this.refresh(), 5000);
+      // キーボード: / で検索、Esc でモーダルを閉じる、g+d/t/c でジャンプ
+      let g = false;
+      document.addEventListener('keydown', e => {
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (['input', 'textarea', 'select'].includes(tag) || e.target.isContentEditable) { if (e.key === 'Escape') e.target.blur(); return; }
+        if (e.key === '/') { e.preventDefault(); const s = document.getElementById('globalSearch'); if (s) s.focus(); }
+        else if (e.key === 'Escape') { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); }
+        else if (e.key === 'g') { g = true; setTimeout(() => g = false, 800); }
+        else if (g) { const map = { d: '/', f: '/findings', t: '/tasks', c: '/chat', m: '/mail', k: '/calendar', w: '/wiki', a: '/agent', n: '/notifications' }; if (map[e.key]) location.href = map[e.key]; g = false; }
+      });
+    },
     async refresh() {
       try { const r = await fetch('/api/agent/status'); const j = await r.json(); this.agent = j.state; } catch (e) {}
       try { const r = await fetch('/api/notifications/count'); this.notif = (await r.json()).count; } catch (e) {}
