@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}ダッシュボード{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>{% endblock %}
 {% block content %}
 <div class="grid grid-cols-4 gap-4 mb-6">
   <div class="bg-white border border-gray-200 rounded-xl p-4">
@@ -105,6 +106,16 @@
         {% else %}<li class="text-gray-400">まだ活動はありません</li>{% endfor %}
       </ul>
     </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <h2 class="font-semibold text-sm mb-2">直近14日の活動 <span class="text-xs text-gray-400 font-normal">情報源別の出来事と検知</span></h2>
+      <canvas id="trend" height="120"></canvas>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-4">
+      <h2 class="font-semibold text-sm mb-2">最近の動き <span class="text-xs text-gray-400 font-normal">チャット・メール・Wiki・成果物</span></h2>
+      <ul class="text-xs space-y-1.5">
+        {% for f in feed %}<li class="flex gap-2"><span class="shrink-0">{{ f.icon }}</span><a href="{{ f.href }}" class="min-w-0 flex-1 truncate hover:underline"><b>{{ f.who }}</b> {{ f.text }}</a><span class="text-gray-400 shrink-0">{{ f.at|rel }}</span></li>{% else %}<li class="text-gray-400">まだありません</li>{% endfor %}
+      </ul>
+    </div>
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
       <h2 class="font-semibold text-sm mb-2">統合グラフ</h2>
       <div class="text-gray-600">出来事 <b>{{ events_n }}</b> 件</div>
@@ -118,4 +129,20 @@
     </div>
   </div>
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+new Chart(document.getElementById('trend'), {
+  type: 'bar',
+  data: { labels: {{ days|map('replace', '2026-', '')|list|tojson }},
+    datasets: [
+      {% for src, label, color in [('meet','会議','#6366f1'),('chat','チャット','#0ea5e9'),('mail','メール','#14b8a6'),('excel','成果物','#f59e0b'),('wiki','Wiki','#8b5cf6')] %}
+      { label: '{{ label }}', data: {{ trend[src].values()|list|tojson }}, backgroundColor: '{{ color }}', stack: 'ev' },
+      {% endfor %}
+      { label: '検知', data: {{ f_trend.values()|list|tojson }}, type: 'line', borderColor: '#dc2626', backgroundColor: '#dc2626', yAxisID: 'y2', tension: .3, pointRadius: 3 },
+    ] },
+  options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+    scales: { x: { stacked: true, ticks: { font: { size: 10 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } }, y2: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { font: { size: 10 }, precision: 0 } } } },
+});
+</script>
 {% endblock %}

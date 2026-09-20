@@ -442,7 +442,28 @@ def dashboard(request: Request):
     today_evs = [e for e in cal.between(conn, datetime.combine(date.today(), datetime.min.time()),
                                         datetime.combine(date.today() + timedelta(days=1), datetime.min.time())) if not me or me in e["attendees"] or e.get("organizer") == me]
     my_notifs = notifications_for(conn, me, limit=5) if me else []
-    return render("index.html", request, conn, autonomy=agent.autonomy_stats(conn), stalled=stalled,
+    # 直近14日の活動（出来事の日別件数 × 情報源）と検知件数
+    days = [(date.today() - timedelta(days=i)).isoformat() for i in range(13, -1, -1)]
+    trend = {src: {d: 0 for d in days} for src in ("meet", "chat", "mail", "excel", "wiki")}
+    for r in conn.execute("SELECT source, substr(occurred_at,1,10) d, COUNT(*) n FROM events WHERE occurred_at >= ? GROUP BY source, d", (days[0],)):
+        if r["source"] in trend and r["d"] in trend[r["source"]]:
+            trend[r["source"]][r["d"]] = r["n"]
+    f_trend = {d: 0 for d in days}
+    for r in conn.execute("SELECT substr(created_at,1,10) d, COUNT(*) n FROM findings WHERE created_at >= ? GROUP BY d", (days[0],)):
+        if r["d"] in f_trend:
+            f_trend[r["d"]] = r["n"]
+    feed = []
+    for r in conn.execute("SELECT id, channel, actor, text, posted_at FROM chat_messages WHERE deleted=0 AND channel NOT LIKE 'task:%' AND channel NOT LIKE 'wiki:%' ORDER BY posted_at DESC LIMIT 6"):
+        feed.append({"at": r["posted_at"], "icon": "💬", "who": r["actor"], "text": r["text"][:80], "href": f"/chat?channel={r['channel']}#msg-{r['id']}"})
+    for r in conn.execute("SELECT id, thread_id, sender, subject, sent_at FROM mails ORDER BY sent_at DESC LIMIT 4"):
+        feed.append({"at": r["sent_at"], "icon": "✉", "who": r["sender"], "text": r["subject"], "href": f"/mail?thread={r['thread_id']}"})
+    for r in conn.execute("SELECT id, title, actor, updated_at FROM wiki_pages ORDER BY updated_at DESC LIMIT 3"):
+        feed.append({"at": r["updated_at"], "icon": "📄", "who": r["actor"], "text": f"Wiki「{r['title']}」を更新", "href": f"/wiki/{r['id']}"})
+    for r in conn.execute("SELECT id, actor, occurred_at, json_extract(meta,'$.file') f FROM events WHERE kind='artifact_change' ORDER BY occurred_at DESC LIMIT 20"):
+        if not any(x["text"].endswith(str(r["f"])) for x in feed):
+            feed.append({"at": r["occurred_at"], "at_src": True, "icon": "📎", "who": r["actor"], "text": f"成果物を更新 {r['f']}", "href": f"/artifacts?q={str(r['f']).rsplit('_v', 1)[0]}"})
+    feed.sort(key=lambda x: x["at"], reverse=True)
+    return render("index.html", request, conn, autonomy=agent.autonomy_stats(conn), stalled=stalled, trend=trend, f_trend=f_trend, days=days, feed=feed[:10],
                   config_stalled_days=config.STALLED_DAYS, my_tasks=my_tasks, today_evs=today_evs, my_notifs=my_notifs,
                   today=date.today(),
                   cards=cards,
