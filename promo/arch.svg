@@ -5,11 +5,11 @@
   </defs>
   <!-- sources -->
   <g font-size="20" fill="#111827">
-    <rect x="20" y="40" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="77" text-anchor="middle">📹 会議（文字起こし）</text>
-    <rect x="20" y="130" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="167" text-anchor="middle">💬 チャット</text>
-    <rect x="20" y="220" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="257" text-anchor="middle">✉ メール</text>
-    <rect x="20" y="310" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="347" text-anchor="middle">📄 Wiki</text>
-    <rect x="20" y="400" width="200" height="60" rx="12" fill="#fff7ed" stroke="#fed7aa"/><text x="120" y="437" text-anchor="middle">📎 成果物（版管理）</text>
+    <rect x="20" y="40" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="77" text-anchor="middle">会議（文字起こし）</text>
+    <rect x="20" y="130" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="167" text-anchor="middle">チャット</text>
+    <rect x="20" y="220" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="257" text-anchor="middle">メール</text>
+    <rect x="20" y="310" width="200" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="120" y="347" text-anchor="middle">Wiki</text>
+    <rect x="20" y="400" width="200" height="60" rx="12" fill="#fff7ed" stroke="#fed7aa"/><text x="120" y="437" text-anchor="middle">成果物（版管理）</text>
   </g>
   <!-- normalize -->
   <g>
@@ -43,6 +43,6 @@
     <rect x="365" y="420" width="815" height="100" rx="12" fill="#f9fafb" stroke="#e5e7eb"/>
     <text x="385" y="452" font-weight="700" fill="#111827">自律的に動く: </text>
     <text x="510" y="452">60秒の定期巡回 ＋ 投稿・保存・会議終了のイベントで即時起動（保存 → 約8秒で検知）</text>
-    <text x="385" y="490">OrcaRouter で3段階に振り分け: 抽出＝mid ／ 埋め込み＝embed ／ 判定＝high → 全処理 $0.71（全 high なら $1.94）</text>
+    <text x="385" y="490">OrcaRouter で3段階に振り分け: 抽出＝mid ／ 埋め込み＝embed ／ 判定＝high（全処理 $0.71）</text>
   </g>
 </svg>
