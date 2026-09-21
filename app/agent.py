@@ -603,6 +603,9 @@ def reset_demo() -> dict:
         auth.seed_demo_users(conn)
         results = replay(conn, speed=0, record=False)
         router.CACHE_ONLY = False
+        # 再生で投入した出来事を「取込済み」にする（次の巡回で全件を取り直して重複判定→実 API 呼び出しになるのを防ぐ）
+        for a in adapters(conn):
+            db.update_sync_state(conn, a.name)
         n = sum(len(r.findings) for r in results)
         global _file_sig
         _file_sig = _excel_signature()   # 復元した版を「既知」にして二重取込を防ぐ
