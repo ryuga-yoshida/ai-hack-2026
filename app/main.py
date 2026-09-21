@@ -1779,18 +1779,38 @@ def mail_draft_delete(draft_id: str):
 
 
 @app.post("/mail/send")
-def mail_send(request: Request, sender: str = Form(""), recipients: list[str] = Form(...), cc: list[str] = Form([]),
-              subject: str = Form(...), body: str = Form(...), thread_id: str = Form(""),
-              attachment_url: str = Form(""), attachment_name: str = Form(""), draft_id: str = Form("")):
+async def mail_send(request: Request, sender: str = Form(""), recipients: list[str] = Form(...), cc: list[str] = Form([]),
+                    subject: str = Form(...), body: str = Form(...), thread_id: str = Form(""),
+                    attachment_url: str = Form(""), attachment_name: str = Form(""), draft_id: str = Form(""),
+                    file: UploadFile | None = File(None)):
     conn = get_conn()
     sender = who(request, sender)
     if draft_id.strip():
         mailmod.delete_draft(conn, draft_id.strip())
-    att = None
+    att = []
     if attachment_url.strip():
-        att = [{"url": attachment_url.strip(), "name": attachment_name.strip() or attachment_url.strip().rsplit("/", 1)[-1]}]
+        att.append({"url": attachment_url.strip(), "name": attachment_name.strip() or attachment_url.strip().rsplit("/", 1)[-1]})
         if attachment_url.strip() not in body:
             body = f"{body.rstrip()}\n{attachment_url.strip()}"
+    if file is not None and file.filename:
+        # 添付ファイルは成果物ライブラリ「メール添付/<差出人>」に版として保存し、リンクを添付にする（チャットと同じ扱い）
+        data = await _read_upload(file)
+        name = Path(file.filename).name
+        root = LIB()
+        rel_path = f"メール添付/{sender}/{name}"
+        try:
+            dest = _register_version(conn, rel_path, data, sender, "", "")
+            versions = json.loads((root / "versions.json").read_text(encoding="utf-8"))
+            url = f"{config.APP_BASE_URL}/artifacts/file/{dest.relative_to(root)}"
+        except HTTPException:
+            versions = json.loads((root / "versions.json").read_text(encoding="utf-8"))
+            cands = sorted(k for k in versions if k.startswith(f"メール添付/{sender}/") and Path(k).stem.rsplit("_v", 1)[0] == Path(name).stem)
+            url = f"{config.APP_BASE_URL}/artifacts/file/{cands[-1]}" if cands else ""
+        if url:
+            att.append({"url": url, "name": name})
+            if url not in body:
+                body = f"{body.rstrip()}\n{url}"
+    att = att or None
     tid = mailmod.send(conn, sender, list(recipients), subject.strip(), body.strip(), cc=list(cc),
                        thread_id=thread_id.strip() or None, attachments=att)
     _ingest_mail(conn)

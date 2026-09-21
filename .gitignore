@@ -7,3 +7,4 @@ __pycache__/
 .DS_Store
 .trash/
 fixtures/excel/チャット添付/
+fixtures/excel/メール添付/

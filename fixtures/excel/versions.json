@@ -18,5 +18,17 @@
     "actor": "田中",
     "at": "2026-09-19T16:30:00",
     "url": "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/商品D_企画書.docx"
+  },
+  "商品企画/商品D_原価試算_v1.xlsx": {
+    "actor": "田中",
+    "at": "2026-09-17T17:35:00",
+    "note": "メールで山田へ送付",
+    "url": "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/商品D_原価試算.xlsx"
+  },
+  "管理部/予算会議資料_テンプレ_v1.docx": {
+    "actor": "高橋",
+    "at": "2026-09-11T15:15:00",
+    "note": "予算会議用のテンプレ",
+    "url": "https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/管理部/予算会議資料_テンプレ.docx"
   }
 }

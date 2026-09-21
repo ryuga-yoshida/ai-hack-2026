@@ -95,7 +95,7 @@
           </div>
           <div x-show="expanded === {{ i }} || {{ 'true' if msgs|length <= 3 else 'false' }}">
             <div class="text-sm mt-4 leading-relaxed">{{ m.html|safe }}</div>
-            {% for a in m.attachments %}<a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-2 mt-3 text-xs border border-gray-200 rounded-lg px-2 py-1 bg-white hover:bg-gray-50"><span class="w-5 h-5 rounded bg-emerald-100 text-emerald-700 grid place-items-center text-[10px] font-bold">{{ icon('clip') }}</span>{{ a.name }}</a>{% endfor %}
+            {% for a in m.attachments %}<span class="inline-flex items-center mt-3 mr-2 text-xs border border-gray-200 rounded-lg bg-white overflow-hidden"><a href="{{ a.url }}" target="_blank" class="inline-flex items-center gap-2 px-2 py-1 hover:bg-gray-50"><span class="w-5 h-5 rounded bg-emerald-100 text-emerald-700 grid place-items-center">{{ icon('clip', 'w-3 h-3') }}</span>{{ a.name }}</a>{% if '/artifacts/file/' in a.url %}<a href="/artifacts?q={{ a.name.rsplit('.', 1)[0] }}" class="px-2 py-1 border-l border-gray-200 text-gray-500 hover:bg-gray-50" title="成果物ライブラリで版と検知を見る">ライブラリ</a>{% endif %}</span>{% endfor %}
           </div>
           <div x-show="expanded !== {{ i }} && {{ 'false' if msgs|length <= 3 else 'true' }}" class="text-xs text-gray-400 truncate mt-1 pl-12">{{ m.body|replace('\n', ' ')|truncate(90) }}</div>
         </div>
@@ -116,7 +116,7 @@
        $nextTick(() => { $el.querySelectorAll('[data-picker]').forEach((el, i) => { const pk = Alpine.$data(el.querySelector('[x-data]')); if (pk) pk.sel = [...(i === 0 ? to : cc)]; }); $el.querySelector('textarea').focus(); })" x-cloak>
   <div x-show="open" class="fixed inset-0 bg-black/30 z-40" @click="open = false"></div>
   <div x-show="open" class="fixed inset-0 z-50 grid place-items-center pointer-events-none">
-    <form method="post" action="/mail/send" class="bg-white rounded-xl shadow-xl p-6 w-[680px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="open = false" x-ref="form">
+    <form method="post" action="/mail/send" enctype="multipart/form-data" class="bg-white rounded-xl shadow-xl p-6 w-[680px] pointer-events-auto space-y-3 text-sm" @keydown.escape.window="open = false" x-ref="form">
       <div class="flex items-center"><h3 class="font-semibold flex-1" x-text="reply ? '返信' : (draftId ? '下書きを編集' : '新しいメール')"></h3><button type="button" @click="open = false" class="text-gray-400 hover:text-gray-700">✕</button></div>
       <input type="hidden" name="thread_id" :value="thread"><input type="hidden" name="draft_id" :value="draftId">
       <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">差出人</label><span class="text-sm">{{ me }} <span class="text-gray-400">&lt;{{ me }}@aoba-beverage.example&gt;</span></span></div>
@@ -124,7 +124,8 @@
       <div class="flex gap-2"><label class="w-14 text-xs text-gray-500 pt-2">CC</label><div class="flex-1" data-picker>{% with pp_name='cc', pp_selected=[], pp_multi=true, pp_placeholder='CC を検索' %}{% include "_people_picker.html" %}{% endwith %}</div></div>
       <div class="flex gap-2 items-center"><label class="w-14 text-xs text-gray-500">件名</label><input name="subject" x-model="subject" required class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5"></div>
       <textarea name="body" x-model="body" rows="10" required placeholder="本文（URL は自動でリンクになり、成果物リンクはタスクに登録されます）" class="w-full border border-gray-300 rounded-lg px-3 py-2 font-mono text-[13px]"></textarea>
-      <div class="flex gap-2"><input name="attachment_url" placeholder="添付ファイルのリンク（成果物ライブラリのリンクなど、任意）" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"><input name="attachment_name" placeholder="表示名" class="w-40 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"></div>
+      <div class="flex gap-2 items-center"><label class="text-xs text-gray-500 w-14">添付</label><input type="file" name="file" class="flex-1 text-xs"><span class="text-[10px] text-gray-400">成果物ライブラリ「メール添付/」に保存され、版管理と検知の対象になります（50MB まで）</span></div>
+      <div class="flex gap-2"><input name="attachment_url" placeholder="または、ファイルのリンク（成果物ライブラリのリンクなど）" class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"><input name="attachment_name" placeholder="表示名" class="w-40 border border-gray-300 rounded-lg px-3 py-1.5 text-xs"></div>
       <div class="flex justify-between items-center">
         <button type="button" @click="$refs.form.action = '/mail/draft'; $refs.form.querySelectorAll('[required]').forEach(e => e.required = false); $refs.form.submit()" class="text-xs text-gray-500 hover:text-gray-800">下書きとして保存</button>
         <div class="flex gap-2"><button type="button" @click="open = false" class="px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="px-4 py-1.5 rounded-lg bg-indigo-600 text-white">送信</button></div>
