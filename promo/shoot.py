@@ -19,6 +19,8 @@ SHOTS = [
     ("agent", "/agent", 1440, 900),
     ("cost", "/cost", 1440, 900),
     ("mail", "/mail", 1440, 900),
+    ("tasks_gantt", "/tasks?view=gantt", 1440, 900),
+    ("meet", "/meet", 1440, 900),
 ]
 def shot(name, url, w, h):
     dest = OUT / f"{name}.png"
