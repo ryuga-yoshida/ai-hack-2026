@@ -7,7 +7,7 @@
 | `pitch.pdf`（`pitch.html`） | 最終ピッチ 8枚（16:9）。台本は `docs/10_ピッチ台本.md` | そのまま使える |
 | `arch.svg` | アーキテクチャ図（ポスター・チラシ・スライド共通） | — |
 | `screenshots/*.png` | 実画面のスクショ 13 枚（1440px 幅、`shoot.py` で再撮影可） | 記事・SNS 用 |
-| `qr_github.png` | GitHub リポジトリの QR | public 化後もURLは同じ |
+| `qr_github.png` / `qr_zenn.png` | GitHub リポジトリ／Zenn 記事の QR | Zenn: https://zenn.dev/leadus_nova/articles/c83d2577a48079 |
 
 関連: `docs/11_展示デモ台本.md`（ブースでの話し方）、`docs/12_ループ動画_絵コンテ.md`（モニターで流す動画の絵コンテ）、`docs/zenn_draft.md`（Zenn 記事の下書き）
 
@@ -26,7 +26,6 @@ python promo/shoot.py     # スクショを撮り直す（サーバー起動中�
 
 ## まだ決めていないこと（吉田さんの判断待ち）
 
-- **Zenn 記事の URL** — 公開後に `qr_zenn.png` を作ってポスター・チラシに追加（`python -c "import qrcode; qrcode.make(URL).save('promo/qr_zenn.png')"`）
 - **顔写真・アイコン** — 入れるならポスター右上（`.who`）とスライド最終ページ
 - **印刷サイズ** — A1 が高ければ A2（半分）でも文字は読める。コンビニなら A3 が上限
 - **ループ動画** — 絵コンテどおり録画するだけ。字幕入れは iMovie / CapCut

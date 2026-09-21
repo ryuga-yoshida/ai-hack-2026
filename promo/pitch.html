@@ -117,7 +117,7 @@
   <h2>OrcaRouter の振り分けとコスト実測<small>2:40 – 3:20</small></h2>
   <div class="grid2" style="grid-template-columns: 3fr 2fr">
     <table>
-      <tr><th>high<br><span style="font-size:16px">claude-opus-5</span></th><td>矛盾の判定だけ。1件ずつ根拠と文脈を渡す</td><td style="text-align:right;white-space:nowrap"><b>$0.50</b></td></tr>
+      <tr><th>high<br><span style="font-size:16px">claude-opus-5</span></th><td>矛盾の判定だけ。1件ずつ根拠と文脈を渡す</td><td style="text-align:right;white-space:nowrap"><b>$0.63</b></td></tr>
       <tr><th>mid<br><span style="font-size:16px">gemini-3.6-flash</span></th><td>抽出・紐付け最終段・議事録要約</td><td style="text-align:right"><b>$0.21</b></td></tr>
       <tr><th>embed<br><span style="font-size:16px">gemini-embedding</span></th><td>候補絞り込み・重複統合・紐付け</td><td style="text-align:right"><b>$0.001</b></td></tr>
       <tr><th>コード</th><td>時系列ガード・語彙ゲート・引用検証・閾値判定</td><td style="text-align:right"><b>$0</b></td></tr>
@@ -148,7 +148,8 @@
   <h1 style="margin-top:80px;font-size:54px">人が「確認して」と言う前に、<br>矛盾は見つかっている。</h1>
   <div class="sub" style="margin-top:20px">git clone → 3コマンド。API キー不要の replay で追体験できます。</div>
   <div style="display:flex;align-items:center;gap:28px;margin-top:60px">
-    <div style="background:#fff;padding:10px;border-radius:12px"><img src="qr_github.png" style="width:150px;height:150px;display:block"></div>
+    <div style="background:#fff;padding:10px;border-radius:12px;text-align:center;color:#111827;font-size:16px"><img src="qr_github.png" style="width:150px;height:150px;display:block">GitHub</div>
+    <div style="background:#fff;padding:10px;border-radius:12px;text-align:center;color:#111827;font-size:16px"><img src="qr_zenn.png" style="width:150px;height:150px;display:block">Zenn 記事</div>
     <div style="font-size:22px;color:#e0e7ff;line-height:1.7">github.com/ryuga-yoshida/ai-hack-2026<br>設計書・評価セット・LLM キャッシュ同梱<br><span style="color:#fde68a">ブースで触れます</span></div>
   </div>
   <div style="position:absolute;right:72px;bottom:56px;text-align:right;color:#c7d2fe;font-size:22px">吉田 龍河</div>

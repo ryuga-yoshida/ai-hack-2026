@@ -31,7 +31,7 @@
   th, td { text-align: left; padding: 1.6mm 2mm; border-bottom: 1px solid #e5e7eb; vertical-align: top; line-height: 1.45; }
   th { color: #6b7280; font-weight: 600; width: 32%; }
   .foot { position: absolute; left: 0; right: 0; bottom: 0; background: #111827; color: #fff; padding: 5mm 14mm; display: flex; align-items: center; gap: 6mm; }
-  .foot .qr { background: #fff; padding: 1.5mm; border-radius: 6px; } .foot .qr img { width: 20mm; height: 20mm; display: block; }
+  .foot .qr { background: #fff; padding: 1.5mm; border-radius: 6px; text-align: center; } .foot .qr img { width: 20mm; height: 20mm; display: block; } .foot .qr span { display: block; font-size: 7pt; color: #111827; line-height: 1.2; }
   .foot .txt { font-size: 9pt; line-height: 1.5; color: #d1d5db; } .foot .txt b { color: #fff; display: block; font-size: 10.5pt; }
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; margin-bottom: 5mm; }
   .step { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 3mm; font-size: 8.5pt; line-height: 1.45; }
@@ -99,7 +99,7 @@
       <div>
         <h2>OrcaRouter の使い分けと実測</h2>
         <div class="card" style="padding:2mm 3mm"><table>
-          <tr><th>high（Claude Opus）</th><td>矛盾の判定だけ。根拠と文脈を渡して1件ずつ。$0.50</td></tr>
+          <tr><th>high（Claude Opus）</th><td>矛盾の判定だけ。根拠と文脈を渡して1件ずつ。$0.63</td></tr>
           <tr><th>mid（Gemini Flash）</th><td>決定・タスクの抽出、紐付けの最終段、議事録要約。$0.21</td></tr>
           <tr><th>embed</th><td>候補絞り込み・重複統合・紐付け。$0.001</td></tr>
           <tr><th>コード</th><td>時系列ガード・語彙ゲート・引用検証・閾値。LLM を呼ぶ前に絞る</td></tr>
@@ -129,8 +129,9 @@
     </dl>
   </div>
   <div class="foot">
-    <div class="qr"><img src="qr_github.png" alt="GitHub"></div>
-    <div class="txt"><b>吉田 龍河 ／ AI HACK 2026</b>github.com/ryuga-yoshida/ai-hack-2026 — 設計書・評価セット・LLM キャッシュ同梱。Zenn 記事は QR の README から。</div>
+    <div class="qr"><img src="qr_github.png" alt="GitHub"><span>GitHub</span></div>
+    <div class="qr"><img src="qr_zenn.png" alt="Zenn"><span>Zenn 記事</span></div>
+    <div class="txt"><b>吉田 龍河 ／ AI HACK 2026</b>github.com/ryuga-yoshida/ai-hack-2026 — 設計書・評価セット・LLM キャッシュ同梱。作った経緯と仕組みの解説は Zenn 記事へ。</div>
   </div>
 </div>
 </body></html>

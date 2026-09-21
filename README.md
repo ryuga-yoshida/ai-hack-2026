@@ -142,4 +142,4 @@ python -m app.cli cost      # コスト集計（全て high で回した場合�
 - [docs/04_設計書_現状.md](docs/04_設計書_現状.md) — いま動いているものの設計（構成・データモデル・パイプライン・LLM・セキュリティ・評価・差し替え点）
 - [docs/03_仕様からの差分.md](docs/03_仕様からの差分.md) — 仕様書から変えた判断と、仕様外に足した機能
 - [docs/10_ピッチ台本.md](docs/10_ピッチ台本.md) / [docs/11_展示デモ台本.md](docs/11_展示デモ台本.md) / [promo/](promo/) — 発表・展示用
-- Zenn 記事: （公開後にリンクを追加）
+- Zenn 記事: https://zenn.dev/leadus_nova/articles/c83d2577a48079

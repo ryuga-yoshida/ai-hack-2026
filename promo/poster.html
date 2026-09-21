@@ -32,7 +32,7 @@
   th { color: #6b7280; font-weight: 600; width: 36%; }
   .foot { position: absolute; left: 0; right: 0; bottom: 0; background: #111827; color: #fff; padding: 10mm 30mm; display: flex; align-items: center; gap: 16mm; }
   .foot .qr { background: #fff; padding: 4mm; border-radius: 12px; }
-  .foot .qr img { width: 46mm; height: 46mm; display: block; }
+  .foot .qr { text-align: center; } .foot .qr img { width: 46mm; height: 46mm; display: block; } .foot .qr span { display: block; font-size: 22px; color: #111827; margin-top: 2mm; }
   .foot .txt { font-size: 28px; line-height: 1.6; color: #d1d5db; }
   .foot .txt b { color: #fff; font-size: 34px; display: block; }
   .foot .cta { margin-left: auto; text-align: right; font-size: 30px; color: #fde68a; line-height: 1.5; }
@@ -112,7 +112,8 @@
   </div>
 
   <div class="foot">
-    <div class="qr"><img src="qr_github.png" alt="GitHub"></div>
+    <div class="qr"><img src="qr_github.png" alt="GitHub"><span>GitHub</span></div>
+    <div class="qr"><img src="qr_zenn.png" alt="Zenn"><span>Zenn 記事</span></div>
     <div class="txt"><b>GitHub — git clone して3コマンドで動きます</b>github.com/ryuga-yoshida/ai-hack-2026　／　API キー不要の replay モードで検知までを追体験できます</div>
     <div class="cta">触ってみてください →<br><span style="font-size:24px;color:#d1d5db">Excel を保存するだけで、数秒後に通知が来ます</span></div>
   </div>
