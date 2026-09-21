@@ -1,32 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" font-family="Hiragino Sans, Noto Sans JP, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="Hiragino Sans, Noto Sans JP, sans-serif">
   <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6366f1"/></marker></defs>
-  <g font-size="19" fill="#111827">
-    <rect x="30" y="30" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="58" text-anchor="middle" font-weight="700">会議の発言</text><text x="155" y="80" text-anchor="middle" font-size="14" fill="#6b7280">「それ以外の数字は変更しない」</text>
-    <rect x="30" y="110" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="138" text-anchor="middle" font-weight="700">チャットの投稿</text><text x="155" y="160" text-anchor="middle" font-size="14" fill="#6b7280">「更新版はこちら &lt;URL&gt;」</text>
-    <rect x="30" y="190" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="218" text-anchor="middle" font-weight="700">メール</text><text x="155" y="240" text-anchor="middle" font-size="14" fill="#6b7280">件名＋本文</text>
-    <rect x="30" y="270" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="298" text-anchor="middle" font-weight="700">Wiki の改訂</text><text x="155" y="320" text-anchor="middle" font-size="14" fill="#6b7280">段落の差分</text>
-    <rect x="30" y="350" width="250" height="60" rx="12" fill="#fff7ed" stroke="#fed7aa"/><text x="155" y="378" text-anchor="middle" font-weight="700">Excel のセル変更</text><text x="155" y="400" text-anchor="middle" font-size="14" fill="#6b7280">D5: 1200 → 1500</text>
+  <text x="30" y="40" font-size="20" font-weight="700" fill="#111827">種類の違う入力が、同じ 7 項目の Event になる</text>
+
+  <!-- 例1: 会議の発言 -->
+  <g font-size="15">
+    <rect x="30" y="70" width="330" height="170" rx="12" fill="#eef2ff" stroke="#c7d2fe"/>
+    <text x="50" y="98" font-weight="700" fill="#312e81">会議の発言（文字起こし）</text>
+    <text x="50" y="128" fill="#374151">[10:12] 鈴木:</text>
+    <text x="50" y="152" fill="#374151">見込み表の更新は商品Dの追加と</text>
+    <text x="50" y="176" fill="#374151">商品Bの修正のみ。それ以外の数字は</text>
+    <text x="50" y="200" fill="#374151">変更しない。</text>
+    <text x="50" y="228" fill="#6b7280" font-size="13">9/15 定例・LLM が決定として抽出</text>
   </g>
-  <path d="M280 60 H340 V220 M280 140 H340 M280 220 H340 M280 300 H340 V220 M280 380 H340 V220" fill="none" stroke="#a5b4fc" stroke-width="3"/>
-  <line x1="340" y1="220" x2="420" y2="220" stroke="#6366f1" stroke-width="3" marker-end="url(#a)"/>
-  <rect x="430" y="60" width="330" height="320" rx="16" fill="#4f46e5"/>
-  <text x="595" y="100" text-anchor="middle" fill="#fff" font-size="24" font-weight="700">Event（1種類）</text>
-  <g font-size="17" fill="#e0e7ff" font-family="ui-monospace, Menlo, monospace">
-    <text x="460" y="145">source     どこから（meet / chat / mail / wiki / excel）</text>
-    <text x="460" y="180">kind       何か（発言 / 決定 / タスク候補 / 成果物の変更）</text>
-    <text x="460" y="215">text       内容</text>
-    <text x="460" y="250">actor      誰が</text>
-    <text x="460" y="285">occurred_at いつ</text>
-    <text x="460" y="320">ref        出典の座標（会議#26 / D5 セル …）</text>
-    <text x="460" y="355">quote      原文（幻覚チェックに使う）</text>
+  <line x1="360" y1="155" x2="430" y2="155" stroke="#6366f1" stroke-width="3" marker-end="url(#a)"/>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="15">
+    <rect x="440" y="70" width="730" height="170" rx="12" fill="#4f46e5"/>
+    <text x="465" y="100" fill="#c7d2fe">source</text><text x="600" y="100" fill="#fff">meet</text>
+    <text x="465" y="124" fill="#c7d2fe">kind</text><text x="600" y="124" fill="#fff">decision（決定）</text>
+    <text x="465" y="148" fill="#c7d2fe">text</text><text x="600" y="148" fill="#fff">見込み表の更新は商品Dの追加と商品Bの修正のみ…</text>
+    <text x="465" y="172" fill="#c7d2fe">actor / occurred_at</text><text x="680" y="172" fill="#fff">鈴木 / 2026-09-15 10:12</text>
+    <text x="465" y="196" fill="#c7d2fe">ref</text><text x="600" y="196" fill="#fff">meet:2026-09-15_teirei#26（会議の26行目）</text>
+    <text x="465" y="220" fill="#c7d2fe">quote</text><text x="600" y="220" fill="#fff">「それ以外の数字は変更しない」← 原文に無ければ破棄</text>
   </g>
-  <line x1="760" y1="220" x2="840" y2="220" stroke="#6366f1" stroke-width="3" marker-end="url(#a)"/>
-  <rect x="850" y="110" width="320" height="220" rx="16" fill="#fff" stroke="#6366f1" stroke-width="3"/>
-  <text x="1010" y="150" text-anchor="middle" font-size="22" font-weight="700" fill="#312e81">統合グラフ</text>
-  <g font-size="17" fill="#374151">
-    <text x="1010" y="190" text-anchor="middle">決定 ─ タスク ─ 発言 ─ 変更</text>
-    <text x="1010" y="220" text-anchor="middle">が同じ形で繋がる</text>
-    <text x="1010" y="265" text-anchor="middle" fill="#6b7280" font-size="15">情報源を増やしても</text>
-    <text x="1010" y="290" text-anchor="middle" fill="#6b7280" font-size="15">判定側のコードは変わらない</text>
+
+  <!-- 例2: Excel のセル変更 -->
+  <g font-size="15">
+    <rect x="30" y="280" width="330" height="170" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
+    <text x="50" y="308" font-weight="700" fill="#9a3412">Excel のセル変更（版の差分）</text>
+    <text x="50" y="338" fill="#374151">売上見込_v2.xlsx → 売上見込_v3.xlsx</text>
+    <text x="50" y="362" fill="#374151">シート 売上見込 / セル D5</text>
+    <text x="50" y="386" fill="#374151">行「商品A」× 列「第4四半期」</text>
+    <text x="50" y="410" fill="#374151" font-weight="700">1200 → 1500</text>
+    <text x="50" y="438" fill="#6b7280" font-size="13">保存時に自動で差分・LLM 不使用</text>
   </g>
+  <line x1="360" y1="365" x2="430" y2="365" stroke="#6366f1" stroke-width="3" marker-end="url(#a)"/>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="15">
+    <rect x="440" y="280" width="730" height="170" rx="12" fill="#4f46e5"/>
+    <text x="465" y="310" fill="#c7d2fe">source</text><text x="600" y="310" fill="#fff">excel</text>
+    <text x="465" y="334" fill="#c7d2fe">kind</text><text x="600" y="334" fill="#fff">artifact_change（成果物の変更）</text>
+    <text x="465" y="358" fill="#c7d2fe">text</text><text x="600" y="358" fill="#fff">売上見込の商品Aの第4四半期が 1200 から 1500 に変更</text>
+    <text x="465" y="382" fill="#c7d2fe">actor / occurred_at</text><text x="680" y="382" fill="#fff">山田 / 2026-09-18 14:05</text>
+    <text x="465" y="406" fill="#c7d2fe">ref</text><text x="600" y="406" fill="#fff">売上見込_v3.xlsx:売上見込!D5（セルの座標）</text>
+    <text x="465" y="430" fill="#c7d2fe">quote</text><text x="600" y="430" fill="#fff">（差分は機械的に取るので不要）</text>
+  </g>
+
+  <text x="600" y="495" text-anchor="middle" font-size="16" fill="#374151">同じ形なので「決定 ⇔ 変更」の突き合わせが 1 つのクエリで書ける。情報源を増やしても判定側は変わらない</text>
 </svg>
