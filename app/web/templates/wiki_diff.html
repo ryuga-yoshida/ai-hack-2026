@@ -12,7 +12,7 @@
   <section class="flex-1 min-w-0 overflow-y-auto scrollbar-thin bg-white">
     <div class="max-w-3xl mx-auto px-10 py-8 space-y-3">
       {% for d in diffs %}
-      {% set ref = "wiki:" ~ page.id ~ "#" ~ cur.id ~ ":段落" ~ (d.index + 1) %}
+      {% set ref = "wiki:" ~ page.id ~ "#改訂" ~ n ~ ":段落" ~ (d.index + 1) %}
       <div class="border rounded-lg px-4 py-3 text-sm {% if findings_by_ref.get(ref) %}border-red-200{% else %}border-gray-200{% endif %}">
         <span class="text-[10px] px-1.5 py-0.5 rounded {% if d.kind == 'changed' %}bg-sky-100 text-sky-800{% elif d.kind == 'added' %}bg-emerald-100 text-emerald-800{% else %}bg-red-100 text-red-800{% endif %}">{{ {'changed':'変更','added':'追加','removed':'削除'}[d.kind] }}</span>
         {% if d.old %}<div class="mt-1 text-gray-500 line-through">{{ d.old }}</div>{% endif %}

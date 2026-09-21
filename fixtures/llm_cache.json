@@ -18657,5 +18657,382 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "link"
+ },
+ "4d853303917c2cd842107154": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.8,\n  \"reason\": \"決定事項は売上見込表そのものの数字の更新範囲に関するものだが、変更対象はWiki「売上見込表の運用ルール」の更新手順の段落であり、対象が異なる。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1091,
+   "completion_tokens": 142,
+   "total_tokens": 1233,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1089,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1091,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1089,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "ab8e6222b1f13cc3f91df931": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定は定例の開始時間（15日10時半）に関するものだが、変更対象はWiki「売上見込表の運用ルール」の更新手順の段落であり、対象が異なる。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1237,
+   "completion_tokens": 138,
+   "total_tokens": 1375,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1235,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1237,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1235,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "1ffc44b451513076ada3ef31": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.8,\n  \"reason\": \"決定事項は売上見込表そのものの数値更新範囲を定めたものだが、変更対象はWiki「売上見込表の運用ルール」の記述（上方修正の要件）であり、見込み表の数字を書き換えたものではない。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1227,
+   "completion_tokens": 144,
+   "total_tokens": 1371,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1225,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1227,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1225,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "eb0d1f3aeefa5f24ba3078bb": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定は売上見込表における商品Aの第3四半期の数値（1200据え置き）が対象だが、変更は運用ルールWikiの上方修正要件の記述であり、対象が異なる。商品Aの数値自体は変更されていない。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1196,
+   "completion_tokens": 147,
+   "total_tokens": 1343,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1194,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1196,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1194,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "dde7fc8fdb64d48f62600deb": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.8,\n  \"reason\": \"決定事項は売上見込表の第4四半期の数値（一律上乗せの有無）に関するものだが、変更対象はWiki運用ルールの上方修正の書面要件（1社→2社以上）という別の対象であり、第4四半期の数値操作には触れていない。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1179,
+   "completion_tokens": 160,
+   "total_tokens": 1339,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1177,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1179,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1177,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "7886dd5298e8ed3b07b9d932": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定は売上見込表における商品Bの第1四半期の数値修正であり、変更はWiki運用ルール文書の上方修正要件（書面1社→2社以上）の記述変更で、対象物が異なる。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1184,
+   "completion_tokens": 148,
+   "total_tokens": 1332,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1182,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1184,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1182,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "d416faf7f2ad0cfe97c62139": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.92,\n  \"reason\": \"決定は商品Dの第3四半期を300から350へ変更するもので、変更後のWiki記載は350ケースとなっており決定を正しく反映している。09/08の300という以前の決定は09/17の決定で上書きされており、会話でも増産理由が説明・合意されている。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1194,
+   "completion_tokens": 147,
+   "total_tokens": 1341,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1192,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1194,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1192,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "cfa6c4bbc9ff860d1c266cad": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.9,\n  \"reason\": \"決定事項は商品Aの第3四半期見込み（1200）の据え置きに関するものであり、変更対象は商品Dの販売計画（300→350ケース）で別物である。加えて09/17の会話と決定で商品Dの350への変更は明示的に承認されている。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1192,
+   "completion_tokens": 158,
+   "total_tokens": 1350,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1190,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1192,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1190,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "9a16d5cac7485dd304cdb1c8": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定事項は第4四半期の一律上乗せの禁止であり、変更は商品Dの第3四半期を製造都合で300→350にしたもので対象期が異なる。さらに09/17の決定で明示的に承認されている。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1175,
+   "completion_tokens": 142,
+   "total_tokens": 1317,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1173,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1175,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1173,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "83841ff82d93b98e6da23b89": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"決定事項は予算会議の日程確定（9/29午後）であり、変更対象は商品DのWiki原価段落の記述である。変更は予算会議の日程そのものに触れず、「予算会議の後で判断する」と後続扱いにしているだけで、日程決定と食い違う内容はない。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1157,
+   "completion_tokens": 164,
+   "total_tokens": 1321,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1155,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1157,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1155,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "df1c1d792291f2cc236a202b": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.7,\n  \"reason\": \"決定は第4四半期の一律上乗せを行わないというものであり、変更内容は原価率の試算結果の記載と「第4四半期の見直しは予算会議の後で判断する」という保留の記述にとどまり、上乗せを実行していない。数値の変更もないため矛盾しない。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1153,
+   "completion_tokens": 162,
+   "total_tokens": 1315,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1151,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1153,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1151,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "73719c3150b526de54f3e504": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.9,\n  \"reason\": \"決定事項は見込み表（売上見込のスプレッドシート）の数字の更新範囲に関するものだが、変更は商品DのWikiページへのパッケージ色味に関する段落追加であり、対象が異なる。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1347,
+   "completion_tokens": 212,
+   "total_tokens": 1559,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1345,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1347,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1345,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "83bb60e08b293c6ae017951a": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": false,\n  \"contradicts\": false,\n  \"confidence\": 0.9,\n  \"reason\": \"決定は商品Bの第1四半期の数値修正に関するものだが、変更は商品DのWikiページへのパッケージ色味に関する段落追加であり、対象が異なる。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1071,
+   "completion_tokens": 145,
+   "total_tokens": 1216,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "cached_creation_tokens": 1069,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1071,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 1069,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
  }
 }

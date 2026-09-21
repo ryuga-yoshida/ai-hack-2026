@@ -224,7 +224,7 @@ def toc(body: str) -> list[dict]:
 
 
 class WikiAdapter:
-    """改訂間の段落差分を Event にする。ref は "wiki:<page_id>#<rev_id>:段落N" """
+    """改訂間の段落差分を Event にする。ref は "wiki:<page_id>#改訂N:段落M" """
     name = "wiki"
 
     def __init__(self, conn: sqlite3.Connection):
@@ -234,7 +234,7 @@ class WikiAdapter:
         out: list[Event] = []
         for page in self.conn.execute("SELECT id, title FROM wiki_pages").fetchall():
             revs = revisions(self.conn, page["id"])
-            for prev, cur in zip(revs, revs[1:]):
+            for rev_no, (prev, cur) in enumerate(zip(revs, revs[1:]), start=2):
                 at = db.from_iso(cur["created_at"])
                 if since and at <= since:
                     continue
@@ -250,7 +250,7 @@ class WikiAdapter:
                     else:
                         text = f"Wiki「{cur['title']}」から段落「{_short(d['old'])}」が削除されました"
                     out.append(Event(id=new_id(), source="wiki", kind="artifact_change", text=text, actor=cur["actor"],
-                                     occurred_at=at, ref=f"wiki:{page['id']}#{cur['id']}:段落{d['index'] + 1}",
+                                     occurred_at=at, ref=f"wiki:{page['id']}#改訂{rev_no}:段落{d['index'] + 1}",   # 改訂 id は DB ごとに変わるので番号で（LLM キャッシュを安定させる）
                                      meta={**meta, "diff_kind": f"text_{d['kind']}", "old": d["old"], "new": d["new"],
                                            "row_key": _short(d["old"] or d["new"], 20), "column_label": "本文"}))
         return out
