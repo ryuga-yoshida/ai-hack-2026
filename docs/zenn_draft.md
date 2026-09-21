@@ -1,5 +1,5 @@
 ---
-title: "「決めたこと」と「作られているもの」の食い違いを勝手に見つけるエージェントを、AI HACK 2026 で2日で作った"
+title: "「確認して」と言われる前に矛盾を見つける — 誰も頼んでいない監視業務を自律化するエージェントを AI HACK 2026 で作った"
 emoji: "🕵️"
 type: "tech"
 topics: ["ai", "llm", "python", "fastapi", "hackathon"]
