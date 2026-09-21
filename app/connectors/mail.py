@@ -187,7 +187,7 @@ class MailAdapter:
     def fetch(self, since: datetime | None) -> list[Event]:
         sql, params = "SELECT * FROM mails", []
         if since:
-            sql += " WHERE sent_at > ?"; params.append(db.to_iso(since))
+            sql += " WHERE sent_at >= ? AND id NOT IN (SELECT id FROM events)"; params.append(db.to_iso(since))
         sql += " ORDER BY sent_at, rowid"
         out = []
         for r in self.conn.execute(sql, params):

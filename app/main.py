@@ -104,7 +104,7 @@ async def require_signin(request: Request, call_next):
         return RedirectResponse(f"/login?next={quote(str(request.url.path) + ('?' + request.url.query if request.url.query else ''))}", status_code=303)
     return await call_next(request)
 
-STATUSES = [("todo", "未着手"), ("in_progress", "進行中"), ("blocked", "ブロック"), ("done", "完了")]
+STATUSES = [("todo", "未着手"), ("in_progress", "進行中"), ("review", "レビュー中"), ("blocked", "ブロック"), ("done", "完了")]
 STATUS_LABEL = dict(STATUSES)
 PRIORITIES = [("urgent", "緊急"), ("high", "高"), ("normal", "中"), ("low", "低")]
 PRIORITY_LABEL = dict(PRIORITIES)
@@ -857,7 +857,7 @@ def tasks_page(request: Request, assignee: str = "", q: str = "", tag: str = "",
         tasks = [t for t in tasks if q in t.title or q in (t.description or "")]
     metas = [task_meta(conn, t) for t in tasks]
     by_status = {s: [m for m in metas if m["task"].status == s] for s, _ in STATUSES}
-    order = {"todo": 0, "in_progress": 1, "blocked": 2, "done": 3}
+    order = {"todo": 0, "in_progress": 1, "review": 2, "blocked": 3, "done": 4}
     keyf = {"updated": lambda m: m["updated_at"], "due": lambda m: (m["task"].due_date is None, str(m["task"].due_date or "")),
             "status": lambda m: order[m["task"].status], "assignee": lambda m: m["task"].assignee or "～",
             "title": lambda m: m["task"].title, "findings": lambda m: -m["n_findings"],
@@ -1324,7 +1324,15 @@ def _message_dict(conn: sqlite3.Connection, r: sqlite3.Row) -> dict:
             "task": {"id": link["to_id"], "title": link["title"], "method": link["method"],
                      "confidence": link["confidence"]} if link else None,
             "decision": decided["text"] if decided else None,
+            "quote": _quote_of(conn, r["quote_of"] if "quote_of" in r.keys() else None),
             "pinned": bool(conn.execute("SELECT 1 FROM chat_pins WHERE message_id=?", (r["id"],)).fetchone())}
+
+
+def _quote_of(conn: sqlite3.Connection, qid: str | None) -> dict | None:
+    if not qid:
+        return None
+    q = conn.execute("SELECT id, actor, text, channel, posted_at FROM chat_messages WHERE id=?", (qid,)).fetchone()
+    return dict(q) if q else None
 
 
 def message_rows(conn: sqlite3.Connection, channel: str, after: str | None = None) -> list[dict]:
@@ -1543,7 +1551,7 @@ def chat_thread_api(root_id: str):
 
 @app.post("/chat")
 def post_chat(request: Request, channel: str = Form("general"), actor: str = Form(""), text: str = Form(...),
-              reply_to: str = Form(""), attachment_url: str = Form(""), attachment_name: str = Form("")):
+              reply_to: str = Form(""), attachment_url: str = Form(""), attachment_name: str = Form(""), quote_of: str = Form("")):
     conn = get_conn()
     actor = who(request, actor)
     attachments = None
@@ -1554,7 +1562,7 @@ def post_chat(request: Request, channel: str = Form("general"), actor: str = For
         if url not in text:
             text = f"{text.strip()} {url}".strip()   # URL を本文にも入れる（成果物の自動登録が効く）
     mid = chat.post_message(conn, channel.strip() or "general", actor, text.strip(),
-                            reply_to=reply_to.strip() or None, attachments=attachments)
+                            reply_to=reply_to.strip() or None, attachments=attachments, quote_of=quote_of.strip() or None)
     for tname in tagmod.apply_hashtags(conn, text, "message", mid):
         for a in (attachments or []):
             tagmod.link(conn, tname, "artifact", a["name"])

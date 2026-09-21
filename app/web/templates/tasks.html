@@ -57,13 +57,13 @@
       {% for b in gantt.bars %}{% set t = b.task %}
       <div class="flex items-center border-b border-gray-100 relative" style="height: {{ RH }}px">
         <div class="shrink-0 px-4 flex items-center gap-2 min-w-0" style="width: {{ LW }}px">
-          <span class="w-2 h-2 rounded-full shrink-0 {% if t.status == 'done' %}bg-emerald-500{% elif t.status == 'in_progress' %}bg-indigo-500{% elif t.status == 'blocked' %}bg-red-500{% else %}bg-gray-300{% endif %}"></span>
+          <span class="w-2 h-2 rounded-full shrink-0 {% if t.status == 'done' %}bg-emerald-500{% elif t.status == 'in_progress' %}bg-indigo-500{% elif t.status == 'review' %}bg-violet-500{% elif t.status == 'blocked' %}bg-red-500{% else %}bg-gray-300{% endif %}"></span>
           <a href="/tasks/{{ t.id }}" class="text-sm truncate hover:underline {% if t.status == 'done' %}text-gray-400 line-through{% endif %}">{{ t.title }}</a>
           {% if b.blocked_by %}<span class="text-[10px] text-amber-700 shrink-0" title="待ち: {{ b.blocked_by|map(attribute='title')|join('、') }}">{{ icon('link') }} {{ b.blocked_by|length }}</span>{% endif %}
           {% if b.dep_warn %}<span class="text-[10px] text-red-600 shrink-0" title="依存先の期限がこのタスクの期限より後">{{ icon('warn') }}</span>{% endif %}
           <span class="ml-auto text-[10px] text-gray-400 shrink-0">{{ t.assignee or '' }}</span>
         </div>
-        <div class="absolute rounded-md text-[11px] leading-6 px-2 truncate cursor-grab select-none {% if b.tentative %}border-2 border-dashed border-gray-400 text-gray-500 bg-white{% elif t.status == 'done' %}text-white bg-emerald-400{% elif t.status == 'blocked' %}text-white bg-red-400{% elif b.overdue %}text-white bg-red-500{% elif t.status == 'in_progress' %}text-white bg-indigo-500{% else %}text-white bg-gray-400{% endif %}"
+        <div class="absolute rounded-md text-[11px] leading-6 px-2 truncate cursor-grab select-none {% if b.tentative %}border-2 border-dashed border-gray-400 text-gray-500 bg-white{% elif t.status == 'done' %}text-white bg-emerald-400{% elif t.status == 'blocked' %}text-white bg-red-400{% elif b.overdue %}text-white bg-red-500{% elif t.status == 'in_progress' %}text-white bg-indigo-500{% elif t.status == 'review' %}text-white bg-violet-500{% else %}text-white bg-gray-400{% endif %}"
              style="left: {{ LW + b.left * DW }}px; width: {{ b.width * DW - 4 }}px; top: 8px; height: 24px"
              data-id="{{ t.id }}" data-start="{{ b.start.isoformat() }}" data-end="{{ b.end.isoformat() }}" @mousedown="down($event, 'move')" title="{{ b.start.strftime('%m/%d') }} 〜 {{ b.end.strftime('%m/%d') }}{% if b.tentative %}（日付未設定・仮置き。ドラッグすると確定します）{% elif not t.start_date %}（開始日は未設定・期限から仮置き）{% endif %}">
           <span class="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize" @mousedown.stop="down($event, 'start')"></span>
@@ -111,7 +111,7 @@
         <td class="px-3 py-2 min-w-[260px]"><a href="/tasks/{{ t.id }}" class="font-medium hover:underline">{{ t.title }}</a>{% if m.origin %}<div class="text-[11px] text-gray-400">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成</div>{% endif %}</td>
         <td class="px-3 py-2"><select onchange="window.shellPatch('/tasks/{{ t.id }}', {priority: this.value}, '優先度を更新しました')" class="text-xs border-0 bg-transparent hover:bg-gray-100 rounded px-1 py-0.5 cursor-pointer">{% for k, l in PRIORITIES %}<option value="{{ k }}" {% if k == t.priority %}selected{% endif %}>{{ {'urgent':'','high':'','normal':'','low':''}[k] }} {{ l }}</option>{% endfor %}</select></td>
         <td class="px-3 py-2">
-          <select onchange="window.shellPatch('/tasks/{{ t.id }}', {status: this.value}, '状態を更新しました')" class="text-xs rounded-full border-0 py-0.5 pl-2 pr-6 cursor-pointer {% if t.status == 'todo' %}bg-gray-100 text-gray-700{% elif t.status == 'in_progress' %}bg-indigo-100 text-indigo-700{% elif t.status == 'blocked' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
+          <select onchange="window.shellPatch('/tasks/{{ t.id }}', {status: this.value}, '状態を更新しました')" class="text-xs rounded-full border-0 py-0.5 pl-2 pr-6 cursor-pointer {% if t.status == 'todo' %}bg-gray-100 text-gray-700{% elif t.status == 'in_progress' %}bg-indigo-100 text-indigo-700{% elif t.status == 'review' %}bg-violet-100 text-violet-700{% elif t.status == 'blocked' %}bg-red-100 text-red-700{% else %}bg-emerald-100 text-emerald-700{% endif %}">
             {% for s_, l_ in STATUSES %}<option value="{{ s_ }}" {% if s_ == t.status %}selected{% endif %}>{{ l_ }}</option>{% endfor %}</select></td>
         <td class="px-3 py-2">
           <select onchange="window.shellPatch('/tasks/{{ t.id }}', {assignee: this.value || null}, '担当者を更新しました')" class="text-sm border-0 bg-transparent hover:bg-gray-100 rounded px-1 py-0.5 cursor-pointer {% if not t.assignee %}text-gray-400{% endif %}">
@@ -132,14 +132,14 @@
 </div>
 </form>
 {% else %}
-<div class="grid grid-cols-4 gap-4 min-w-[900px]" x-data="kanban()">
+<div class="grid grid-cols-5 gap-4 min-w-[1150px]" x-data="kanban()">
 {% for status, label in STATUSES %}
   <div class="bg-gray-100 rounded-xl p-3 min-h-[60vh]" data-status="{{ status }}"
        @dragover.prevent="over = '{{ status }}'" @dragleave="over = null" @drop.prevent="drop('{{ status }}')"
        :class="over === '{{ status }}' && 'ring-2 ring-indigo-400'">
     <div class="flex items-center justify-between mb-3 px-1">
       <h2 class="text-sm font-semibold flex items-center gap-2">
-        <span class="w-2.5 h-2.5 rounded-full {% if status == 'todo' %}bg-gray-400{% elif status == 'in_progress' %}bg-indigo-500{% elif status == 'blocked' %}bg-red-500{% else %}bg-emerald-500{% endif %}"></span>
+        <span class="w-2.5 h-2.5 rounded-full {% if status == 'todo' %}bg-gray-400{% elif status == 'in_progress' %}bg-indigo-500{% elif status == 'review' %}bg-violet-500{% elif status == 'blocked' %}bg-red-500{% else %}bg-emerald-500{% endif %}"></span>
         {{ label }}</h2>
       <span class="text-xs text-gray-500">{{ by_status[status]|length }}</span>
     </div>

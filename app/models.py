@@ -6,7 +6,7 @@ from uuid import uuid4
 
 Source = Literal["meet", "chat", "excel", "wiki"]
 EventKind = Literal["decision", "task_hint", "utterance", "artifact_change"]
-TaskStatus = Literal["todo", "in_progress", "blocked", "done"]
+TaskStatus = Literal["todo", "in_progress", "review", "blocked", "done"]
 Relation = Literal["implements", "discusses", "contradicts", "follows"]
 LinkMethod = Literal["explicit", "context", "assignee", "embedding", "llm"]
 FindingKind = Literal["contradiction", "stalled", "orphan_change"]

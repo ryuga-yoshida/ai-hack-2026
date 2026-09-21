@@ -51,6 +51,7 @@ def by_explicit(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | Non
     from app import tags as tagmod
     text = msg.text
     msg_tags = set(tagmod.hashtags(text))
+    url_stems = {_norm_artifact(name) for _, name in file_links(text)}   # 発言中のファイル URL → 名前（版番号を除く）
     scored: list[tuple[int, Task]] = []
     for t in _open_tasks(conn):
         if t.id in text or (len(t.title) >= 3 and t.title in text):
@@ -60,9 +61,10 @@ def by_explicit(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | Non
             shared = msg_tags & {x["name"] for x in tagmod.tags_for(conn, "task", t.id)}
             score += 3 * len(shared)
         for a in t.artifacts:
-            stem = a.rsplit(".", 1)[0]
-            if len(stem) >= 3 and stem in text:
-                score += 2
+            stem = _norm_artifact(a)
+            if len(stem) >= 3 and (stem in text or stem in url_stems):
+                score += 4   # 成果物の URL/名前が出ていればほぼ確定
+        
         words = _content_words(t.title)
         hits = [w for w in words if w in text]
         if any(len(w) >= 4 for w in hits) or len(hits) >= 2:
@@ -89,16 +91,50 @@ def last_linked_message(conn: sqlite3.Connection, channel: str, before) -> tuple
 
 
 def by_context(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | None:
-    # スレッド返信: 親メッセージが紐付いていれば同じタスク
-    if parent := msg.meta.get("reply_to"):
-        r = conn.execute(
-            "SELECT to_id FROM links WHERE from_type='event' AND from_id=? AND to_type='task' AND relation='discusses' LIMIT 1",
-            (parent,)).fetchone()
-        if r:
-            return (r["to_id"], 0.9)
+    # スレッド返信・引用: 親（引用元）メッセージが紐付いていれば同じタスク（会話のやり取りとして繋がっている）
+    for key in ("reply_to", "quote_of"):
+        if parent := msg.meta.get(key):
+            r = conn.execute(
+                "SELECT to_id FROM links WHERE from_type='event' AND from_id=? AND to_type='task' AND relation='discusses' LIMIT 1",
+                (parent,)).fetchone()
+            if r:
+                return (r["to_id"], 0.9)
+    # メンション: 「@山田 これ見て」→ 山田の直近の紐付き発言、または「@自分」宛の直近の紐付き発言と同じ話題
+    r = _by_mention(conn, msg)
+    if r:
+        return r
     prev = last_linked_message(conn, msg.meta.get("channel", ""), before=msg.occurred_at)
     if prev and (msg.occurred_at - prev[0].occurred_at) < timedelta(minutes=config.LINK_CONTEXT_WINDOW_MIN):
         return (prev[1], 0.8)
+    return None
+
+
+_MENTION_RE = re.compile(r"@([^\s@,、。<]+)")
+
+
+def _by_mention(conn: sqlite3.Connection, msg: Event) -> tuple[str, float] | None:
+    """会話の流れをメンションから察する（LLM 不使用）:
+    ① 自分が @X に話しかけた → X の直近（2時間以内）の紐付き発言と同じタスク
+    ② 自分宛の @自分 が直近にあり、それが紐付いている → その発言と同じタスク（返事とみなす）"""
+    channel = msg.meta.get("channel", "")
+    window = timedelta(hours=2)
+    mentioned = [n for n in _MENTION_RE.findall(msg.text) if n in config.PERSONS]
+    for name in mentioned:
+        r = conn.execute(
+            "SELECT l.to_id FROM events e JOIN links l ON l.from_id = e.id "
+            "WHERE e.source IN ('chat','mail') AND e.kind='utterance' AND e.actor=? AND l.to_type='task' AND l.relation='discusses' "
+            "AND json_extract(e.meta,'$.channel')=? AND e.occurred_at < ? AND e.occurred_at > ? ORDER BY e.occurred_at DESC LIMIT 1",
+            (name, channel, db.to_iso(msg.occurred_at), db.to_iso(msg.occurred_at - window))).fetchone()
+        if r:
+            return (r["to_id"], 0.85)
+    if msg.actor:
+        r = conn.execute(
+            "SELECT l.to_id FROM events e JOIN links l ON l.from_id = e.id "
+            "WHERE e.source IN ('chat','mail') AND e.kind='utterance' AND e.text LIKE ? AND l.to_type='task' AND l.relation='discusses' "
+            "AND json_extract(e.meta,'$.channel')=? AND e.occurred_at < ? AND e.occurred_at > ? ORDER BY e.occurred_at DESC LIMIT 1",
+            (f"%@{msg.actor}%", channel, db.to_iso(msg.occurred_at), db.to_iso(msg.occurred_at - window))).fetchone()
+        if r:
+            return (r["to_id"], 0.85)
     return None
 
 
@@ -195,6 +231,14 @@ def link_message(conn: sqlite3.Connection, msg: Event) -> tuple[str | None, floa
 
 
 _URL = re.compile(r"https?://[^\s<>\"']+")
+
+
+def _norm_artifact(name: str) -> str:
+    """'商品企画/売上見込_v3.xlsx' → '売上見込'（フォルダ・版番号・拡張子を落とす）"""
+    from urllib.parse import unquote
+    base = unquote(name).rsplit("/", 1)[-1]
+    stem = base.rsplit(".", 1)[0] if "." in base else base
+    return re.sub(r"_v\d+$", "", stem)
 
 
 def file_links(text: str) -> list[tuple[str, str]]:

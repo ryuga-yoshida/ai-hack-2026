@@ -279,7 +279,7 @@ function toMarkdown(node) {
 window.ME_NAME = {{ me|tojson }};
 function composer(channel) {
   return {
-    attach: false, emo: false, typers: {}, lastSent: 0,
+    attach: false, emo: false, typers: {}, lastSent: 0, quote: null,
     emojis: ['👍','👎','✅','❌','👀','🙏','🎉','🔥','💯','😀','😂','😅','🤔','😢','😮','🙌','👏','💪','🚀','⭐','❗','❓','📌','📎','📅','⏰','💡','📝','☕','🍵','🍺','🎯'],
     get typingText() { const n = Object.keys(this.typers); return n.length ? n.join('、') + ' が入力中…' : ''; },
     init() {

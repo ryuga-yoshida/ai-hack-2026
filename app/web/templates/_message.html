@@ -22,6 +22,7 @@
       {% for t in m.tags %}<a href="/chat?channel={{ m.channel }}{% if q is not defined or q != '#' + t.name %}&q=%23{{ t.name }}{% endif %}" class="text-[11px] px-1.5 py-0.5 rounded {% if q is defined and q == '#' + t.name %}bg-{{ t.color }}-500 text-white{% else %}bg-{{ t.color }}-100 text-{{ t.color }}-800{% endif %}" title="このタグの発言で絞り込み（もう一度で解除）">#{{ t.name }}{% if q is defined and q == '#' + t.name %} ×{% endif %}</a>{% endfor %}
       {% if m.mentions %}<span class="text-[10px] text-gray-400" title="メンション先">→ {{ m.mentions|join('・') }}</span>{% endif %}
     </div>
+    {% if m.quote %}<a href="/chat?channel={{ m.quote.channel }}#msg-{{ m.quote.id }}" class="block mt-1 mb-0.5 border-l-2 border-indigo-300 bg-indigo-50/60 rounded-r px-2 py-1 text-xs text-gray-600 hover:bg-indigo-50"><b class="text-gray-700">{{ m.quote.actor }}</b> <span class="text-gray-400">{{ m.quote.posted_at|rel }}</span><div class="truncate">{{ m.quote.text|truncate(120) }}</div></a>{% endif %}
     <div class="text-sm mt-0.5 leading-relaxed break-words" x-show="!editing">{{ m.html|safe }}</div>
     <form method="post" action="/chat/{{ m.id }}/edit" x-show="editing" x-cloak class="mt-1 flex gap-2">
       <textarea name="text" rows="2" class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1" @keydown.enter="if ($event.isComposing || $event.keyCode === 229) return; if (!$event.shiftKey) { $event.preventDefault(); $event.target.form.requestSubmit(); }">{{ m.text }}</textarea>
@@ -48,6 +49,7 @@
         {% for e in ['👍','✅','👀','🙏','🎉','❗'] %}<button @click="react('{{ m.id }}', '{{ e }}'); emo = false" class="px-1 hover:bg-gray-100 rounded">{{ e }}</button>{% endfor %}
       </div>
     </div>
+    {% if not compact %}<button type="button" @click="window.dispatchEvent(new CustomEvent('quote-message', { detail: { id: '{{ m.id }}', actor: {{ m.actor|tojson|forceescape }}, text: {{ m.text|truncate(80)|tojson|forceescape }} } }))" class="p-1 hover:text-gray-700" data-tip="引用して返信（会話として紐付く）">{{ icon('quote') }}</button>{% endif %}
     {% if not compact %}<a href="/chat?channel={{ m.channel }}&thread={{ m.id }}" class="p-1 hover:text-gray-700" data-tip="スレッドで返信">{{ icon('reply') }}</a>{% endif %}
     <button type="button" @click="toTask('{{ m.id }}')" class="p-1 hover:text-gray-700" data-tip="この発言からタスクを作る">{{ icon('task') }}</button>
     <form method="post" action="/chat/{{ m.id }}/pin"><button class="p-1 hover:text-gray-700 {% if m.pinned %}text-amber-600{% endif %}" data-tip="{{ 'ピン留めを外す' if m.pinned else 'ピン留め' }}">{{ icon('pin') }}</button></form>

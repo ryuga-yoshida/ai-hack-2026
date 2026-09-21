@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS chat_mutes (
 );
 """
 
-_COLUMNS = {"reply_to": "TEXT", "edited_at": "TEXT", "deleted": "INTEGER NOT NULL DEFAULT 0", "attachments": "TEXT"}
+_COLUMNS = {"reply_to": "TEXT", "edited_at": "TEXT", "deleted": "INTEGER NOT NULL DEFAULT 0", "attachments": "TEXT", "quote_of": "TEXT"}
 _CH_COLUMNS = {"kind": "TEXT NOT NULL DEFAULT 'channel'", "members": "TEXT", "title": "TEXT"}
 
 
@@ -72,14 +72,14 @@ def init(conn: sqlite3.Connection) -> None:
 
 def post_message(conn: sqlite3.Connection, channel: str, actor: str, text: str,
                  posted_at: datetime | None = None, msg_id: str | None = None,
-                 reply_to: str | None = None, attachments: list[dict] | None = None) -> str:
+                 reply_to: str | None = None, attachments: list[dict] | None = None, quote_of: str | None = None) -> str:
     import json
     msg_id = msg_id or new_id()
     ensure_channel(conn, channel)
     conn.execute(
-        "INSERT INTO chat_messages (id, channel, actor, text, posted_at, reply_to, attachments) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO chat_messages (id, channel, actor, text, posted_at, reply_to, attachments, quote_of) VALUES (?,?,?,?,?,?,?,?)",
         (msg_id, channel, actor, text, db.to_iso(posted_at or datetime.now().replace(microsecond=0)),
-         reply_to, json.dumps(attachments, ensure_ascii=False) if attachments else None),
+         reply_to, json.dumps(attachments, ensure_ascii=False) if attachments else None, quote_of),
     )
     conn.commit()
     return msg_id
@@ -282,7 +282,7 @@ class ChatAdapter:
     def fetch(self, since: datetime | None) -> list[Event]:
         if since:
             rows = self.conn.execute(
-                "SELECT * FROM chat_messages WHERE deleted=0 AND posted_at > ? ORDER BY posted_at, rowid",
+                "SELECT * FROM chat_messages WHERE deleted=0 AND posted_at >= ? AND id NOT IN (SELECT id FROM events) ORDER BY posted_at, rowid",
                 (db.to_iso(since),)).fetchall()
         else:
             rows = list_messages(self.conn)
@@ -291,7 +291,7 @@ class ChatAdapter:
                 id=r["id"], source="chat", kind="utterance", text=r["text"],
                 actor=r["actor"], occurred_at=db.from_iso(r["posted_at"]),
                 ref=f"chat:{r['channel']}#{r['id']}",
-                meta={"channel": r["channel"], "message_id": r["id"], "reply_to": r["reply_to"]},
+                meta={"channel": r["channel"], "message_id": r["id"], "reply_to": r["reply_to"], "quote_of": r["quote_of"]},
             )
             for r in rows
         ]

@@ -418,7 +418,8 @@ _DONE_PAT = re.compile(r"(出せました|出しました|提出しました|送
 _START_PAT = re.compile(r"(着手しました|始めました|今やってます|やってます|進めています|取りかかりました|作業中|対応中|確認中|回ります|回りました)")
 _BLOCK_PAT = re.compile(r"(止まって|ブロック|待ちです|待ちになって|できません|進められません|遅れ|遅延|間に合いません)")
 
-STATUS_PENALTY = {"done": 0.7, "in_progress": 0.6, "blocked": 0.6}
+STATUS_PENALTY = {"done": 0.7, "in_progress": 0.6, "blocked": 0.6, "review": 0.6}
+_REVIEW_PAT = re.compile(r"(レビュー(を)?お願い|確認(を)?お願い|見てもらえ|チェック(を)?お願い|査読|ご確認ください|確認いただけ)")
 
 
 def suggest_status_updates(conn: sqlite3.Connection) -> list[tuple[Finding, dict]]:
@@ -447,13 +448,15 @@ def suggest_status_updates(conn: sqlite3.Connection) -> list[tuple[Finding, dict
                 to = "done"
             elif _BLOCK_PAT.search(ev.text) and task.status != "blocked":
                 to = "blocked"
+            elif _REVIEW_PAT.search(ev.text) and task.status in ("todo", "in_progress"):
+                to = "review"
             elif _START_PAT.search(ev.text) and task.status == "todo":
                 to = "in_progress"
             db.mark_processed(conn, "suggest", ev.id, {"task_id": task.id, "to": to})
             if not to or to == task.status or (task.id, to) in already:
                 continue
-            label = {"done": "完了", "in_progress": "進行中", "blocked": "ブロック"}[to]
-            cur = {"todo": "未着手", "in_progress": "進行中", "blocked": "ブロック", "done": "完了"}[task.status]
+            _L = {"todo": "未着手", "in_progress": "進行中", "review": "レビュー中", "blocked": "ブロック", "done": "完了"}
+            label, cur = _L[to], _L[task.status]
             f = Finding(
                 id=new_id(), kind="status_suggestion", severity="low", task_id=task.id,
                 evidence=[ev.id, task.created_from] if task.created_from else [ev.id, ev.id],
