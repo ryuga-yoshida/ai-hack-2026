@@ -263,6 +263,10 @@ def stage_fetch(conn, stats: TickResult, events_override: list[Event] | None = N
     for adapter in adapters(conn):
         try:
             events = adapter.fetch(db.last_synced(conn, adapter.name))
+            # ファイル系アダプタ（excel/docs/wiki）は id が毎回変わるので内容で重複を除く
+            seen = {(r["ref"], r["occurred_at"], r["text"]) for r in conn.execute(
+                "SELECT ref, occurred_at, text FROM events WHERE source=?", (adapter.name,))}
+            events = [e for e in events if (e.ref, db.to_iso(e.occurred_at), e.text) not in seen]
             db.save_events(conn, events)
             if events:
                 db.update_sync_state(conn, adapter.name, max(e.occurred_at for e in events))

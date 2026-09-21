@@ -2280,7 +2280,7 @@ def _artifact_wiki_markdown(conn: sqlite3.Connection, key: str) -> tuple[str, st
         md += ["## 関連タスク"] + [f"- [{t.title}]({config.APP_BASE_URL}/tasks/{t.id})（{STATUS_LABEL.get(t.status, t.status)}・{t.assignee or '未割当'}）" for t in a["tasks"]] + [""]
     md += ["## 版の履歴", "", "| 版 | 更新者 | 日時 | メモ | 変更点 | 検知 |", "|---|---|---|---|---|---|"]
     for v in reversed(a["versions"]):
-        md.append(f"| v{v['n']} | {v['actor'] or '—'} | {v['at'][:16].replace('T', ' ')} | {v.get('note') or ''} | {v['changes'] or '—'} | {('⚠ ' + str(v['findings'])) if v['findings'] else '—'} |")
+        md.append(f"| v{v['n']} | {v['actor'] or '—'} | {v['at'][:16].replace('T', ' ')} | {v.get('note') or ''} | {v['changes'] or '—'} | {(str(v['findings']) + '件') if v['findings'] else '—'} |")
     md.append("")
     changes = [db.row_to_event(r) for r in conn.execute(
         "SELECT * FROM events WHERE kind='artifact_change' AND json_extract(meta,'$.file') IN (%s) ORDER BY occurred_at DESC LIMIT 30"

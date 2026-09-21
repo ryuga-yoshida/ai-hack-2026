@@ -54,6 +54,8 @@ def cmd_replay(args) -> int:
     from fixtures import seed
     seed.run(conn)
     results = agent.replay(conn, speed=args.speed, record=args.record)
+    for a in agent.adapters(conn):                     # 再生済みの範囲を同期済みにし、サーバーの初回巡回で二重取込しない
+        db.update_sync_state(conn, a.name)
     n = sum(len(r.findings) for r in results)
     print(f"replay: Finding {n}件")
     return 0

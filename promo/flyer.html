@@ -79,7 +79,7 @@
     <div class="nums">
       <div class="num green"><b>9/10</b><span>評価セットの検知率<br>誤検知 0</span></div>
       <div class="num"><b>8秒</b><span>保存 → 検知<br>（イベント起動）</span></div>
-      <div class="num amber"><b>-63%</b><span>LLM コスト $0.71<br>vs 全て high $1.94</span></div>
+      <div class="num amber"><b>-59%</b><span>LLM コスト $0.84<br>vs 全て high $2.07</span></div>
       <div class="num"><b>100%</b><span>人の指示なしで<br>完結した判断</span></div>
     </div>
   </div>
@@ -103,7 +103,7 @@
           <tr><th>mid（Gemini Flash）</th><td>決定・タスクの抽出、紐付けの最終段、議事録要約。$0.21</td></tr>
           <tr><th>embed</th><td>候補絞り込み・重複統合・紐付け。$0.001</td></tr>
           <tr><th>コード</th><td>時系列ガード・語彙ゲート・引用検証・閾値。LLM を呼ぶ前に絞る</td></tr>
-          <tr><th>合計</th><td><b>$0.71</b>（全て high なら $1.94、削減 63%）</td></tr>
+          <tr><th>合計</th><td><b>$0.84</b>（全て high なら $2.07、削減 59%）</td></tr>
         </table></div>
         <h2>評価</h2>
         <div class="card" style="font-size:9pt">評価セット 10 ケース（矛盾あり 6・許容 4）を毎回再生。<b>9/10 検知・誤検知 0・見逃し 1</b>（数式だけの変更）。判定を変えるたびに走らせ、悪化したら戻す。</div>
