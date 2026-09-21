@@ -1,6 +1,7 @@
 """FastAPI エントリポイント。Jinja2 + Tailwind CDN + Alpine.js の UI。"""
 import json
 import os
+import logging
 import re
 import sqlite3
 from datetime import date, datetime
@@ -16,6 +17,8 @@ from pydantic import BaseModel
 from app import auth, config, db, tags as tagmod
 from app.connectors import calendar as cal, chat, mail as mailmod, meet, wiki as wikimod
 from app.models import Event, Link, Task, new_id
+
+log = logging.getLogger(__name__)
 
 app = FastAPI(title="進行管理エージェント")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
@@ -2247,6 +2250,79 @@ def _minutes_markdown(conn: sqlite3.Connection, meeting_id: str) -> tuple[str, s
     return head["title"], "\n".join(md)
 
 
+def _auto_wiki_minutes(conn: sqlite3.Connection, meeting_id: str) -> None:
+    """会議の抽出が終わったら、議事録ページを Wiki「議事録」スペースに自動生成／更新する（fixtures 由来の会議は対象外）"""
+    if not conn.execute("SELECT 1 FROM meetings WHERE id=? AND status='done'", (meeting_id,)).fetchone():
+        return
+    title, md = _minutes_markdown(conn, meeting_id)
+    head = _meeting_source(conn, meeting_id)[0]
+    page_title = f"{(head.get('started_at') or '')[:10]} {title}".strip()
+    existing = conn.execute("SELECT id FROM wiki_pages WHERE title=?", (page_title,)).fetchone()
+    if existing:
+        wikimod.update(conn, existing["id"], page_title, md, "エージェント", note="会議の抽出結果を反映")
+        pid = existing["id"]
+    else:
+        pid = wikimod.create(conn, page_title, md, "エージェント", space="議事録")
+    tagmod.link(conn, "議事録", "wiki", pid) if tagmod.get_tag(conn, "議事録") else None
+    from app import agent
+    agent.say(f"action: 議事録ページを Wiki に作成: {page_title} {config.APP_BASE_URL}/wiki/{pid}")
+
+
+def _artifact_wiki_markdown(conn: sqlite3.Connection, key: str) -> tuple[str, str] | None:
+    """成果物1つの Wiki ページ本文（LLM 不使用）: 概要・最新版・版の履歴と変更点・関連タスク・関連する決定・検知"""
+    rows = library_rows(conn, str(Path(key).parent) if str(Path(key).parent) != "." else "")
+    a = next((f for f in rows["files"] if f["key"] == key), None)
+    if not a:
+        return None
+    md = [f"# {a['name']}", "", f"**場所**: {a['folder'] or '（ルート）'}　**最新版**: v{a['latest']['n']}（{a['latest']['actor'] or '—'}・{a['latest']['at'][:16].replace('T', ' ')}）　**形式**: {a['ext'].lstrip('.')}", "",
+          f"このページはエージェントが成果物ライブラリから自動生成しています。版が増えるたびに更新されます。", ""]
+    if a["tasks"]:
+        md += ["## 関連タスク"] + [f"- [{t.title}]({config.APP_BASE_URL}/tasks/{t.id})（{STATUS_LABEL.get(t.status, t.status)}・{t.assignee or '未割当'}）" for t in a["tasks"]] + [""]
+    md += ["## 版の履歴", "", "| 版 | 更新者 | 日時 | メモ | 変更点 | 検知 |", "|---|---|---|---|---|---|"]
+    for v in reversed(a["versions"]):
+        md.append(f"| v{v['n']} | {v['actor'] or '—'} | {v['at'][:16].replace('T', ' ')} | {v.get('note') or ''} | {v['changes'] or '—'} | {('⚠ ' + str(v['findings'])) if v['findings'] else '—'} |")
+    md.append("")
+    changes = [db.row_to_event(r) for r in conn.execute(
+        "SELECT * FROM events WHERE kind='artifact_change' AND json_extract(meta,'$.file') IN (%s) ORDER BY occurred_at DESC LIMIT 30"
+        % ",".join("?" * len(a["versions"])), [v["file"] for v in a["versions"]])]
+    if changes:
+        md += ["## 最近の変更点"] + [f"- {c.occurred_at:%m/%d %H:%M} {c.actor or ''}: {c.text}" for c in changes[:15]] + [""]
+    decs = {}
+    for c in changes:
+        for r in conn.execute("SELECT f.summary, f.status, e.text dtext FROM findings f JOIN events e ON e.id = json_extract(f.evidence, '$[0]') "
+                              "WHERE f.evidence LIKE ? AND f.kind='contradiction'", (f"%{c.id}%",)):
+            decs[r["dtext"]] = r["summary"]
+    if decs:
+        md += ["## 関連する決定と検知"] + [f"- 決定「{d}」→ {s_}" for d, s_ in decs.items()] + [""]
+    md += ["---", f"ライブラリ: {config.APP_BASE_URL}/artifacts?q={quote(a['stem'])}"]
+    return a["name"], "\n".join(md)
+
+
+def _auto_wiki_artifact(conn: sqlite3.Connection, key: str) -> str | None:
+    """成果物の Wiki ページを生成／最新化する（エージェントが編集者。判定の対象にはならない）"""
+    r = _artifact_wiki_markdown(conn, key)
+    if not r:
+        return None
+    title, md = r
+    page_title = f"成果物: {title}"
+    existing = conn.execute("SELECT id FROM wiki_pages WHERE title=?", (page_title,)).fetchone()
+    if existing:
+        wikimod.update(conn, existing["id"], page_title, md, "エージェント", note="成果物の版が更新されたため最新化")
+        return existing["id"]
+    return wikimod.create(conn, page_title, md, "エージェント", space="成果物")
+
+
+def _auto_wiki_all_artifacts(conn: sqlite3.Connection) -> int:
+    from app.connectors.excel import version_series
+    n = 0
+    for key in version_series(LIB(), ext=None):
+        if key.startswith(("チャット添付/", "メール添付/")):
+            continue
+        if _auto_wiki_artifact(conn, key):
+            n += 1
+    return n
+
+
 @app.post("/meet/{meeting_id}/minutes/to_wiki")
 def minutes_to_wiki(request: Request, meeting_id: str, space: str = Form("議事録")):
     conn = get_conn()
@@ -2292,6 +2368,11 @@ def share_minutes(request: Request, meeting_id: str, channel: str = Form("genera
     chat.post_message(conn, channel, me, f"「{src[0]['title']}」の議事録サマリーです（決定 {n_dec} 件） {config.APP_BASE_URL}/meet/{meeting_id}/minutes")
     _ingest_chat(conn)
     return RedirectResponse(f"/meet/{meeting_id}/minutes", status_code=303)
+
+
+from app import agent as _agent_mod
+_agent_mod.on_meeting_extracted.append(lambda conn, mid: _auto_wiki_minutes(conn, mid))
+_agent_mod.on_tick_done.append(lambda conn: _auto_wiki_all_artifacts(conn))   # 検知結果を成果物ページに反映
 
 
 @app.on_event("startup")
@@ -2893,6 +2974,12 @@ def _register_version(conn: sqlite3.Connection, rel_path: str, data: bytes | Non
     from app import agent
     agent.mirror_to_watch_dir(dest)
     agent.request_tick(f"成果物の保存（{dest.relative_to(root)}）")
+    try:
+        key = str(Path(rel_path).parent / (re.sub(r"_v\d+$", "", Path(rel_path).stem) + Path(rel_path).suffix)) if str(Path(rel_path).parent) != "." else re.sub(r"_v\d+$", "", Path(rel_path).stem) + Path(rel_path).suffix
+        if not key.startswith(("チャット添付/", "メール添付/")):
+            _auto_wiki_artifact(conn, key)
+    except Exception as e:
+        log.warning("成果物 Wiki の生成に失敗: %s", e)
     return dest
 
 

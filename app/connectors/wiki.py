@@ -238,6 +238,8 @@ class WikiAdapter:
                 at = db.from_iso(cur["created_at"])
                 if since and at <= since:
                     continue
+                if cur["actor"] == "エージェント":
+                    continue   # エージェントが自動生成したページ（議事録・成果物ページ）は判定の対象外
                 meta = {"file": f"wiki:{page['id']}", "base": f"wiki:{page['title']}", "page_id": page["id"], "revision_id": cur["id"],
                         "url": f"/wiki/{page['id']}"}
                 for d in diff_paragraphs(paragraphs(prev["body"]), paragraphs(cur["body"])):

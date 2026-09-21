@@ -50,6 +50,10 @@ _pending_reasons: list[str] = []
 _file_sig: dict[str, float] = {}
 
 
+on_meeting_extracted: list = []   # (conn, meeting_id) を受けるコールバック。main.py が登録する
+on_tick_done: list = []           # (conn) 巡回の最後に呼ぶ（成果物ページの最新化など）
+
+
 def request_tick(reason: str) -> bool:
     """感度の高いイベント（会議終了・チャット投稿・成果物の新版）から即時巡回を要求する。
     自動巡回が OFF のときは何もしない（ポーリングもトリガーも止まっている状態）"""
@@ -300,6 +304,11 @@ def stage_extract(conn, stats: TickResult) -> None:
         stats.extracted += n
         stats.tasks_created += created
         db.mark_processed(conn, "extract", f"meet:{mid}", {"events": n, "tasks": created})
+        for cb in on_meeting_extracted:   # 例: 議事録ページを Wiki に自動生成
+            try:
+                cb(conn, mid)
+            except Exception as e:
+                log.warning("on_meeting_extracted failed: %s", e)
 
     # チャット・メール: 未処理発言をチャンネル（メールはスレッド）ごとにまとめて
     rows = conn.execute(
@@ -464,6 +473,11 @@ def tick(conn: sqlite3.Connection, now: datetime | None = None,
     stage_detect(conn, stats, now)                 # 5-6. 検知（新規 artifact_change＋定期）
     if events_override is None:
         stage_calendar(conn, stats, now)           # 7. 予定のリマインド（再生時は行わない）
+    for cb in on_tick_done:
+        try:
+            cb(conn)
+        except Exception as e:
+            log.warning("on_tick_done failed: %s", e)
     say(f"巡回終了: 取込{stats.fetched} 抽出{stats.extracted} 紐付け{stats.linked} Finding{len(stats.findings)}")
     return stats
 
