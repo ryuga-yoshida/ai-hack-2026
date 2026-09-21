@@ -27,9 +27,9 @@
   <g font-size="15">
     <rect x="30" y="280" width="330" height="170" rx="12" fill="#fff7ed" stroke="#fed7aa"/>
     <text x="50" y="308" font-weight="700" fill="#9a3412">Excel のセル変更（版の差分）</text>
-    <text x="50" y="338" fill="#374151">売上見込_v2.xlsx → 売上見込_v3.xlsx</text>
+    <text x="50" y="338" fill="#374151">売上見込_v1.xlsx → 売上見込_v2.xlsx</text>
     <text x="50" y="362" fill="#374151">シート 売上見込 / セル D5</text>
-    <text x="50" y="386" fill="#374151">行「商品A」× 列「第4四半期」</text>
+    <text x="50" y="386" fill="#374151">行「商品A」× 列「第3四半期」</text>
     <text x="50" y="410" fill="#374151" font-weight="700">1200 → 1500</text>
     <text x="50" y="438" fill="#6b7280" font-size="13">保存時に自動で差分・LLM 不使用</text>
   </g>
@@ -38,9 +38,9 @@
     <rect x="440" y="280" width="730" height="170" rx="12" fill="#4f46e5"/>
     <text x="465" y="310" fill="#c7d2fe">source</text><text x="600" y="310" fill="#fff">excel</text>
     <text x="465" y="334" fill="#c7d2fe">kind</text><text x="600" y="334" fill="#fff">artifact_change（成果物の変更）</text>
-    <text x="465" y="358" fill="#c7d2fe">text</text><text x="600" y="358" fill="#fff">売上見込の商品Aの第4四半期が 1200 から 1500 に変更</text>
+    <text x="465" y="358" fill="#c7d2fe">text</text><text x="600" y="358" fill="#fff">売上見込の商品Aの第3四半期が 1200 から 1500 に変更</text>
     <text x="465" y="382" fill="#c7d2fe">actor / occurred_at</text><text x="680" y="382" fill="#fff">山田 / 2026-09-18 14:05</text>
-    <text x="465" y="406" fill="#c7d2fe">ref</text><text x="600" y="406" fill="#fff">売上見込_v3.xlsx:売上見込!D5（セルの座標）</text>
+    <text x="465" y="406" fill="#c7d2fe">ref</text><text x="600" y="406" fill="#fff">売上見込_v2.xlsx:売上見込!D5（セルの座標）</text>
     <text x="465" y="430" fill="#c7d2fe">quote</text><text x="600" y="430" fill="#fff">（差分は機械的に取るので不要）</text>
   </g>
 
