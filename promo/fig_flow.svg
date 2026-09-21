@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" font-family="Hiragino Sans, Noto Sans JP, sans-serif">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6366f1"/></marker></defs>
+  <text x="30" y="36" font-size="20" font-weight="700" fill="#111827">利用の流れ（上段＝人がすること・下段＝エージェントが自動でやること）</text>
+
+  <!-- ステップ見出し -->
+  <g font-size="16" font-weight="700" fill="#fff">
+    <rect x="30" y="60" width="170" height="44" rx="10" fill="#4f46e5"/><text x="115" y="88" text-anchor="middle">1 会議</text>
+    <rect x="225" y="60" width="170" height="44" rx="10" fill="#4f46e5"/><text x="310" y="88" text-anchor="middle">2 議事録</text>
+    <rect x="420" y="60" width="170" height="44" rx="10" fill="#4f46e5"/><text x="505" y="88" text-anchor="middle">3 タスク</text>
+    <rect x="615" y="60" width="170" height="44" rx="10" fill="#4f46e5"/><text x="700" y="88" text-anchor="middle">4 成果物の作成</text>
+    <rect x="810" y="60" width="170" height="44" rx="10" fill="#4f46e5"/><text x="895" y="88" text-anchor="middle">5 チャットで調整</text>
+    <rect x="1005" y="60" width="170" height="44" rx="10" fill="#4f46e5"/><text x="1090" y="88" text-anchor="middle">6 提出・Wiki</text>
+  </g>
+  <g stroke="#6366f1" stroke-width="2.5" marker-end="url(#a)">
+    <line x1="200" y1="82" x2="222" y2="82"/><line x1="395" y1="82" x2="417" y2="82"/><line x1="590" y1="82" x2="612" y2="82"/><line x1="785" y1="82" x2="807" y2="82"/><line x1="980" y1="82" x2="1002" y2="82"/>
+  </g>
+
+  <!-- レーン: 人 -->
+  <rect x="30" y="120" width="1145" height="150" rx="12" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="45" y="145" font-size="14" font-weight="700" fill="#6b7280">人</text>
+  <g font-size="14" fill="#111827">
+    <text x="115" y="180" text-anchor="middle">会議室で話す</text>
+    <text x="115" y="202" text-anchor="middle">終了ボタンを押す</text>
+    <text x="310" y="180" text-anchor="middle">サマリーを読む</text>
+    <text x="310" y="202" text-anchor="middle">（書かない）</text>
+    <text x="505" y="180" text-anchor="middle">担当・期限を確認</text>
+    <text x="505" y="202" text-anchor="middle">違えば直す</text>
+    <text x="700" y="180" text-anchor="middle">Excel / Word を作る</text>
+    <text x="700" y="202" text-anchor="middle">ライブラリに保存</text>
+    <text x="895" y="180" text-anchor="middle">URL を貼る・引用返信</text>
+    <text x="895" y="202" text-anchor="middle">「直しました」「確認お願いします」</text>
+    <text x="1090" y="180" text-anchor="middle">修正版を保存</text>
+    <text x="1090" y="202" text-anchor="middle">提案を承認して完了</text>
+  </g>
+  <g font-size="12" fill="#9ca3af">
+    <text x="115" y="245" text-anchor="middle">議事録は書かない</text>
+    <text x="310" y="245" text-anchor="middle">起票しない</text>
+    <text x="505" y="245" text-anchor="middle">割り当て作業なし</text>
+    <text x="700" y="245" text-anchor="middle">_v2 の命名不要</text>
+    <text x="895" y="245" text-anchor="middle">タスク画面を開かない</text>
+    <text x="1090" y="245" text-anchor="middle">Wiki を書かない</text>
+  </g>
+
+  <!-- レーン: エージェント -->
+  <rect x="30" y="285" width="1145" height="195" rx="12" fill="#eef2ff" stroke="#c7d2fe"/>
+  <text x="45" y="310" font-size="14" font-weight="700" fill="#4338ca">エージェント</text>
+  <g font-size="13.5" fill="#1e1b4b">
+    <text x="115" y="345" text-anchor="middle">話者別に文字起こし</text>
+    <text x="115" y="367" text-anchor="middle">ライブ字幕</text>
+
+    <text x="310" y="345" text-anchor="middle">決定・タスク・懸念を抽出</text>
+    <text x="310" y="367" text-anchor="middle">根拠の発言を引用</text>
+    <text x="310" y="389" text-anchor="middle">Wiki「議事録」に作成</text>
+
+    <text x="505" y="345" text-anchor="middle">タスクを登録</text>
+    <text x="505" y="367" text-anchor="middle">担当者を発言から読む</text>
+    <text x="505" y="389" text-anchor="middle">決定に紐付け</text>
+
+    <text x="700" y="345" text-anchor="middle">版を自動採番</text>
+    <text x="700" y="367" text-anchor="middle">セル・段落の差分</text>
+    <text x="700" y="389" text-anchor="middle">タスクに紐付け</text>
+    <text x="700" y="411" text-anchor="middle" fill="#b91c1c">決定と突き合わせ → 矛盾通知</text>
+
+    <text x="895" y="345" text-anchor="middle">どのタスクの話か推論</text>
+    <text x="895" y="367" text-anchor="middle">（URL・引用・@メンション）</text>
+    <text x="895" y="389" text-anchor="middle">状態変更を提案</text>
+    <text x="895" y="411" text-anchor="middle">レビュー中／修正中を追跡</text>
+
+    <text x="1090" y="345" text-anchor="middle">成果物ページを最新化</text>
+    <text x="1090" y="367" text-anchor="middle">（版の履歴・変更点・決定）</text>
+    <text x="1090" y="389" text-anchor="middle">完了の提案</text>
+    <text x="1090" y="411" text-anchor="middle">停滞していれば通知</text>
+  </g>
+  <g font-size="12" fill="#6366f1">
+    <text x="115" y="458" text-anchor="middle">Web Speech / コード</text>
+    <text x="310" y="458" text-anchor="middle">LLM mid ＋ 引用検証</text>
+    <text x="505" y="458" text-anchor="middle">埋め込み＋コード</text>
+    <text x="700" y="458" text-anchor="middle">コード ＋ 判定だけ LLM high</text>
+    <text x="895" y="458" text-anchor="middle">コード（LLM 不使用）</text>
+    <text x="1090" y="458" text-anchor="middle">コード（LLM 不使用）</text>
+  </g>
+  <text x="600" y="508" text-anchor="middle" font-size="14" fill="#374151">4 と 5 は完了まで繰り返す。エージェントは通知と提案までで、書き換えは人が承認する</text>
+</svg>
