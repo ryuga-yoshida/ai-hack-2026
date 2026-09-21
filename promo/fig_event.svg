@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" font-family="Hiragino Sans, Noto Sans JP, sans-serif">
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6366f1"/></marker></defs>
+  <g font-size="19" fill="#111827">
+    <rect x="30" y="30" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="58" text-anchor="middle" font-weight="700">会議の発言</text><text x="155" y="80" text-anchor="middle" font-size="14" fill="#6b7280">「それ以外の数字は変更しない」</text>
+    <rect x="30" y="110" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="138" text-anchor="middle" font-weight="700">チャットの投稿</text><text x="155" y="160" text-anchor="middle" font-size="14" fill="#6b7280">「更新版はこちら &lt;URL&gt;」</text>
+    <rect x="30" y="190" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="218" text-anchor="middle" font-weight="700">メール</text><text x="155" y="240" text-anchor="middle" font-size="14" fill="#6b7280">件名＋本文</text>
+    <rect x="30" y="270" width="250" height="60" rx="12" fill="#eef2ff" stroke="#c7d2fe"/><text x="155" y="298" text-anchor="middle" font-weight="700">Wiki の改訂</text><text x="155" y="320" text-anchor="middle" font-size="14" fill="#6b7280">段落の差分</text>
+    <rect x="30" y="350" width="250" height="60" rx="12" fill="#fff7ed" stroke="#fed7aa"/><text x="155" y="378" text-anchor="middle" font-weight="700">Excel のセル変更</text><text x="155" y="400" text-anchor="middle" font-size="14" fill="#6b7280">D5: 1200 → 1500</text>
+  </g>
+  <path d="M280 60 H340 V220 M280 140 H340 M280 220 H340 M280 300 H340 V220 M280 380 H340 V220" fill="none" stroke="#a5b4fc" stroke-width="3"/>
+  <line x1="340" y1="220" x2="420" y2="220" stroke="#6366f1" stroke-width="3" marker-end="url(#a)"/>
+  <rect x="430" y="60" width="330" height="320" rx="16" fill="#4f46e5"/>
+  <text x="595" y="100" text-anchor="middle" fill="#fff" font-size="24" font-weight="700">Event（1種類）</text>
+  <g font-size="17" fill="#e0e7ff" font-family="ui-monospace, Menlo, monospace">
+    <text x="460" y="145">source     どこから（meet / chat / mail / wiki / excel）</text>
+    <text x="460" y="180">kind       何か（発言 / 決定 / タスク候補 / 成果物の変更）</text>
+    <text x="460" y="215">text       内容</text>
+    <text x="460" y="250">actor      誰が</text>
+    <text x="460" y="285">occurred_at いつ</text>
+    <text x="460" y="320">ref        出典の座標（会議#26 / D5 セル …）</text>
+    <text x="460" y="355">quote      原文（幻覚チェックに使う）</text>
+  </g>
+  <line x1="760" y1="220" x2="840" y2="220" stroke="#6366f1" stroke-width="3" marker-end="url(#a)"/>
+  <rect x="850" y="110" width="320" height="220" rx="16" fill="#fff" stroke="#6366f1" stroke-width="3"/>
+  <text x="1010" y="150" text-anchor="middle" font-size="22" font-weight="700" fill="#312e81">統合グラフ</text>
+  <g font-size="17" fill="#374151">
+    <text x="1010" y="190" text-anchor="middle">決定 ─ タスク ─ 発言 ─ 変更</text>
+    <text x="1010" y="220" text-anchor="middle">が同じ形で繋がる</text>
+    <text x="1010" y="265" text-anchor="middle" fill="#6b7280" font-size="15">情報源を増やしても</text>
+    <text x="1010" y="290" text-anchor="middle" fill="#6b7280" font-size="15">判定側のコードは変わらない</text>
+  </g>
+</svg>

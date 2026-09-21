@@ -93,38 +93,15 @@ AI HACK 2026 に個人で参加し、「進行管理エージェント」を作�
 
 ### 正規化
 
-5つの情報源を、全部この1種類にします。
+5つの情報源を1種類の「出来事（Event）」に変換します。決定・タスク・発言・変更が同じ形で1つのグラフに入るため、横断の矛盾検知が通常のクエリで書けます。情報源を増やすときはアダプタを1つ追加するだけです。
 
-```python
-@dataclass
-class Event:
-    source: str        # meet | chat | mail | wiki | excel
-    kind: str          # utterance | decision | task_hint | artifact_change
-    text: str
-    actor: str | None
-    occurred_at: datetime
-    ref: str | None    # 出典の座標 "売上見込_v2.xlsx:売上見込!D5"
-    quote: str | None  # 原文（幻覚チェック用）
-```
-
-決定・タスク・発言・変更が同じ形で1つのグラフに入るので、「横断して矛盾を探す」が普通のクエリになります。情報源を増やすときはアダプタを1つ足すだけです。
+![Event への正規化](/images/fig_event.png)
 
 ### 矛盾検知（LLM を呼ぶのは最後だけ）
 
-| 段階 | 処理 | LLM |
-|---|---|---|
-| ① 候補 | タスク直結の決定 ＋ 埋め込み類似の上位 × 語彙ゲート（対象語を含む決定だけ） | 埋め込みのみ |
-| ② ガード | 決定が変更より前・30日以内。数式セルの値変化は除外 | なし |
-| ③ 判定 | 決定・変更・関連発言・その後の決定を渡して判定。`same_subject`=false なら矛盾扱いしない | high |
-| ④ 行動 | confidence ≥0.8 通知 ／ ≥0.5 確認キュー ／ それ未満は記録のみ | なし |
+判定の前に候補の絞り込みとルールによる除外をコードで行い、LLM は絞り込んだ後の1件ずつにだけ使います。判定結果には「決定と変更の対象が同じか」を必ず含めさせ、別物なら矛盾として扱いません。処理はすべて増分で、全件走査はしません。
 
-```python
-res = router.complete(JUDGE_PROMPT, masked, tier="high", task="judge")
-if res.get("same_subject") is False and res.get("contradicts"):
-    res["contradicts"] = False   # 対象が別物なら、この決定との矛盾ではない
-```
-
-処理はすべて増分で、全件走査はしません。
+![矛盾検知の流れ](/images/fig_detect.png)
 
 ### 壊れたときの振る舞い
 
@@ -145,20 +122,13 @@ if res.get("same_subject") is False and res.get("contradicts"):
 
 ## OrcaRouter の振り分けとコスト
 
-| tier | モデル | 用途 | 実測 |
-|---|---|---|---|
-| high | claude-opus-5 | 矛盾の判定だけ（絞り込み後、1件ずつ） | $0.50 |
-| mid | gemini-3.6-flash | 抽出・紐付け最終段・議事録要約 | $0.21 |
-| embed | gemini-embedding-001 | 候補絞り込み・重複統合 | $0.001 |
-| コード | — | 時系列・語彙・引用検証・閾値 | $0 |
+LLM の呼び出しはすべて OrcaRouter 経由（OpenAI 互換）です。呼ぶ回数が多い処理ほど安いモデルに振り分け、判定だけを high にしています。
 
-**全処理 $0.71。すべて high なら $1.94（−63%）。** 料金表は `/v1/models` から取得し、ダッシュボードに常時表示しています。
+![OrcaRouter の振り分けと実測コスト](/images/fig_route.png)
 
 ![コスト画面](/images/cost.png)
 
-方針は「呼ぶ回数が多い処理ほど安いモデル」です。判定を Opus に残したのは、「対象が別物か」「後の決定で上書きされていないか」の読み取りが mid では安定しなかったためです。
-
-応答はプロンプトをキーにキャッシュしており、`replay` はキャッシュだけで動きます。API キーなしで再現でき、UI 開発中の LLM コストはゼロでした。
+判定を Opus に残した理由は、「対象が別物か」「後の決定で上書きされていないか」の読み取りが mid では安定しなかったためです。応答はプロンプトをキーにキャッシュしており、`replay` はキャッシュだけで動きます。API キーなしで再現でき、UI 開発中の LLM コストはゼロでした。
 
 ## セキュリティ
 
