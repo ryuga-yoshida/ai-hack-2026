@@ -2,7 +2,7 @@
 {% block title %}ダッシュボード{% endblock %}
 {% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>{% endblock %}
 {% block content %}
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
   <div class="bg-white border border-gray-200 rounded-xl p-4">
     <div class="text-xs text-gray-500">未対応の検知</div>
     <div class="text-3xl font-semibold mt-1">{{ counts.notified + counts.pending }}</div>
@@ -10,17 +10,17 @@
   </div>
   <div class="bg-white border border-gray-200 rounded-xl p-4">
     <div class="text-xs text-gray-500">種別</div>
-    <div class="flex gap-3 mt-2 text-sm">
-      <span><b class="text-xl">{{ kinds.contradiction }}</b> <span class="text-gray-500">矛盾</span></span>
-      <span><b class="text-xl">{{ kinds.stalled }}</b> <span class="text-gray-500">停滞</span></span>
-      <span><b class="text-xl">{{ kinds.orphan_change }}</b> <span class="text-gray-500">根拠なし</span></span>
-      <span><b class="text-xl">{{ kinds.status_suggestion }}</b> <span class="text-gray-500">提案</span></span>
+    <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-sm">
+      <span class="whitespace-nowrap"><b class="text-xl">{{ kinds.contradiction }}</b> <span class="text-gray-500">矛盾</span></span>
+      <span class="whitespace-nowrap"><b class="text-xl">{{ kinds.stalled }}</b> <span class="text-gray-500">停滞</span></span>
+      <span class="whitespace-nowrap"><b class="text-xl">{{ kinds.orphan_change }}</b> <span class="text-gray-500">根拠なし</span></span>
+      <span class="whitespace-nowrap"><b class="text-xl">{{ kinds.status_suggestion }}</b> <span class="text-gray-500">提案</span></span>
     </div>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl p-4">
     <div class="text-xs text-gray-500">タスク</div>
-    <div class="flex gap-3 mt-2 text-sm">
-      {% for s, label in STATUSES %}<span><b class="text-xl">{{ task_counts[s] }}</b> <span class="text-gray-500">{{ label }}</span></span>{% endfor %}
+    <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-sm">
+      {% for s, label in STATUSES %}<span class="whitespace-nowrap"><b class="text-xl">{{ task_counts[s] }}</b> <span class="text-gray-500">{{ label }}</span></span>{% endfor %}
     </div>
   </div>
   <div class="bg-white border border-gray-200 rounded-xl p-4">

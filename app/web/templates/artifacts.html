@@ -5,8 +5,8 @@
 {% block actions %}
 <form method="get" action="/artifacts" class="flex items-center gap-2">
   <input type="hidden" name="path" value="{{ folder }}"><input type="hidden" name="view" value="{{ view }}">
-  <input name="q" value="{{ q }}" placeholder="ファイル名で検索（全フォルダ）" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-48">
-  <select name="tag" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">
+  <input name="q" value="{{ q }}" placeholder="ファイル名で検索" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-32 xl:w-48">
+  <select name="tag" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white hidden xl:block">
     <option value="">全タグ</option>{% for t in all_tags %}<option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>#{{ t.name }}</option>{% endfor %}
   </select>
   <select name="sort" onchange="this.form.submit()" class="text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white">

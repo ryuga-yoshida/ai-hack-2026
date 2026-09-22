@@ -101,19 +101,19 @@
 
   <!-- メイン -->
   <div class="flex-1 min-w-0 flex flex-col">
-    <header class="h-14 shrink-0 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
+    <header class="min-h-[3.5rem] py-1.5 shrink-0 bg-white border-b border-gray-200 flex flex-wrap items-center px-4 gap-x-3 gap-y-1.5">
       <button @click="sidebar = !sidebar; try { localStorage.setItem('sidebar', sidebar ? '1' : '0') } catch (e) {}" class="w-8 h-8 grid place-items-center rounded-lg text-gray-500 hover:bg-gray-100" title="サイドバー">☰</button>
-      <h1 class="font-semibold">{% block heading %}{{ self.title() }}{% endblock %}</h1>
-      <form method="get" action="/search" class="ml-4 hidden md:block"><input id="globalSearch" name="q" placeholder="検索（/）  ⌘K でどこへでも" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-52 focus:w-72 transition-all"></form>
-      <div class="ml-auto flex items-center gap-2">
+      <h1 class="font-semibold whitespace-nowrap shrink-0 truncate max-w-[40vw]">{% block heading %}{{ self.title() }}{% endblock %}</h1>
+      <form method="get" action="/search" class="ml-4 hidden {% if self.actions()|trim %}xl:block{% else %}lg:block{% endif %} shrink"><input id="globalSearch" name="q" placeholder="検索（/）  ⌘K でどこへでも" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-44 xl:w-52 focus:w-72 transition-all"></form>
+      <div class="ml-auto flex flex-wrap justify-end items-center gap-2 min-w-0 max-w-full whitespace-nowrap">
         {% block actions %}{% endblock %}
         <a href="/notifications" class="relative w-9 h-9 grid place-items-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50" title="通知">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
           <span x-show="notif > 0" x-cloak x-text="notif" class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] grid place-items-center"></span>
         </a>
-        <button @click="tick()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 flex items-center gap-1.5" :disabled="agent.running">
+        <button @click="tick()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50 flex items-center gap-1.5 whitespace-nowrap" :disabled="agent.running">
           <svg class="w-4 h-4" :class="agent.running && 'animate-spin'" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.6 9A8 8 0 0119 7.5M18.4 15A8 8 0 015 16.5"/></svg>
-          今すぐ巡回
+          <span class="hidden md:inline">今すぐ巡回</span>
         </button>
       </div>
     </header>
