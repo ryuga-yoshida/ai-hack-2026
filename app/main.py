@@ -20,7 +20,9 @@ from app.models import Event, Link, Task, new_id
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="進行管理エージェント")
+app = FastAPI(title="Followup — 進行管理エージェント")
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "web" / "static")), name="static")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "web" / "templates"))
 
 

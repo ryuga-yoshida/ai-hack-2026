@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}進行管理エージェント{% endblock %}</title>
+  <title>{% block title %}Followup{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/brand/followup-app-icon.svg">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { safelist: [
@@ -33,8 +34,8 @@
   <div x-show="sidebar && mobile" x-cloak class="fixed inset-0 bg-black/30 z-30 md:hidden" @click="sidebar = false"></div>
   <aside class="w-60 shrink-0 bg-white border-r border-gray-200 flex-col max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl" :class="sidebar ? 'flex' : 'hidden'" x-cloak>
     <a href="/" class="flex items-center gap-2 px-5 h-14 border-b border-gray-200">
-      <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white grid place-items-center text-sm font-bold">A</span>
-      <span class="font-semibold text-sm">進行管理エージェント</span>
+      <img src="/static/brand/followup-app-icon.svg" alt="" class="w-7 h-7 rounded-lg">
+      <span class="flex flex-col leading-tight"><span class="font-bold text-[15px] text-indigo-700 tracking-tight">Followup</span><span class="text-[10px] text-gray-400">進行管理エージェント</span></span>
     </a>
     <nav class="flex-1 px-3 py-2 text-sm overflow-y-auto scrollbar-thin">
       {% set groups = [
@@ -356,7 +357,7 @@ function shell() {
     async refresh() {
       try { const r = await fetch('/api/agent/status'); const j = await r.json(); this.agent = j.state; } catch (e) {}
       try { const r = await fetch('/api/notifications/count'); const n = (await r.json()).count;
-        if (this.notifInit && n > this.notif) { this.toast('新しい通知が ' + (n - this.notif) + ' 件あります'); this.desktopNotify('進行管理エージェント', '新しい通知が ' + (n - this.notif) + ' 件あります'); }
+        if (this.notifInit && n > this.notif) { this.toast('新しい通知が ' + (n - this.notif) + ' 件あります'); this.desktopNotify('Followup', '新しい通知が ' + (n - this.notif) + ' 件あります'); }
         this.notif = n; this.notifInit = true; } catch (e) {}
     },
     notifInit: false,

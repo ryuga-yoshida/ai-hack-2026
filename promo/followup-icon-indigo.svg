@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Followup icon</title>
+  <desc id="desc">Indigo checkmark with a circular follow-up arrow.</desc>
+  <rect width="256" height="256" fill="#FFFFFF"/>
+  <g fill="none" stroke="#4F46E5" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M196 82C169 31 107 17 61 45C9 76 9 149 57 181C99 209 157 195 185 152"/>
+    <path d="M164 150L186 152L181 129"/>
+    <path d="M75 116L110 151L184 69"/>
+  </g>
+</svg>

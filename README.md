@@ -1,4 +1,6 @@
-# 進行管理エージェント
+<p><img src="app/web/static/brand/followup-logo-indigo-nobg.svg" alt="Followup" width="360"></p>
+
+# Followup — 進行管理エージェント
 
 議事録・チャット・タスク・成果物を横断し、**「決定されたこと」と「実際に作られているもの」の食い違いを自律的に検知する** AI エージェント。AI HACK 2026 提出作品。
 

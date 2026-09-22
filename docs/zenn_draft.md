@@ -1,16 +1,18 @@
 ---
-title: "進行管理をエージェントに任せる — 議事録・タスク・進捗・成果物・Wiki を自動で揃え、矛盾を検知する（AI HACK 2026）"
+title: "Followup — 進行管理をエージェントに任せる。議事録・タスク・進捗・成果物・Wiki を自動で揃え、矛盾を検知する（AI HACK 2026）"
 emoji: "🗂️"
 type: "tech"
 topics: ["ai", "llm", "python", "fastapi", "hackathon"]
 published: false
 ---
 
+![Followup](/images/followup-logo.png)
+
 ## 概要
 
 | 項目 | 内容 |
 |---|---|
-| 作ったもの | 進行管理エージェント。会議・チャット・成果物を監視し、議事録化・タスク化・進捗追跡・版管理・Wiki 更新・矛盾検知を自動で行う |
+| 作ったもの | **Followup**（進行管理エージェント）。会議・チャット・成果物を監視し、議事録化・タスク化・進捗追跡・版管理・Wiki 更新・矛盾検知を自動で行う |
 | イベント | AI HACK 2026（テーマ: 業務を自律化する AI エージェント）。個人参加 |
 | デモ | https://agent.leadus-nova.com/ （ID `suzuki@aoba-beverage.example` ／ PW `aoba2026`） |
 | コード | https://github.com/ryuga-yoshida/ai-hack-2026 。API キー不要で検知まで再現可 |

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800" viewBox="0 0 1600 800" role="img" aria-labelledby="title desc">
+  <title id="title">Followup logo, reverse</title>
+  <desc id="desc">White Followup wordmark with a checkmark and circular follow-up arrow icon on an indigo background.</desc>
+  <rect width="1600" height="800" fill="#312E81"/>
+  <g transform="translate(400 300)" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M162 58C137 11 82 0 40 25C-8 54-9 124 35 153C74 179 127 166 153 128"/>
+    <path d="M132 125L154 128L149 105"/>
+    <path d="M52 92L82 122L145 54"/>
+  </g>
+  <text x="610" y="452" fill="#FFFFFF" font-family="Inter, Manrope, Arial, sans-serif" font-size="180" font-weight="600" letter-spacing="-8">Followup</text>
+</svg>
