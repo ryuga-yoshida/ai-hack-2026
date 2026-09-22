@@ -265,7 +265,8 @@ class MeetAdapter:
                 events += self._fetch_drive(since)
             except Exception as e:   # 実接続で詰まったらフォールバックだけで進める
                 log.warning("Drive API failed (%s) → fixtures にフォールバック", e)
-        events += self._fetch_fixtures(since)         # 架空データ（デモ・評価用）
+        if not config.BLANK_START:
+            events += self._fetch_fixtures(since)     # 架空データ（デモ・評価用）
         return events
 
     def _fetch_own(self, since: datetime | None) -> list[Event]:

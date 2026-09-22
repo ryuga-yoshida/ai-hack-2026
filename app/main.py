@@ -2477,7 +2477,7 @@ async def _bind_loop():
     autostart = os.getenv("AGENT_AUTOSTART", "0") == "1"
 
     def boot():
-        if empty:
+        if empty and not config.BLANK_START:
             agent.reset_demo()   # 空の環境 → 架空データを投入してキャッシュ再生（巡回と同時に走らせない）
         if autostart:
             agent.set_enabled(True, int(os.getenv("AGENT_INTERVAL", "60")))
@@ -2663,7 +2663,9 @@ def manual_tick(request: Request, background: BackgroundTasks):
         except Exception as e:
             agent.say(f"tick 失敗: {e}")
 
-    background.add_task(run)
+    # 自動巡回が動いていれば巡回スレッドに任せる（同じ変更を 2 本の巡回が同時に判定しないように）
+    if not agent.request_tick("手動"):
+        background.add_task(run)
     if "application/json" in request.headers.get("accept", ""):
         return {"ok": True}
     return RedirectResponse(request.headers.get("referer") or "/agent", status_code=303)
@@ -2671,7 +2673,7 @@ def manual_tick(request: Request, background: BackgroundTasks):
 
 # ---------- 成果物（SharePoint のドキュメントライブラリ代替） ----------
 
-LIB = lambda: config.FIXTURES_DIR / "excel"
+LIB = lambda: config.LIBRARY_DIR
 FILE_ICON = {".xlsx": ("X", "bg-emerald-100 text-emerald-700"), ".docx": ("W", "bg-sky-100 text-sky-700"),
              ".pptx": ("P", "bg-orange-100 text-orange-700"), ".pdf": ("PDF", "bg-red-100 text-red-700"),
              ".md": ("MD", "bg-gray-200 text-gray-700"), ".txt": ("TXT", "bg-gray-200 text-gray-700"),
@@ -3011,9 +3013,9 @@ def artifact_diff(request: Request, rel: str):
     """この版で何が変わったか（人間向け）。差分エンジンの出力と、それに対する検知を並べる"""
     from app.connectors.excel import version_series
     conn = get_conn()
-    root = LIB()
+    root = LIB().resolve()
     path = (root / _safe_rel(rel)).resolve()
-    if not path.is_file() or root.resolve() not in path.parents:
+    if not path.is_file() or root not in path.parents:
         raise HTTPException(404)
     m = re.match(r"^(?P<base>.+)_v(?P<ver>\d+)(?P<ext>\.[A-Za-z0-9]+)$", path.name)
     key = str(path.parent.relative_to(root) / m["base"]) if str(path.parent.relative_to(root)) != "." else m["base"]

@@ -23,6 +23,9 @@ ARTIFACT_WATCH_DIR = os.getenv("ARTIFACT_WATCH_DIR", "")
 ARTIFACT_WATCH_ACTOR = os.getenv("ARTIFACT_WATCH_ACTOR", "山田")   # 監視フォルダ経由の更新者（OneDrive は更新者を教えてくれない）
 
 FIXTURES_DIR = ROOT / "fixtures"
+_lib = os.getenv("LIBRARY_DIR", "")
+LIBRARY_DIR = (Path(_lib) if Path(_lib).is_absolute() else ROOT / _lib) if _lib else FIXTURES_DIR / "excel"   # 成果物ライブラリ（版フォルダ）
+BLANK_START = os.getenv("BLANK_START", "0") == "1"   # 空の環境でも架空データを投入しない（まっさらな立ち上げデモ用）
 
 # --- 紐付け ---
 LINK_CONTEXT_WINDOW_MIN = 30      # 会話文脈を継承する時間

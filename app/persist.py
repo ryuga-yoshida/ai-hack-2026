@@ -23,7 +23,7 @@ def _client():
 
 
 def _paths() -> list:
-    return [config.DB_PATH.parent, config.FIXTURES_DIR / "excel"]
+    return [config.DB_PATH.parent, config.LIBRARY_DIR]
 
 
 def _make_tar() -> bytes:

@@ -45,7 +45,7 @@ class ExcelAdapter:
 
     def __init__(self, dir_: Path | None = None, actor: str | None = None,
                  changed_at: dict[str, datetime] | None = None):
-        self.dir = dir_ or (config.FIXTURES_DIR / "excel")
+        self.dir = dir_ or (config.LIBRARY_DIR)
         self.actor = actor
         # {新版ファイル名: 変更日時}。未指定なら versions.json → ファイルの更新時刻の順
         self.changed_at = changed_at or {}
@@ -91,7 +91,7 @@ def register_version(data: bytes, rel_path: str, actor: str, dest_dir: Path | No
     rel_path はライブラリ直下からの相対パス（例: 商品企画/売上見込.xlsx）。
     直前の版と内容が同じなら何もしない"""
     import hashlib
-    dest_dir = dest_dir or (config.FIXTURES_DIR / "excel")
+    dest_dir = dest_dir or (config.LIBRARY_DIR)
     rel = Path(rel_path)
     stem, ext = re.sub(r"_v\d+$", "", rel.stem), rel.suffix.lower()
     key = str(rel.parent / stem) if str(rel.parent) != "." else stem

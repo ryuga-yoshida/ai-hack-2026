@@ -126,7 +126,7 @@ def request_tick(reason: str) -> bool:
 
 
 def _excel_signature() -> dict[str, float]:
-    d = config.FIXTURES_DIR / "excel"
+    d = config.LIBRARY_DIR
     return {str(p.relative_to(d)): p.stat().st_mtime for p in d.rglob("*")
             if p.is_file() and p.name != "versions.json" and not any(part.startswith(".") for part in p.relative_to(d).parts)} if d.exists() else {}
 
@@ -551,8 +551,17 @@ def propose_agenda(conn, attendees: list[str], now: datetime | None = None, limi
 
 # ---------- ループ本体 ----------
 
+_tick_lock = threading.Lock()   # 巡回は同時に 1 本だけ（手動・イベント・定期が重なっても直列に）
+
+
 def tick(conn: sqlite3.Connection, now: datetime | None = None,
          events_override: list[Event] | None = None, trigger: str = "auto") -> TickResult:
+    with _tick_lock:
+        return _tick(conn, now, events_override, trigger)
+
+
+def _tick(conn: sqlite3.Connection, now: datetime | None,
+          events_override: list[Event] | None, trigger: str) -> TickResult:
     global _log_conn, _live_tick
     router.bind(conn)
     _log_conn = conn
@@ -626,7 +635,7 @@ def mirror_to_watch_dir(version_path) -> None:
     if not d.exists():
         return
     vp = Path(version_path)
-    root = config.FIXTURES_DIR / "excel"
+    root = config.LIBRARY_DIR
     rel_dir = vp.parent.relative_to(root) if vp.is_relative_to(root) else Path(".")
     base = _re.sub(r"_v\d+(?=\.[A-Za-z0-9]+$)", "", vp.name)
     dest = d / rel_dir / base
@@ -680,7 +689,7 @@ def reset_demo() -> dict:
         db.init_db(conn)
         _log_conn = conn
         say("action: デモをリセットします（DB 初期化 → 版の復元 → キャッシュ再生）")
-        root = config.FIXTURES_DIR / "excel"
+        root = config.LIBRARY_DIR
         try:
             subprocess.run(["git", "checkout", "--", str(root)], cwd=str(config.FIXTURES_DIR.parent), capture_output=True, timeout=30)
             subprocess.run(["git", "clean", "-fdq", str(root)], cwd=str(config.FIXTURES_DIR.parent), capture_output=True, timeout=30)

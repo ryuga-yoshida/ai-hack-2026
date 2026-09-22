@@ -81,8 +81,8 @@
 </div>
 <p class="text-xs text-gray-500 mt-2">点線＝日付未設定（仮置き・ドラッグで確定）。灰の矢印＝依存（先に終わる必要がある）。赤の破線＝依存先の期限がこのタスクの期限より後（順序が破綻）。バーをドラッグして日付を変更、端をつかんで期間を変更。依存はタスク詳細で追加します。</p>
 {% elif view == 'list' %}
-<form method="post" action="/tasks/bulk" x-data="bulk()" id="bulkForm">
-<div x-show="sel.length" x-cloak class="sticky top-0 z-20 mb-2 flex items-center gap-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
+<div x-data="bulk()">
+<form id="bulkForm" method="post" action="/tasks/bulk" x-show="sel.length" x-cloak class="sticky top-0 z-20 mb-2 flex items-center gap-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
   <span class="font-semibold" x-text="sel.length + ' 件を選択中'"></span>
   <span class="text-gray-400">→</span>
   <select name="action" x-model="act" class="text-gray-900 rounded px-1 py-0.5">
@@ -92,7 +92,7 @@
   <input type="hidden" name="value" :value="val">
   <button type="submit" @click="if (act === 'delete' && !confirm(sel.length + ' 件を削除しますか？')) $event.preventDefault()" class="bg-indigo-500 hover:bg-indigo-400 rounded px-3 py-0.5 font-semibold">適用</button>
   <button type="button" @click="sel = []; all = false" class="ml-auto text-gray-400 hover:text-white">選択解除</button>
-</div>
+</form>
 <div class="bg-white border border-gray-200 rounded-xl overflow-x-auto">
   <table class="w-full min-w-[1100px] text-sm">
     <thead class="bg-gray-50 text-xs text-gray-500 text-left">
@@ -107,7 +107,7 @@
     <tbody>
     {% for m in rows %}{% set t = m.task %}
       <tr class="border-t border-gray-100 hover:bg-gray-50 {% if t.status == 'done' %}text-gray-400{% endif %}" :class="sel.includes('{{ t.id }}') && 'bg-indigo-50'">
-        <td class="pl-4 pr-1 py-2"><input type="checkbox" name="ids" value="{{ t.id }}" x-model="sel"></td>
+        <td class="pl-4 pr-1 py-2"><input type="checkbox" name="ids" value="{{ t.id }}" form="bulkForm" x-model="sel"></td>
         <td class="px-3 py-2 min-w-[260px]"><a href="/tasks/{{ t.id }}" class="font-medium hover:underline">{{ t.title }}</a>{% if m.origin %}<div class="text-[11px] text-gray-400">{{ '会議' if m.origin.source == 'meet' else 'チャット' }}から自動生成</div>{% endif %}</td>
         <td class="px-3 py-2"><select onchange="window.shellPatch('/tasks/{{ t.id }}', {priority: this.value}, '優先度を更新しました')" class="text-xs border-0 bg-transparent hover:bg-gray-100 rounded px-1 py-0.5 cursor-pointer">{% for k, l in PRIORITIES %}<option value="{{ k }}" {% if k == t.priority %}selected{% endif %}>{{ {'urgent':'','high':'','normal':'','low':''}[k] }} {{ l }}</option>{% endfor %}</select></td>
         <td class="px-3 py-2">
@@ -130,7 +130,7 @@
     </tbody>
   </table>
 </div>
-</form>
+</div>
 {% else %}
 <div class="grid grid-cols-5 gap-4 min-w-[1150px]" x-data="kanban()">
 {% for status, label in STATUSES %}

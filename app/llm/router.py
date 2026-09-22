@@ -145,8 +145,18 @@ def _record(task: str, tier: str, usage: dict) -> None:
     if _conn is None:
         return
     with _lock:
-        cost.record(_conn, task, model_for(tier), tier,
-                    int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0)))
+        try:
+            cost.record(_conn, task, model_for(tier), tier,
+                        int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0)))
+        except sqlite3.ProgrammingError:
+            # bind された接続が別スレッドのもの（巡回スレッド vs リクエスト）なら、この記録だけ別接続で行う
+            from app import db as _db
+            c = _db.connect()
+            try:
+                cost.record(c, task, model_for(tier), tier,
+                            int(usage.get("prompt_tokens", 0)), int(usage.get("completion_tokens", 0)))
+            finally:
+                c.close()
 
 
 # ---------- 公開 API ----------

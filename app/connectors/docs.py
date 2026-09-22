@@ -91,7 +91,7 @@ class DocsAdapter:
     name = "docs"
 
     def __init__(self, dir_: Path | None = None):
-        self.dir = dir_ or (config.FIXTURES_DIR / "excel")
+        self.dir = dir_ or (config.LIBRARY_DIR)
         vp = self.dir / "versions.json"
         self.versions = json.loads(vp.read_text(encoding="utf-8")) if vp.exists() else {}
 
