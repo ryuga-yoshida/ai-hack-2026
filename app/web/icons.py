@@ -60,5 +60,5 @@ PATHS = {
 def icon(name: str, cls: str = "w-4 h-4", title: str | None = None) -> Markup:
     d = PATHS.get(name, PATHS["dot"])
     t = f"<title>{title}</title>" if title else ""
-    return Markup(f'<svg class="{cls} inline-block align-[-0.15em] shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" '
+    return Markup(f'<svg class="{cls} inline-block align-[-0.15em] shrink-0" fill="none" stroke="currentColor" stroke-width="2" '
                   f'stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">{t}<path d="{d}"/></svg>')

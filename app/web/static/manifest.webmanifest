@@ -1,0 +1,16 @@
+{
+  "name": "Followup — 進行管理エージェント",
+  "short_name": "Followup",
+  "description": "議事録化・タスク化・進捗追跡・版管理・Wiki 更新・矛盾検知を、人の指示なしで行う進行管理エージェント",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4F46E5",
+  "lang": "ja",
+  "icons": [
+    {"src": "/static/brand/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/static/brand/followup-app-icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}
