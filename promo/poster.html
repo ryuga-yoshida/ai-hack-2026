@@ -22,9 +22,9 @@
   .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7mm; align-items: stretch; }
   .tile { background: #fff; border: 4px solid #e5e7eb; border-radius: 26px; padding: 8mm 6mm 7mm; position: relative; }
   .tile .no { position: absolute; left: 6mm; top: 6mm; width: 46px; height: 46px; border-radius: 50%; background: #4f46e5; color: #fff; font-size: 26px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
-  .tile .ic { width: 140px; height: 140px; margin: 4mm auto 2mm; display: block; }
+  .tile .ic { width: 160px; height: 160px; margin: 5mm auto 3mm; display: block; }
   .tile .nm { text-align: center; font-size: 46px; font-weight: 800; margin-bottom: 5mm; letter-spacing: -.01em; }
-  .lane { border-radius: 14px; padding: 3.5mm 4.5mm; font-size: 28px; line-height: 1.38; margin-top: 3mm; min-height: 34mm; }
+  .lane { border-radius: 14px; padding: 4mm 4.5mm; font-size: 30px; line-height: 1.38; margin-top: 3.5mm; min-height: 40mm; }
   .lane.h { background: #f3f4f6; color: #374151; }
   .lane.a { background: #eef2ff; color: #1e1b4b; }
   .lane .tag { display: inline-block; font-size: 23px; font-weight: 800; letter-spacing: .1em; padding: 1px 8px; border-radius: 8px; margin-bottom: 2mm; }
@@ -49,9 +49,9 @@
 
   /* 仕組み 1 行 */
   .chips { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; gap: 5mm; align-items: center; }
-  .chip { background: #f9fafb; border: 4px solid #e5e7eb; border-radius: 22px; padding: 6mm 8mm; text-align: center; }
-  .chip b { display: block; font-size: 42px; margin-bottom: 2mm; }
-  .chip span { font-size: 28px; color: #6b7280; line-height: 1.4; display: block; }
+  .chip { background: #f9fafb; border: 4px solid #e5e7eb; border-radius: 22px; padding: 8mm 8mm; text-align: center; }
+  .chip b { display: block; font-size: 46px; margin-bottom: 2mm; }
+  .chip span { font-size: 30px; color: #6b7280; line-height: 1.4; display: block; }
   .chip.ai { background: #eef2ff; border-color: #c7d2fe; } .chip.ai b { color: #3730a3; }
   .chip.red { background: #fef2f2; border-color: #fecaca; } .chip.red b { color: #b91c1c; }
   .arr { font-size: 60px; color: #6366f1; font-weight: 800; }
@@ -59,6 +59,11 @@
   .safe div { flex: 1; background: #fff; border: 4px solid #e5e7eb; border-radius: 22px; padding: 5mm 9mm; font-size: 29px; line-height: 1.45; }
   .safe div b { display: block; color: #4f46e5; font-size: 34px; margin-bottom: 2mm; }
 
+  .can { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10mm; }
+  .can .c { background: #fff; border: 5px solid #e0e7ff; border-radius: 28px; padding: 10mm 11mm 10mm; }
+  .can .il { width: 100%; height: 58mm; display: block; margin-bottom: 5mm; }
+  .can b { display: block; font-size: 52px; color: #1e1b4b; line-height: 1.25; margin-bottom: 4mm; letter-spacing: -.01em; }
+  .can p { margin: 0; font-size: 34px; line-height: 1.5; color: #374151; }
   .foot { position: absolute; left: 0; right: 0; bottom: 0; background: #111827; color: #fff; padding: 10mm 30mm; display: flex; align-items: center; gap: 16mm; }
   .foot .qr { background: #fff; padding: 4mm; border-radius: 12px; text-align: center; }
   .foot .qr img { width: 46mm; height: 46mm; display: block; }
@@ -119,21 +124,6 @@
   </div>
 
   <div class="sec">
-    <div class="two">
-      <div class="quote"><div class="lab">エージェントが見つけた矛盾（架空データでの実際の通知）</div>
-        「9/15 の定例で『それ以外の数字は変更しない』と決まっていますが、山田さんが 9/18 に更新した見込み表では商品Aの第3四半期が <b style="color:#b91c1c">1200 → 1500</b> に変わっています。」
-        <div class="ev"><b>根拠 3 点</b>　① 9/15 会議の発言（原文）　② 9/18 チャットの共有　③ セル 売上見込!D5 の差分</div>
-      </div>
-      <div class="nums">
-        <div class="num green"><b>9/10</b><span>評価セット<br>検知率・誤検知 0</span></div>
-        <div class="num"><b>8秒</b><span>Excel 保存<br>→ 通知</span></div>
-        <div class="num amber"><b>-59%</b><span>LLM コスト<br>$0.84（全 Opus $2.07）</span></div>
-        <div class="num"><b>0回</b><span>人に確認を<br>求めた回数</span></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="sec">
     <h2>仕組み</h2>
     <div class="chips">
       <div class="chip"><b>5 つの入力</b><span>会議・チャット・メール<br>Wiki・成果物</span></div>
@@ -144,10 +134,26 @@
       <div class="arr">→</div>
       <div class="chip red"><b>LLM は最後だけ</b><span>Opus が 1 件ずつ判定<br>抽出は Gemini Flash</span></div>
     </div>
-    <div class="safe">
-      <div><b>書かない</b>エージェントは通知と提案まで。書き換えは人が承認</div>
-      <div><b>送らない</b>人名・メール・電話はマスクしてから LLM へ</div>
-      <div><b>作らない</b>引用が原文に無いタスクは幻覚として破棄</div>
+  </div>
+
+  <div class="sec">
+    <h2>できること</h2>
+    <div class="can">
+      <div class="c">
+        <svg viewBox="0 0 320 90" class="il"><g stroke="#4f46e5" stroke-width="4" fill="#fff"><line x1="30" y1="45" x2="290" y2="45"/><circle cx="40" cy="45" r="14"/><circle cx="120" cy="45" r="14"/><circle cx="200" cy="45" r="14"/><circle cx="280" cy="45" r="14" fill="#4f46e5"/></g><g font-size="17" fill="#374151" text-anchor="middle" font-family="Hiragino Sans, sans-serif"><text x="40" y="82">会議の決定</text><text x="120" y="82">タスク</text><text x="200" y="82">チャット</text><text x="280" y="82" fill="#4f46e5" font-weight="700">v3 更新</text></g></svg>
+        <b>全ての成果物の履歴が辿れる</b>
+        <p>会議の決定 → タスク → チャットの共有 → 版の更新が 1 本に繋がる。「なぜこの数字になったか」を誰でも遡れる</p>
+      </div>
+      <div class="c">
+        <svg viewBox="0 0 320 90" class="il"><g font-family="Hiragino Sans, sans-serif"><rect x="20" y="14" width="130" height="62" rx="12" fill="#fef2f2" stroke="#fecaca" stroke-width="3"/><text x="85" y="40" text-anchor="middle" font-size="18" font-weight="700" fill="#b91c1c">矛盾</text><text x="85" y="64" text-anchor="middle" font-size="13" fill="#7f1d1d">決定と食い違う変更</text><rect x="170" y="14" width="130" height="62" rx="12" fill="#fffbeb" stroke="#fde68a" stroke-width="3"/><text x="235" y="40" text-anchor="middle" font-size="18" font-weight="700" fill="#b45309">停滞</text><text x="235" y="64" text-anchor="middle" font-size="13" fill="#78350f">7日動きのないタスク</text></g></svg>
+        <b>矛盾・未実施のタスクを AI が指摘</b>
+        <p>決定と食い違う変更、根拠のない変更、止まっているタスクを、人が聞く前に根拠つきで通知する</p>
+      </div>
+      <div class="c">
+        <svg viewBox="0 0 320 90" class="il"><g font-family="Hiragino Sans, sans-serif" font-size="15" text-anchor="middle"><rect x="14" y="16" width="86" height="30" rx="8" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/><text x="57" y="36" fill="#3730a3">チャット</text><rect x="117" y="16" width="86" height="30" rx="8" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/><text x="160" y="36" fill="#3730a3">会議室</text><rect x="220" y="16" width="86" height="30" rx="8" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/><text x="263" y="36" fill="#3730a3">Wiki</text><rect x="14" y="52" width="86" height="30" rx="8" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/><text x="57" y="72" fill="#3730a3">メール</text><rect x="117" y="52" width="86" height="30" rx="8" fill="#eef2ff" stroke="#c7d2fe" stroke-width="2"/><text x="160" y="72" fill="#3730a3">予定表</text><rect x="220" y="52" width="86" height="30" rx="8" fill="#4f46e5"/><text x="263" y="72" fill="#fff" font-weight="700">タグ・チーム</text></g></svg>
+        <b>管理が一元化される</b>
+        <p>チャット・メール・予定表・会議室・Wiki・成果物が 1 つに。タグとチームで、案件ごと・部署ごとに横断して見られる</p>
+      </div>
     </div>
   </div>
 
