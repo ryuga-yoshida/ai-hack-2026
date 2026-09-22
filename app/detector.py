@@ -216,13 +216,23 @@ def _task_for_pair(conn: sqlite3.Connection, decision: Event, change: Event) -> 
 
 # ---------- 第2段: 上位モデルによる判定 ----------
 
+def can_override(decision: Event, other: Event) -> bool:
+    """other が decision を上書きする決定として扱えるか。
+    会議で決めたことを、チャットの発言（決めた本人以外）が上書きしたことにはしない。
+    「得意先の要望で増やしました」のような報告が『後の決定』扱いになると、矛盾を見逃す"""
+    if other.source != "chat" or decision.source == "chat":
+        return True
+    return bool(decision.actor) and other.actor == decision.actor
+
+
 def later_decisions(conn: sqlite3.Connection, decision: Event, change: Event,
                     candidates: list[Event]) -> list[Event]:
     """decision より後・change より前の関連する決定（候補リストとタスクに紐付く決定から）"""
-    out = {d.id: d for d in candidates if decision.occurred_at < d.occurred_at <= change.occurred_at}
+    out = {d.id: d for d in candidates
+           if decision.occurred_at < d.occurred_at <= change.occurred_at and can_override(decision, d)}
     if task := task_for_artifact(conn, change.ref):
         for d in decisions_for_task(conn, task):
-            if decision.occurred_at < d.occurred_at <= change.occurred_at:
+            if decision.occurred_at < d.occurred_at <= change.occurred_at and can_override(decision, d):
                 out[d.id] = d
     return sorted(out.values(), key=lambda d: d.occurred_at)
 
@@ -323,7 +333,7 @@ def detect_for_change(conn: sqlite3.Connection, change: Event) -> Finding | None
                                         change=change)
         later = later_decisions(conn, decision, change, candidates)
         others = [d for d in candidates if d.id != decision.id and d.occurred_at <= change.occurred_at
-                  and d.id not in {x.id for x in later}]
+                  and d.id not in {x.id for x in later} and can_override(decision, d)]
         explain.update({"utterances": len(utterances), "later": len(later), "others": len(others)})
         result = judge(conn, decision, change, utterances, later, others)  # 第2段：LLM 判定
         explain["judged"] += 1

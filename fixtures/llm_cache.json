@@ -20291,5 +20291,656 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "extract"
+ },
+ "b75f0c578fc32fa98b887e78": {
+  "tier": "mid",
+  "content": "{\"items\": []}",
+  "usage": {
+   "prompt_tokens": 292,
+   "completion_tokens": 291,
+   "total_tokens": 583,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 292,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 4,
+    "audio_tokens": 0,
+    "reasoning_tokens": 287
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "fcab04ba8283ba80ae63418b": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"初回ロットを300ケースと確定する\",\n      \"actor\": \"<PERSON_1>\",\n      \"quote\": \"分かりました。初回ロットは300ケースで確定します。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"decision\",\n      \"text\": \"第4四半期の売上見込を450ケースで確定する\",\n      \"actor\": \"<PERSON_1>\",\n      \"quote\": \"では第4四半期は450で確定。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"売上見込表の初版を今週中に作成しライブラリにアップロードする\",\n      \"actor\": \"<PERSON_2>\",\n      \"quote\": \"<PERSON_2>さん、売上見込表の初版を今週中に作ってライブラリに上げてください。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"原価試算を来週の定例までに提出する\",\n      \"actor\": \"<PERSON_3>\",\n      \"quote\": \"<PERSON_3>さん、原価試算を来週の定例までにお願いします。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"主要得意先3社にヒアリングし、結果を来週共有する\",\n      \"actor\": \"<PERSON_4>\",\n      \"quote\": \"<PERSON_4>さんは主要得意先3社にヒアリングして、結果を来週共有してください。\",\n      \"confidence\": 1.0\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 741,
+   "completion_tokens": 1608,
+   "total_tokens": 2349,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 741,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 416,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1192
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "c8c7bfd687410d045d01636e": {
+  "tier": "mid",
+  "content": "{\n  \"purpose\": \"11月発売の商品X（青葉りんごソーダ）立ち上げに向けた数値および担当の決定\",\n  \"agenda\": [\n    {\n      \"topic\": \"初回ロット数\",\n      \"summary\": \"製造側の上限条件を踏まえ検討した。\",\n      \"outcome\": \"確定（初回ロット300ケース）\"\n    },\n    {\n      \"topic\": \"売上見込\",\n      \"summary\": \"第3四半期は0、第4四半期は450ケースとし、得意先からの増量要望があっても見込みを変更しない方針となった。\",\n      \"outcome\": \"確定（第4四半期450ケース）\"\n    }\n  ],\n  \"open_issues\": [],\n  \"next\": [\n    \"PERSON_2: 今週中に売上見込表の初版を作成しライブラリへ格納\",\n    \"PERSON_3: 来週の定例までに原価試算を提出\",\n    \"PERSON_4: 来週までに主要得意先3社へヒアリングを実施し結果を共有\"\n  ],\n  \"mood\": \"円滑で迅速\"\n}",
+  "usage": {
+   "prompt_tokens": 762,
+   "completion_tokens": 1222,
+   "total_tokens": 1984,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 762,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 265,
+    "audio_tokens": 0,
+    "reasoning_tokens": 957
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "summarize"
+ },
+ "776e18a9c19966c1d9d9b8eb": {
+  "tier": "mid",
+  "content": "{\n  \"items\": []\n}",
+  "usage": {
+   "prompt_tokens": 372,
+   "completion_tokens": 454,
+   "total_tokens": 826,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 372,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 9,
+    "audio_tokens": 0,
+    "reasoning_tokens": 445
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "84fc602665ea3d30fbf72c1f": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"得意先の要望に伴い第4四半期を増量する\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"得意先の要望で第4四半期を増量\",\n      \"confidence\": 0.85\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 365,
+   "completion_tokens": 824,
+   "total_tokens": 1189,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 365,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 86,
+    "audio_tokens": 0,
+    "reasoning_tokens": 738
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "44b4d69baa8d9fbbd1a5e368": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.8,\n  \"reason\": \"商品Xの第4四半期売上見込という同一対象であり、450から500への増量は「得意先の要望に伴い第4四半期を増量する」という決定を正しく反映した変更で、この決定は先行する450確定の決定を上書きしている。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1111,
+   "completion_tokens": 132,
+   "total_tokens": 1243,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 593,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1111,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 593,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "bced7cb9a9a48bf7b4bb6ecc": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.5,\n  \"reason\": \"決定事項と変更はどちらも商品Xの第4四半期売上見込という同一対象だが、変更直前に「得意先の要望に伴い第4四半期を増量する」という後続決定があり、会話でも増量理由が共有されているため、450確定の上書きとみなせる。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1107,
+   "completion_tokens": 268,
+   "total_tokens": 1375,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 589,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1107,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 589,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "198fe454222e4ca71934aa9d": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"今期の見込みは変更しない\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"会議で今期の見込みは変更しないと決めたので\",\n      \"confidence\": 0.95\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"第4四半期の数字を会議の数字に戻す\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"第4四半期は会議の数字に戻してください。\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 301,
+   "completion_tokens": 877,
+   "total_tokens": 1178,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 301,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 150,
+    "audio_tokens": 0,
+    "reasoning_tokens": 727
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "17c91f55d1d27fdbed9dea97": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"task\",\n      \"text\": \"修正されたファイル（商品X_売上見込.xlsx）の確認\",\n      \"actor\": \"\",\n      \"quote\": \"確認お願いします\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 365,
+   "completion_tokens": 1437,
+   "total_tokens": 1802,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 365,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 73,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1364
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "e4d59fb57664b0f8febe8665": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"商品Xの第4四半期という同一対象の変更だが、13:15の「450ケースで確定」という決定と、会議の数字に戻すよう求めた<PERSON_1>の指示に基づく差し戻しであり、誤った増量の取り消しにあたる。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1344,
+   "completion_tokens": 158,
+   "total_tokens": 1502,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 826,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1344,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 826,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "b054dd0b61884305cec54fe9": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.9,\n  \"reason\": \"商品Xの第4四半期売上見込という同一対象の変更であり、500→450 は決定事項どおりの数値に戻す修正である。途中の増量決定も <PERSON_1> の指示（今期の見込みは変更しない、会議の数字に戻す）で撤回され、会話でも合意されている。\",\n  \"severity\": \"low\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1340,
+   "completion_tokens": 168,
+   "total_tokens": 1508,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 822,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1340,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 822,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "34ee049b60ed1d8db7a5febb": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"確認を完了とし、対応を完了とすること\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"確認しました。これで OK です。完了にしてください。\",\n      \"confidence\": 0.95\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 277,
+   "completion_tokens": 525,
+   "total_tokens": 802,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 277,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 80,
+    "audio_tokens": 0,
+    "reasoning_tokens": 445
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "10ec23954d31397e25022100": {
+  "tier": "mid",
+  "content": "{\"items\": []}",
+  "usage": {
+   "prompt_tokens": 292,
+   "completion_tokens": 478,
+   "total_tokens": 770,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 292,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 5,
+    "audio_tokens": 0,
+    "reasoning_tokens": 473
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "4abfcb750d4bf357b9affadd": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"初回ロットを300ケースとする\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"初回ロットは300ケースで確定します。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"decision\",\n      \"text\": \"第4四半期の売上見込は450ケースとし、得意先から増量の要望があっても変更しない\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"では第4四半期は450で確定。得意先から増量の要望が来ても、今期の見込みは450から変更しないでください。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"売上見込表の初版を今週中に作成してライブラリに上げる\",\n      \"actor\": \"PERSON_2\",\n      \"quote\": \"<PERSON_2>さん、売上見込表の初版を今週中に作ってライブラリに上げてください。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"原価試算を来週の定例までに作成する\",\n      \"actor\": \"PERSON_3\",\n      \"quote\": \"<PERSON_3>さん、原価試算を来週の定例までにお願いします。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"主要得意先3社にヒアリングし、結果を来週共有する\",\n      \"actor\": \"PERSON_4\",\n      \"quote\": \"<PERSON_4>さんは主要得意先3社にヒアリングして、結果を来週共有してください。\",\n      \"confidence\": 1.0\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 741,
+   "completion_tokens": 1211,
+   "total_tokens": 1952,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 741,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 440,
+    "audio_tokens": 0,
+    "reasoning_tokens": 771
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "723d936380d0d28bcc3ccf85": {
+  "tier": "mid",
+  "content": "{\n  \"purpose\": \"商品X（青葉りんごソーダ）の11月発売に向けた数値と担当の決定\",\n  \"agenda\": [\n    {\n      \"topic\": \"初回ロットおよび売上見込の確定\",\n      \"summary\": \"製造条件の初回ロット上限300ケースを確認し確定。第4四半期の売上見込は得意先からの増量要望にかかわらず450ケースで確定。\",\n      \"outcome\": \"決定（初回ロット300ケース、第4四半期見込450ケース）\"\n    }\n  ],\n  \"open_issues\": [],\n  \"next\": [\n    \"PERSON_2: 今週中に売上見込表の初版を作成しライブラリへアップロード\",\n    \"PERSON_3: 来週の定例までに原価試算を提出\",\n    \"PERSON_4: 来週の定例までに主要得意先3社へヒアリングし結果を共有\"\n  ],\n  \"mood\": \"円滑\"\n}",
+  "usage": {
+   "prompt_tokens": 762,
+   "completion_tokens": 1021,
+   "total_tokens": 1783,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 762,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 235,
+    "audio_tokens": 0,
+    "reasoning_tokens": 786
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "summarize"
+ },
+ "56c977f240bb33e8299569ac": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"第4四半期の売上見込を450とする\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"会議で決めた 第4四半期 450 で入れています\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 371,
+   "completion_tokens": 837,
+   "total_tokens": 1208,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 371,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 89,
+    "audio_tokens": 0,
+    "reasoning_tokens": 748
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "57a628ba922ecbc3178ccffc": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"得意先の要望に基づき、第4四半期の計画を増量する\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"得意先の要望で第4四半期を増量 https://aoba-beverage-example.sharepoint.com/sites/planning/Shared%20Documents/商品企画/商品X_売上見込.xlsx\",\n      \"confidence\": 0.85\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 365,
+   "completion_tokens": 1039,
+   "total_tokens": 1404,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 365,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 125,
+    "audio_tokens": 0,
+    "reasoning_tokens": 914
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "f7848314528a1ddaec22a19f": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.45,\n  \"reason\": \"変更対象は決定と同じ商品Xの第4四半期売上見込であり、直近の決定（得意先要望に基づく増量）を反映した450→500の変更なので、その決定との矛盾ではない。ただし13:20の「増量要望でも450から変更しない」という決定と併存しており、どちらが最終決定か明確でないため確信度は低い。\",\n  \"severity\": \"medium\"\n}",
+  "usage": {
+   "prompt_tokens": 1219,
+   "completion_tokens": 177,
+   "total_tokens": 1396,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 701,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1219,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 701,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "0d2b7d79a1be6537271ac691": {
+  "tier": "high",
+  "content": "```json\n{\n  \"same_subject\": true,\n  \"contradicts\": true,\n  \"confidence\": 0.6,\n  \"reason\": \"決定は商品Xの第4四半期売上見込を450とするもので、変更対象も同じセル（売上見込!E2）だが500に引き上げられている。直前の決定で「得意先から増量の要望があっても変更しない」と増量理由を明示的に排除しているため、<PERSON_2>による後続の増量決定が<PERSON_1>の制約を上書きできるかは不明確で、現時点では矛盾と判断する。\",\n  \"severity\": \"medium\"\n}\n```",
+  "usage": {
+   "prompt_tokens": 1164,
+   "completion_tokens": 343,
+   "total_tokens": 1507,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 646,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1164,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 646,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "51fd6ed13b7220978b05d3cc": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"今期の売上見込みは変更しない\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"会議で今期の見込みは変更しないと決めたので、第4四半期は会議の数字に戻してください。\",\n      \"confidence\": 0.9\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"第4四半期の数字を元の会議の数値に戻す\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"第4四半期は会議の数字に戻してください。\",\n      \"confidence\": 0.95\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"修正した売上見込ファイルの確認\",\n      \"actor\": \"PERSON_2\",\n      \"quote\": \"直しました。会議の数字に戻しています。確認お願いします http://localhost:8790/artifacts/file/商品企画/商品X_売上見込.xlsx\",\n      \"confidence\": 0.9\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 413,
+   "completion_tokens": 1232,
+   "total_tokens": 1645,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 413,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 256,
+    "audio_tokens": 0,
+    "reasoning_tokens": 976
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "650b8f8a33250290ae6a3a42": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.9,\n  \"reason\": \"変更は商品Xの第4四半期を会議で決めた450に戻すもので、決定事項（今期の見込みは変更しない＝第4四半期450）を正しく反映した誤変更の取り消しにあたる。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1454,
+   "completion_tokens": 133,
+   "total_tokens": 1587,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 936,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1454,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 936,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "7ec7937142c3a6a878c3355d": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.85,\n  \"reason\": \"商品Xの第4四半期という同一対象だが、13:24の「今期の売上見込みは変更しない」という後続決定とPERSON_1の指示により、会議で決めた450へ戻す変更として許可されている。誤った増量の取り消しに該当する。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1481,
+   "completion_tokens": 143,
+   "total_tokens": 1624,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 963,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1481,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 963,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "f5c935159112d0dfd7598e45": {
+  "tier": "high",
+  "content": "{\n  \"same_subject\": true,\n  \"contradicts\": false,\n  \"confidence\": 0.9,\n  \"reason\": \"商品Xの第4四半期売上見込という同一対象であり、500への増量を取り消して決定値450に戻す修正である。PERSON_1の「今期の見込みは変更しない」という後続決定とも一致する。\",\n  \"severity\": \"low\"\n}",
+  "usage": {
+   "prompt_tokens": 1431,
+   "completion_tokens": 129,
+   "total_tokens": 1560,
+   "usage_semantic": "openai",
+   "usage_source": "anthropic",
+   "prompt_tokens_details": {
+    "cached_tokens": 516,
+    "cached_creation_tokens": 913,
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 0,
+    "audio_tokens": 0,
+    "reasoning_tokens": 0
+   },
+   "input_tokens": 1431,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 913,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "judge"
+ },
+ "fc3799c0a195260065219e54": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"確認結果をOKとし、完了とすること\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"確認しました。これで OK です。完了にしてください。\",\n      \"confidence\": 0.9\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"ステータスを完了にすること\",\n      \"actor\": \"PERSON_1\",\n      \"quote\": \"完了にしてください。\",\n      \"confidence\": 0.85\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 278,
+   "completion_tokens": 675,
+   "total_tokens": 953,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 278,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 136,
+    "audio_tokens": 0,
+    "reasoning_tokens": 539
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
  }
 }
