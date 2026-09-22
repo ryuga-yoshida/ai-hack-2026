@@ -2592,8 +2592,11 @@ def agent_page(request: Request):
     from app.llm import cost
     processed = {r["stage"]: r["n"] for r in conn.execute("SELECT stage, COUNT(*) n FROM processed GROUP BY stage")}
     sync = {r["source"]: r["last_synced"] for r in conn.execute("SELECT * FROM sync_state")}
-    return render("agent.html", request, conn, logs=db.recent_logs(conn, limit=150), processed=processed,
-                  sync=sync, link=linker.method_breakdown(conn), cost=cost.summary(conn))
+    from app import agent as _ag
+    logs = [dict(l, role=_ag.role_of(l["message"])) for l in db.recent_logs(conn, limit=150)]
+    return render("agent.html", request, conn, logs=logs, processed=processed,
+                  sync=sync, link=linker.method_breakdown(conn), cost=cost.summary(conn), subagents=_ag.SUBAGENTS,
+                  digest=wiki_digest_status(conn))
 
 
 @app.get("/api/agent/llm_calls")
@@ -2635,7 +2638,8 @@ def agent_toggle(body: AgentToggle):
 @app.get("/api/agent/logs")
 def agent_logs(after_id: int = 0):
     conn = get_conn()
-    return {"logs": db.recent_logs(conn, after_id=after_id, limit=200)}
+    from app import agent as _ag
+    return {"logs": [dict(l, role=_ag.role_of(l["message"])) for l in db.recent_logs(conn, after_id=after_id, limit=200)]}
 
 
 @app.post("/tick")

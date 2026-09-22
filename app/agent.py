@@ -53,6 +53,43 @@ _file_sig: dict[str, float] = {}
 on_meeting_extracted: list = []   # (conn, meeting_id) を受けるコールバック。main.py が登録する
 on_tick_done: list = []           # (conn) 巡回の最後に呼ぶ（成果物ページの最新化など）
 
+# ---------- サブエージェント（役割を 1 つに絞った担当。順次実行し、互いの仕事はしない） ----------
+# 参考: 実装セッションの 3 体（実装／資料／テスト）を、進行管理の巡回に当てはめたもの。
+# 「やらないこと」を持たせることで、1 体に全部やらせたときの見落としと独断を減らす。
+SUBAGENTS = [
+    {"key": "fetch",   "name": "取込係",  "prefixes": ("meet", "chat", "mail", "excel", "docs", "wiki", "再生"),
+     "does": "5 つの情報源から新しい出来事だけを取り込み、同じ形式（Event）に揃える",
+     "doesnt": "内容の解釈・判断はしない", "llm": "不使用", "when": "毎巡回"},
+    {"key": "extract", "name": "抽出係",  "prefixes": ("extract", "embed"),
+     "does": "会議の発言から決定・タスク・懸念を抽出し、根拠の発言を引用する。担当者を発言から読む",
+     "doesnt": "引用が原文に無い項目は残さない。矛盾の判定はしない", "llm": "mid（抽出）／embed", "when": "新しい会議があるとき"},
+    {"key": "link",    "name": "紐付け係", "prefixes": ("link",),
+     "does": "発言・成果物の変更がどのタスクの話かを、URL・引用返信・@メンション・埋め込みの順で判定する",
+     "doesnt": "紐付かないものを無理に紐付けない。状態は変えない", "llm": "embed／最終段のみ mid", "when": "新しい発言・変更があるとき"},
+    {"key": "detect",  "name": "判定係",  "prefixes": ("detect", "FINDING", "review", "record", "suggest", "calendar"),
+     "does": "変更に関係する決定をコードで絞り込み、残った組だけ LLM で矛盾を判定する。停滞・根拠のない変更・状態更新の提案も出す",
+     "doesnt": "タスク・成果物・Wiki を書き換えない。confidence が低いものは通知しない", "llm": "high（判定のみ）", "when": "新しい変更があるとき・定期"},
+    {"key": "act",     "name": "通知係",  "prefixes": ("action", "trigger"),
+     "does": "判定結果を根拠 3 点つきで担当者に通知し、承認待ちの提案として置く",
+     "doesnt": "外部に送信しない。人の承認なしに適用しない", "llm": "不使用", "when": "判定が出たとき"},
+    {"key": "docs",    "name": "資料係",  "prefixes": ("wiki:",),
+     "does": "成果物の版の履歴・関連タスク・検知を Wiki に反映する。週 1 回、版が変わったファイルだけ中身を読み直して構造化する",
+     "doesnt": "人が書いた Wiki ページは編集しない。自分の書いたページは判定係の対象にしない", "llm": "mid（週 1・変更分のみ）", "when": "毎巡回／週 1 回"},
+]
+
+
+def role_of(message: str) -> str | None:
+    """ログ行の接頭辞からサブエージェントの key を返す（画面のバッジ用）"""
+    head = message.split(":", 1)[0].split("：", 1)[0].strip()
+    if message.startswith("action: Wiki") or message.startswith("action: 議事録ページ"):
+        return "docs"
+    for sa in SUBAGENTS:
+        if head in sa["prefixes"] or any(message.startswith(pfx) for pfx in sa["prefixes"] if pfx.endswith(":")):
+            return sa["key"]
+    if message.startswith(("巡回開始", "巡回終了", "自動巡回", "===")):
+        return "loop"
+    return None
+
 
 def request_tick(reason: str) -> bool:
     """感度の高いイベント（会議終了・チャット投稿・成果物の新版）から即時巡回を要求する。

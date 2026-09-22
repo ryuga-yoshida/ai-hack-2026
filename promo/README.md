@@ -4,7 +4,7 @@
 |---|---|---|
 | `poster_A1.pdf`（`poster.html`） | ブース後ろに貼るポスター（A1 縦・594×841mm）。A2 に縮小印刷しても読める | 印刷するだけ |
 | `flyer_A4.pdf`（`flyer.html`） | 配布チラシ（A4 両面）。表＝課題と画面、裏＝仕組み・コスト・セキュリティ・Q&A | 印刷するだけ（両面・短辺とじ） |
-| `pitch.pdf`（`pitch.html`） | 最終ピッチ 10枚（16:9）。台本は `docs/10_ピッチ台本.md` | そのまま使える |
+| `pitch.pdf`（`pitch.html`） | 最終ピッチ 11枚（16:9）。台本は `docs/10_ピッチ台本.md` | そのまま使える |
 | `arch.svg` | アーキテクチャ図（ポスター・チラシ・スライド共通） | — |
 | `screenshots/*.png` | 実画面のスクショ 13 枚（1440px 幅、`shoot.py` で再撮影可） | 記事・SNS 用 |
 | `qr_github.png` / `qr_zenn.png` | GitHub リポジトリ／Zenn 記事の QR | Zenn: https://zenn.dev/leadus_nova/articles/c83d2577a48079 |

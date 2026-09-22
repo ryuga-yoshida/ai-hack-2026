@@ -13,6 +13,7 @@
     <div class="flex-1 overflow-y-auto scrollbar-thin space-y-0.5" x-ref="log" data-keep-scroll>
       <template x-for="l in logs" :key="l.id">
         <div class="flex gap-2"><span class="text-gray-500 shrink-0" x-text="l.at.slice(11,19)"></span>
+          <span class="shrink-0 w-14 text-center rounded px-1 text-[10px] leading-4" :class="roleClass[l.role] || 'text-gray-600'" x-text="roleName[l.role] || ''"></span>
           <span :class="{'text-red-400 font-semibold': l.level==='finding', 'text-indigo-300': l.level==='action', 'text-amber-300': l.level==='warn', 'text-gray-100': l.level==='info'}" x-text="l.message" class="break-all"></span></div>
       </template>
       <div x-show="!logs.length" class="text-gray-500">まだ活動はありません。「今すぐ巡回」か自動巡回をオンにしてください。</div>
@@ -38,7 +39,7 @@
     </div>
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm space-y-3">
       <div class="flex items-center justify-between">
-        <div><div class="font-semibold">自動巡回</div><div class="text-xs text-gray-500">人間の指示なしに取込→抽出→紐付け→検知を繰り返します</div></div>
+        <div><div class="font-semibold">自動巡回</div><div class="text-xs text-gray-500">人間の指示なしに 取込 → 抽出 → 紐付け → 判定 → 通知 → 資料 の 6 係を順に実行します</div></div>
         <button @click="toggle()" class="relative inline-flex h-6 w-11 items-center rounded-full transition" :class="agent.enabled ? 'bg-emerald-500' : 'bg-gray-300'">
           <span class="inline-block h-5 w-5 transform rounded-full bg-white transition" :class="agent.enabled ? 'translate-x-5' : 'translate-x-0.5'"></span></button>
       </div>
@@ -53,6 +54,24 @@
       <template x-if="agent.last_result">
         <div class="text-xs text-gray-600 bg-gray-50 rounded-lg p-2">前回: 取込 <b x-text="agent.last_result.fetched"></b> · 抽出 <b x-text="agent.last_result.extracted"></b> · 紐付け <b x-text="agent.last_result.linked"></b> · Finding <b x-text="agent.last_result.findings"></b></div>
       </template>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
+      <h2 class="font-semibold text-sm mb-1">サブエージェント（役割分担）</h2>
+      <p class="text-xs text-gray-500 mb-2">役割を 1 つに絞った 6 つの担当を毎巡回この順に実行します。各担当は「やらないこと」を持ち、互いの仕事に手を出しません。ログの左のバッジがどの担当の動きかを示します。</p>
+      <div class="space-y-1.5">
+        {% for sa in subagents %}
+        <details class="text-xs border border-gray-200 rounded-lg">
+          <summary class="cursor-pointer px-2 py-1.5 flex items-center gap-2"><span class="rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap {{ {'fetch':'bg-gray-100 text-gray-700','extract':'bg-sky-100 text-sky-800','link':'bg-emerald-100 text-emerald-800','detect':'bg-red-100 text-red-800','act':'bg-indigo-100 text-indigo-800','docs':'bg-amber-100 text-amber-800'}[sa.key] }}">{{ sa.name }}</span><span class="text-gray-600 truncate">{{ sa.does }}</span></summary>
+          <div class="px-2 pb-2 text-gray-600 space-y-0.5">
+            <div><span class="text-gray-400">やること</span> {{ sa.does }}</div>
+            <div><span class="text-gray-400">やらないこと</span> {{ sa.doesnt }}</div>
+            <div><span class="text-gray-400">LLM</span> {{ sa.llm }}　<span class="text-gray-400">いつ</span> {{ sa.when }}</div>
+            {% if sa.key == 'docs' and digest %}<div><span class="text-gray-400">定期整理</span> {{ digest.interval_days }}日ごと・前回 {{ digest.last_run|rel if digest.last_run else '未実行' }}・変更 {{ digest.stale }} 件</div>{% endif %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
     </div>
 
     <div class="bg-white border border-gray-200 rounded-xl p-4 text-sm">
@@ -83,6 +102,8 @@
 function agentPage() {
   return {
     logs: {{ logs|tojson }}, agent: {{ agent_state|tojson }}, interval: {{ agent_state.interval }},
+    roleName: {fetch:'取込', extract:'抽出', link:'紐付け', detect:'判定', act:'通知', docs:'資料', loop:'巡回'},
+    roleClass: {fetch:'bg-gray-700 text-gray-200', extract:'bg-sky-900 text-sky-200', link:'bg-emerald-900 text-emerald-200', detect:'bg-red-900 text-red-200', act:'bg-indigo-900 text-indigo-200', docs:'bg-amber-900 text-amber-200', loop:'text-gray-500'},
     start() { this.scroll(); setInterval(() => this.poll(), 2000); },
     scroll() { this.$nextTick(() => { const l = this.$refs.log; l.scrollTop = l.scrollHeight; }); },
     async poll() {
