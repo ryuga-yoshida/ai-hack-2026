@@ -19034,5 +19034,135 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "judge"
+ },
+ "8666d7ffb80919736b112960": {
+  "tier": "mid",
+  "content": "{\"markdown\": \"## 概要\\n商品D（青葉ゆず炭酸）の企画書。秋冬の炭酸ラインナップを強化する新商品であり、生産・販売計画、得意先状況、パッケージ仕様などがまとめられている。\\n9月8日の定例で売上見込への追加が決定された。\\n\\n## 位置づけ\\n- 秋冬の炭酸ラインナップを強化する新商品\\n- 9月8日の定例で売上見込への追加を決定\\n\\n## 生産・販売計画\\n- 第3四半期の初回ロットは350ケースとする（製造の都合で50ケース増）\\n- 第3四半期に350、第4四半期に450を売上見込に計上する\\n\\n## 得意先\\n- 主要得意先5社のうち4社が前向き\\n- 2社は正式に確定\\n\\n## パッケージ\\n- ゆずの黄色を基調としたデザイン\\n- 初回ロットは印刷の色味が想定と異なるため、次ロットから修正する\\n\\n## 主な数値\\n| 項目 | 数値・日付 |\\n| --- | --- |\\n| 定例（決定日） | 9月8日 |\\n| 第3四半期初回ロット | 350ケース |\\n| 製造都合による増加分 | 50ケース |\\n| 第3四半期売上見込計上 | 350 |\\n| 第4四半期売上見込計上 | 450 |\\n| 主要得意先 | 5社 |\\n| 前向きな得意先 | 4社 |\\n| 正式確定の得意先 | 2社 |\"}",
+  "usage": {
+   "prompt_tokens": 379,
+   "completion_tokens": 2317,
+   "total_tokens": 2696,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 379,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 389,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1928
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "wiki"
+ },
+ "cfafc2234a7dcf0bffe29e1e": {
+  "tier": "mid",
+  "content": "{\"markdown\": \"## 概要\\n商品Dの原価試算データをまとめたファイルです。\\n原料費や各種経費の内訳、合計原価、想定売価、原価率などの情報が記載されています。\\n\\n## 原価試算\\n\\n| 項目 | 単価（円/ケース） | 備考 |\\n| --- | --- | --- |\\n| 原料（ゆず果汁） | 420 | 国産・秋口の相場 |\\n| 原料（炭酸水・糖類） | 180 | |\\n| 容器・ラベル | 260 | 新ラベル |\\n| 製造加工費 | 310 | 初回ロット300ケース前提 |\\n| 物流 | 140 | |\\n| 合計原価 | =SUM(B2:B6) | |\\n| 想定売価 | 1980 | 希望小売 |\\n| 原価率 | =B7/B8 | 想定より2ポイント高い |\\n\\n## 主な数値\\n\\n| 項目 | 数値 |\\n| --- | --- |\\n| 初回ロット | 300ケース |\\n| 合計原価（円/ケース） | =SUM(B2:B6) |\\n| 想定売価（円/ケース） | 1980 |\\n| 原価率 | =B7/B8 |\"}",
+  "usage": {
+   "prompt_tokens": 373,
+   "completion_tokens": 2591,
+   "total_tokens": 2964,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 373,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 317,
+    "audio_tokens": 0,
+    "reasoning_tokens": 2274
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "wiki"
+ },
+ "5d853814ea150a8cea5282c0": {
+  "tier": "mid",
+  "content": "{\"markdown\": \"## 概要\\nファイル「売上見込_v3.xlsx」の「売上見込」シートに含まれるデータである。\\n各商品の第1四半期から第4四半期における売上見込数値および、各四半期の合計値が記載されている。\\n\\n## 売上見込一覧\\n| 商品名 | 第1四半期 | 第2四半期 | 第3四半期 | 第4四半期 |\\n| --- | --- | --- | --- | --- |\\n| 商品D | 0 | 0 | 350 | 450 |\\n| 商品B | 850 | 820 | 850 | 900 |\\n| 商品E | 300 | 320 | 340 | 360 |\\n| 商品A | 1000 | 1100 | 1200 | 1300 |\\n| 商品F | 200 | 210 | 220 | 230 |\\n| 商品G | 150 | 150 | 160 | 160 |\\n| 商品H | 400 | 420 | 440 | 460 |\\n| 商品I | 120 | 120 | 130 | 130 |\\n| 商品J | 90 | 95 | 100 | 105 |\\n| 商品K | 60 | 60 | 65 | 65 |\\n| 合計 | 3170 | 3295 | 3855 | 4160 |\\n\\n## 主な数値\\n| 項目 | 数値 |\\n| --- | --- |\\n| 第1四半期 合計 | 3170 |\\n| 第2四半期 合計 | 3295 |\\n| 第3四半期 合計 | 3855 |\\n| 第4四半期 合計 | 4160 |\"}",
+  "usage": {
+   "prompt_tokens": 516,
+   "completion_tokens": 2056,
+   "total_tokens": 2572,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 516,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 477,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1579
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "wiki"
+ },
+ "6c993bf85f74a1f8c9b719c3": {
+  "tier": "mid",
+  "content": "{\"markdown\": \"## 概要\\n2026年度下期の予算会議で使用する資料テンプレートの構成を記載した文書。\\n記載すべき各項目の内容や作成上の注意事項がまとめられている。\\n\\n## 主な数値\\n| 項目 | 数値・仕様 |\\n| --- | --- |\\n| 対象年度・時期 | 2026年度 下期 |\\n| 部門サマリーページ数 | 1ページ |\\n\\n## 構成内容\\n- **1. 部門サマリー**: 上期の実績と下期の見込みを1ページにまとめる\\n- **2. 売上見込**: 商品別・四半期別の表を貼り付ける（売上見込表の最新版から流し込み）\\n- **3. 新商品**: 商品Dの位置づけと初回ロット、販売計画を記載する\\n- **4. リスクと対応**: 得意先の増量要請、原価率の上振れなどを記載する\\n- **5. 依頼事項**: 予算の増減があれば理由とともに記載する\"}",
+  "usage": {
+   "prompt_tokens": 339,
+   "completion_tokens": 1251,
+   "total_tokens": 1590,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 339,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 240,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1011
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "wiki"
+ },
+ "ef49f5c14c0e34acd60eff61": {
+  "tier": "mid",
+  "content": "{\"markdown\": \"## 概要\\nファイル「在庫表_v2.xlsx」の「在庫」シートにおける各商品の在庫状況を表したデータである。\\n各商品の安全在庫および現在庫の数値が記録されている。\\n\\n## 主な数値\\n| 商品名 | 安全在庫 | 現在庫 |\\n| --- | --- | --- |\\n| 商品A | 1500 | 1350 |\\n| 商品B | 800 | 900 |\\n| 商品E | 300 | 310 |\\n| 商品F | 150 | 140 |\\n| 商品G | 150 | 150 |\\n| 商品H | 400 | 380 |\\n| 商品I | 120 | 100 |\\n| 商品J | 90 | 95 |\\n| 商品K | 60 | 70 |\"}",
+  "usage": {
+   "prompt_tokens": 355,
+   "completion_tokens": 3751,
+   "total_tokens": 4106,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 355,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 209,
+    "audio_tokens": 0,
+    "reasoning_tokens": 3542
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "wiki"
  }
 }

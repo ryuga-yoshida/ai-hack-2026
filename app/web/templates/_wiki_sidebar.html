@@ -28,6 +28,14 @@
     <a href="/wiki/{{ p_.id }}" x-show="!q || {{ p_.title|tojson|forceescape }}.includes(q)" class="flex items-center gap-1.5 px-2 py-1 rounded-lg truncate {% if page and p_.id == page.id %}bg-white font-medium shadow-sm{% else %}text-gray-600 hover:bg-gray-200{% endif %}" style="padding-left: {{ 8 + p_.depth * 14 }}px">
       <span class="text-gray-400">{{ '└' if p_.depth else '' }}</span><span class="truncate">{{ p_.title }}</span></a>
     {% endfor %}
+    {% if sp == '成果物' and digest_status %}
+    <div class="mx-2 mt-1 mb-2 p-2 rounded-lg bg-white border border-gray-200 text-[10.5px] text-gray-500 leading-relaxed" title="成果物の中身を読み直して構造化する定期整理。前回から版が変わったファイルだけを LLM に渡すので、費用は変更分だけ">
+      <div class="font-semibold text-gray-600">中身の定期整理 <span class="font-normal">{{ digest_status.interval_days }}日ごと</span></div>
+      <div>前回 {{ digest_status.last_run|rel if digest_status.last_run else '未実行' }}{% if digest_status.next_run %} ・ 次回 {{ digest_status.next_run.strftime('%m/%d') }}{% endif %}</div>
+      <div>対象 {{ digest_status.total }} 件 ・ 前回から変更 <b class="{% if digest_status.stale %}text-amber-700{% endif %}">{{ digest_status.stale }} 件</b></div>
+      <form method="post" action="/wiki/digest" class="mt-1" onsubmit="return confirm('変更のあった {{ digest_status.stale }} 件だけ読み直して構造化します。よろしいですか？')"><button class="w-full text-[10.5px] border border-gray-300 rounded px-2 py-1 bg-white hover:bg-gray-50 disabled:opacity-50" {% if not digest_status.stale %}disabled{% endif %}>今すぐ整理（変更分のみ）</button></form>
+    </div>
+    {% endif %}
     {% endfor %}
     {% if not pages %}<div class="px-3 text-xs text-gray-400">まだページがありません</div>{% endif %}
     {% if recent %}

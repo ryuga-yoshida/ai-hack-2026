@@ -4,7 +4,7 @@ import os
 import logging
 import re
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from html import escape
 from pathlib import Path
 
@@ -2294,17 +2294,26 @@ def _auto_wiki_minutes(conn: sqlite3.Connection, meeting_id: str) -> None:
     agent.say(f"action: 議事録ページを Wiki に作成: {page_title} {config.APP_BASE_URL}/wiki/{pid}")
 
 
-def _artifact_wiki_markdown(conn: sqlite3.Connection, key: str) -> tuple[str, str] | None:
+def _artifact_wiki_markdown(conn: sqlite3.Connection, key: str, refresh: bool = False) -> tuple[str, str, bool] | None:
     """成果物1つの Wiki ページ本文（LLM 不使用）: 概要・最新版・版の履歴と変更点・関連タスク・関連する決定・検知"""
     rows = library_rows(conn, str(Path(key).parent) if str(Path(key).parent) != "." else "")
     a = next((f for f in rows["files"] if f["key"] == key), None)
     if not a:
         return None
     md = [f"# {a['name']}", "", f"**場所**: {a['folder'] or '（ルート）'}　**最新版**: v{a['latest']['n']}（{a['latest']['actor'] or '—'}・{a['latest']['at'][:16].replace('T', ' ')}）　**形式**: {a['ext'].lstrip('.')}", "",
-          f"このページはエージェントが成果物ライブラリから自動生成しています。版が増えるたびに更新されます。", ""]
+          f"このページはエージェントが成果物の中身から自動生成しています。版が増えるたびに更新されます。", ""]
+    # 中身の構造化（最新版の内容を mid で整理。版が同じなら保存済みを使う）
+    from app import digest
+    latest_path = LIB() / a["versions"][-1]["rel"] if a["versions"] else None
+    body, called = (digest.content_markdown(conn, key, latest_path, refresh=refresh)
+                    if latest_path and latest_path.is_file() else (None, False))
+    if body:
+        md += [body.replace("\n# ", "\n## "), ""]
+    else:
+        md += ["## 内容", "", "次回の定期整理で中身を読み込んで構造化します（前回から版が変わったファイルだけ読みます）。", ""]
     if a["tasks"]:
         md += ["## 関連タスク"] + [f"- [{t.title}]({config.APP_BASE_URL}/tasks/{t.id})（{STATUS_LABEL.get(t.status, t.status)}・{t.assignee or '未割当'}）" for t in a["tasks"]] + [""]
-    md += ["## 版の履歴", "", "| 版 | 更新者 | 日時 | メモ | 変更点 | 検知 |", "|---|---|---|---|---|---|"]
+    md += ["## 版の履歴（エージェントが記録）", "", "| 版 | 更新者 | 日時 | メモ | 変更点 | 検知 |", "|---|---|---|---|---|---|"]
     for v in reversed(a["versions"]):
         md.append(f"| v{v['n']} | {v['actor'] or '—'} | {v['at'][:16].replace('T', ' ')} | {v.get('note') or ''} | {v['changes'] or '—'} | {(str(v['findings']) + '件') if v['findings'] else '—'} |")
     md.append("")
@@ -2321,32 +2330,76 @@ def _artifact_wiki_markdown(conn: sqlite3.Connection, key: str) -> tuple[str, st
     if decs:
         md += ["## 関連する決定と検知"] + [f"- 決定「{d}」→ {s_}" for d, s_ in decs.items()] + [""]
     md += ["---", f"ライブラリ: {config.APP_BASE_URL}/artifacts?q={quote(a['stem'])}"]
-    return a["name"], "\n".join(md)
+    return a["name"], "\n".join(md), called
 
 
-def _auto_wiki_artifact(conn: sqlite3.Connection, key: str) -> str | None:
-    """成果物の Wiki ページを生成／最新化する（エージェントが編集者。判定の対象にはならない）"""
-    r = _artifact_wiki_markdown(conn, key)
+def _auto_wiki_artifact(conn: sqlite3.Connection, key: str, refresh: bool = False) -> tuple[str | None, bool]:
+    """成果物の Wiki ページを生成／最新化する（エージェントが編集者。判定の対象にはならない）。(page_id, LLM を呼んだか)"""
+    r = _artifact_wiki_markdown(conn, key, refresh=refresh)
     if not r:
-        return None
-    title, md = r
+        return None, False
+    title, md, called = r
     page_title = f"成果物: {title}"
     existing = conn.execute("SELECT id FROM wiki_pages WHERE title=?", (page_title,)).fetchone()
     if existing:
-        wikimod.update(conn, existing["id"], page_title, md, "エージェント", note="成果物の版が更新されたため最新化")
-        return existing["id"]
-    return wikimod.create(conn, page_title, md, "エージェント", space="成果物")
+        wikimod.update(conn, existing["id"], page_title, md, "エージェント",
+                       note="中身を読み直して構造化" if called else "版の履歴を最新化")
+        return existing["id"], called
+    return wikimod.create(conn, page_title, md, "エージェント", space="成果物"), called
+
+
+def _artifact_keys() -> list[str]:
+    from app.connectors.excel import version_series
+    return [k for k in version_series(LIB(), ext=None) if not k.startswith(("チャット添付/", "メール添付/"))]
 
 
 def _auto_wiki_all_artifacts(conn: sqlite3.Connection) -> int:
-    from app.connectors.excel import version_series
+    """毎巡回: 版の履歴・関連タスク・検知だけ最新化（ファイルは読まない・LLM 不使用）"""
     n = 0
-    for key in version_series(LIB(), ext=None):
-        if key.startswith(("チャット添付/", "メール添付/")):
-            continue
-        if _auto_wiki_artifact(conn, key):
+    for key in _artifact_keys():
+        if _auto_wiki_artifact(conn, key, refresh=False)[0]:
             n += 1
     return n
+
+
+WIKI_DIGEST_DEFAULT_DAYS = 7
+
+
+def wiki_digest_status(conn: sqlite3.Connection) -> dict:
+    """定期整理の状態: 前回・次回・間隔・前回から変わったファイル数"""
+    from app import digest
+    from app.connectors.excel import version_series
+    st = db.get_settings(conn)
+    days = int(st.get("wiki_digest_interval_days") or WIKI_DIGEST_DEFAULT_DAYS)
+    last = db.from_iso(st.get("wiki_digest_last_run"))
+    series = version_series(LIB(), ext=None)
+    keys = _artifact_keys()
+    stale = [k for k in keys if digest.is_stale(conn, k, series[k][-1][1])]
+    nxt = (last + timedelta(days=days)) if last else None
+    return {"interval_days": days, "last_run": last, "next_run": nxt, "total": len(keys), "stale": len(stale), "stale_keys": stale,
+            "due": last is None or (nxt is not None and datetime.now() >= nxt)}
+
+
+def run_wiki_digest(conn: sqlite3.Connection, reason: str = "定期") -> dict:
+    """成果物の中身を読み直して Wiki を構造化する。前回から版が変わったファイルだけ LLM に渡す"""
+    from app import agent as _agent
+    st = wiki_digest_status(conn)
+    updated, called = 0, 0
+    for key in _artifact_keys():
+        pid, c = _auto_wiki_artifact(conn, key, refresh=True)
+        if pid:
+            updated += 1
+        if c:
+            called += 1
+    db.set_setting(conn, "wiki_digest_last_run", db.now_iso())
+    _agent.say(f"action: Wiki の成果物ページを整理（{reason}）: 対象 {st['total']} 件・読み直し {called} 件・更新 {updated} ページ")
+    return {"total": st["total"], "reread": called, "updated": updated}
+
+
+def _wiki_digest_if_due(conn: sqlite3.Connection) -> None:
+    st = wiki_digest_status(conn)
+    if st["due"]:
+        run_wiki_digest(conn, reason="定期・初回" if st["last_run"] is None else f"定期・{st['interval_days']}日ごと")
 
 
 @app.post("/meet/{meeting_id}/minutes/to_wiki")
@@ -2398,7 +2451,8 @@ def share_minutes(request: Request, meeting_id: str, channel: str = Form("genera
 
 from app import agent as _agent_mod
 _agent_mod.on_meeting_extracted.append(lambda conn, mid: _auto_wiki_minutes(conn, mid))
-_agent_mod.on_tick_done.append(lambda conn: _auto_wiki_all_artifacts(conn))   # 検知結果を成果物ページに反映
+_agent_mod.on_tick_done.append(lambda conn: _auto_wiki_all_artifacts(conn))   # 検知結果を成果物ページに反映（LLM 不使用）
+_agent_mod.on_tick_done.append(lambda conn: _wiki_digest_if_due(conn))         # 週 1 回: 変わったファイルだけ読み直して構造化
 
 
 @app.on_event("startup")
@@ -3055,8 +3109,21 @@ def _wiki_ctx(conn: sqlite3.Connection, page: dict | None = None, me: str = "") 
     pages = wikimod.tree(conn)
     spaces = sorted({p_["space"] for p_ in pages})
     favs = wikimod.favorites(conn, me) if me else []
+    try:
+        ds = wiki_digest_status(conn)
+    except Exception as e:                                   # ライブラリが無い等でも Wiki は開ける
+        log.warning("digest status failed: %s", e)
+        ds = None
     return {"pages": pages, "spaces": spaces, "page": page, "favs": favs, "fav_pages": [p_ for p_ in pages if p_["id"] in favs],
-            "recent": wikimod.recent(conn), "templates": wikimod.TEMPLATES}
+            "recent": wikimod.recent(conn), "templates": wikimod.TEMPLATES, "digest_status": ds}
+
+
+@app.post("/wiki/digest")
+def wiki_digest_now(request: Request):
+    """成果物の中身を読み直して Wiki を構造化（前回から版が変わったファイルだけ LLM に渡す）"""
+    conn = get_conn()
+    r = run_wiki_digest(conn, reason=f"手動・{get_me(request)}")
+    return RedirectResponse(f"/wiki?digest={r['reread']}", status_code=303)
 
 
 @app.get("/wiki", response_class=HTMLResponse)
@@ -3389,7 +3456,8 @@ def settings_page(request: Request):
               ("Wiki の書き換え", "実装しない"), ("ファイルの更新（外部ストレージ）", "実装しない"), ("Slack・メールへの外部送信", "実装しない")]
     return render("settings.html", request, conn, items=items, models=models, scopes=scopes, writes=writes,
                   agent_state=dict(agent.state), watch_dir=config.ARTIFACT_WATCH_DIR, gemini=bool(config.GEMINI_API_KEY),
-                  orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL, ROLES=ROLES, roles={p_: role_of(conn, p_) for p_ in people_list(conn)}, users=auth.list_users(conn), demo_mode=auth.DEMO_MODE)
+                  orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL, ROLES=ROLES, roles={p_: role_of(conn, p_) for p_ in people_list(conn)}, users=auth.list_users(conn), demo_mode=auth.DEMO_MODE,
+                  wiki_digest_days=int(db.get_settings(conn).get("wiki_digest_interval_days") or WIKI_DIGEST_DEFAULT_DAYS))
 
 
 @app.post("/settings")
@@ -3407,6 +3475,11 @@ async def settings_save(request: Request):
     if "interval" in form:
         from app import agent
         agent.state["interval"] = max(10, int(form["interval"]))
+    if str(form.get("wiki_digest_interval_days", "")).strip():
+        try:
+            db.set_setting(conn, "wiki_digest_interval_days", str(max(1, int(form["wiki_digest_interval_days"]))))
+        except (TypeError, ValueError):
+            pass
     return RedirectResponse("/settings", status_code=303)
 
 

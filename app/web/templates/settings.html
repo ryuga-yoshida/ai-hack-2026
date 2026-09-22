@@ -48,6 +48,9 @@
         <label class="block"><div class="text-gray-700">自動巡回の間隔（秒）</div>
           <input name="interval" value="{{ agent_state.interval }}" type="number" step="10" min="10" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
           <div class="text-xs text-gray-400 mt-0.5">感度の高いイベント（会議終了・投稿・成果物の新版）は間隔を待たず即時</div></label>
+        <label class="block"><div class="text-gray-700">Wiki の中身の定期整理（日ごと）</div>
+          <input name="wiki_digest_interval_days" value="{{ wiki_digest_days }}" type="number" step="1" min="1" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
+          <div class="text-xs text-gray-400 mt-0.5">成果物の中身を読み直して構造化する間隔。前回から版が変わったファイルだけ LLM（mid）に渡す。版の履歴の更新は毎巡回・LLM 不使用</div></label>
       </div>
       <div class="mt-4 flex justify-end"><button class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm">保存</button></div>
     </div>
