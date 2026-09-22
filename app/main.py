@@ -118,7 +118,7 @@ ACTIVITY_LABEL = {"created": "作成", "status": "状態", "assignee": "担当�
 
 KIND_LABEL = {"contradiction": "矛盾", "stalled": "停滞", "orphan_change": "根拠なし変更", "status_suggestion": "状態更新の提案"}
 EVENT_LABEL = {"decision": "決定", "task_hint": "タスク候補", "utterance": "発言", "artifact_change": "変更"}
-FINDING_STATUS_LABEL = {"notified": "通知済", "pending": "確認待ち", "acknowledged": "確認済", "dismissed": "却下"}
+FINDING_STATUS_LABEL = {"notified": "通知済", "queued": "まとめ待ち", "pending": "確認待ち", "acknowledged": "確認済", "dismissed": "却下"}
 PEOPLE = config.PERSONS
 
 
@@ -2451,8 +2451,16 @@ def share_minutes(request: Request, meeting_id: str, channel: str = Form("genera
 
 from app import agent as _agent_mod
 _agent_mod.on_meeting_extracted.append(lambda conn, mid: _auto_wiki_minutes(conn, mid))
-_agent_mod.on_tick_done.append(lambda conn: _auto_wiki_all_artifacts(conn))   # 検知結果を成果物ページに反映（LLM 不使用）
-_agent_mod.on_tick_done.append(lambda conn: _wiki_digest_if_due(conn))         # 週 1 回: 変わったファイルだけ読み直して構造化
+def _wiki_history_hook(conn, stats) -> None:
+    """資料係: 版の履歴の更新。既定は成果物の保存・検知があった巡回だけ（設定で毎巡回にもできる）"""
+    mode = _agent_mod.schedule(conn)["wiki_history_mode"]
+    changed = stats.fetched or stats.findings or not stats.live
+    if mode == "tick" or changed:
+        _auto_wiki_all_artifacts(conn)
+
+
+_agent_mod.on_tick_done.append(_wiki_history_hook)                              # 検知結果を成果物ページに反映（LLM 不使用）
+_agent_mod.on_tick_done.append(lambda conn, stats: _wiki_digest_if_due(conn))  # 週 1 回: 変わったファイルだけ読み直して構造化
 
 
 @app.on_event("startup")
@@ -3122,6 +3130,13 @@ def _wiki_ctx(conn: sqlite3.Connection, page: dict | None = None, me: str = "") 
             "recent": wikimod.recent(conn), "templates": wikimod.TEMPLATES, "digest_status": ds}
 
 
+@app.post("/findings/release_digest")
+def findings_release_digest(request: Request):
+    conn = get_conn()
+    n = _agent_mod.release_digest(conn, reason=f"手動・{get_me(request)}")
+    return RedirectResponse(f"/findings?released={n}", status_code=303)
+
+
 @app.post("/wiki/digest")
 def wiki_digest_now(request: Request):
     """成果物の中身を読み直して Wiki を構造化（前回から版が変わったファイルだけ LLM に渡す）"""
@@ -3461,7 +3476,8 @@ def settings_page(request: Request):
     return render("settings.html", request, conn, items=items, models=models, scopes=scopes, writes=writes,
                   agent_state=dict(agent.state), watch_dir=config.ARTIFACT_WATCH_DIR, gemini=bool(config.GEMINI_API_KEY),
                   orca=bool(config.ORCA_API_KEY), base_url=config.ORCA_BASE_URL, ROLES=ROLES, roles={p_: role_of(conn, p_) for p_ in people_list(conn)}, users=auth.list_users(conn), demo_mode=auth.DEMO_MODE,
-                  wiki_digest_days=int(db.get_settings(conn).get("wiki_digest_interval_days") or WIKI_DIGEST_DEFAULT_DAYS))
+                  wiki_digest_days=int(db.get_settings(conn).get("wiki_digest_interval_days") or WIKI_DIGEST_DEFAULT_DAYS),
+                  sched=_agent_mod.schedule(conn), queued=conn.execute("SELECT COUNT(*) FROM findings WHERE status='queued'").fetchone()[0])
 
 
 @app.post("/settings")
@@ -3479,6 +3495,15 @@ async def settings_save(request: Request):
     if "interval" in form:
         from app import agent
         agent.state["interval"] = max(10, int(form["interval"]))
+    for k, default in _agent_mod.SCHEDULE_DEFAULTS.items():
+        v = str(form.get(f"sched:{k}", "")).strip()
+        if v:
+            if k.endswith("_hour"):
+                try:
+                    v = str(min(23, max(0, int(v))))
+                except ValueError:
+                    continue
+            db.set_setting(conn, f"sched:{k}", v)
     if str(form.get("wiki_digest_interval_days", "")).strip():
         try:
             db.set_setting(conn, "wiki_digest_interval_days", str(max(1, int(form["wiki_digest_interval_days"]))))

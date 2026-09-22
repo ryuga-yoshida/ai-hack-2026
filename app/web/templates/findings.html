@@ -19,9 +19,10 @@
 </div>
 {% endif %}
 <div class="flex items-center gap-2 mb-4 text-sm">
-  {% for key, label in [('open','未対応'),('notified','通知済'),('pending','確認待ち'),('acknowledged','確認済'),('dismissed','却下'),('all','すべて')] %}
-  <a href="/findings?status={{ 'open' if status == key and key != 'open' else key }}&kind={{ kind }}&file={{ file }}" class="px-3 py-1.5 rounded-lg border {% if status == key %}bg-gray-900 text-white border-gray-900{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}">{{ label }} <span class="opacity-60">{{ counts[key] }}</span></a>
+  {% for key, label in [('open','未対応'),('notified','通知済'),('pending','確認待ち'),('queued','まとめ待ち'),('acknowledged','確認済'),('dismissed','却下'),('all','すべて')] %}
+  {% if key != 'queued' or counts.queued %}<a href="/findings?status={{ 'open' if status == key and key != 'open' else key }}&kind={{ kind }}&file={{ file }}" class="px-3 py-1.5 rounded-lg border {% if status == key %}bg-gray-900 text-white border-gray-900{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}" {% if key == 'queued' %}title="severity が high でない検知は、設定の時刻にまとめて通知します（通知係）"{% endif %}>{{ label }} <span class="opacity-60">{{ counts[key] }}</span></a>{% endif %}
   {% endfor %}
+  {% if status == 'queued' and counts.queued %}<form method="post" action="/findings/release_digest" class="inline"><button class="px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 bg-white hover:bg-amber-50">今すぐまとめて通知</button></form>{% endif %}
   <span class="mx-2 text-gray-300">|</span>
   {% for key, label in [('','全種別'),('contradiction','矛盾'),('stalled','停滞'),('orphan_change','根拠なし変更'),('status_suggestion','状態更新の提案')] %}
   <a href="/findings?status={{ status }}&kind={{ '' if kind == key else key }}&file={{ file }}" class="px-3 py-1.5 rounded-lg border {% if kind == key %}bg-indigo-600 text-white border-indigo-600{% else %}bg-white border-gray-300 hover:bg-gray-50{% endif %}">{{ label }}</a>

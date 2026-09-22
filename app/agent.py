@@ -78,6 +78,30 @@ SUBAGENTS = [
 ]
 
 
+# ---------- 動作タイミング（設定画面で担当ごとに変えられる） ----------
+SCHEDULE_DEFAULTS = {
+    "stalled_check_mode": "daily",     # daily | tick   停滞・期限の判定
+    "stalled_check_hour": "9",
+    "notify_batch_mode": "severity",   # severity | immediate   high は即時・それ以外は日次まとめ
+    "notify_digest_hour": "9",
+    "wiki_history_mode": "event",      # event | tick   資料係の版の履歴更新
+}
+
+
+def schedule(conn: sqlite3.Connection) -> dict:
+    st = db.get_settings(conn)
+    return {k: st.get(f"sched:{k}", v) for k, v in SCHEDULE_DEFAULTS.items()}
+
+
+def _due_daily(conn: sqlite3.Connection, key: str, hour: int, now: datetime) -> bool:
+    """今日まだ実行していなくて、指定時刻を過ぎていれば True（実行日を記録する）"""
+    st = db.get_settings(conn)
+    if st.get(f"sched:{key}_last") == now.date().isoformat() or now.hour < hour:
+        return False
+    db.set_setting(conn, f"sched:{key}_last", now.date().isoformat())
+    return True
+
+
 def role_of(message: str) -> str | None:
     """ログ行の接頭辞からサブエージェントの key を返す（画面のバッジ用）"""
     head = message.split(":", 1)[0].split("：", 1)[0].strip()
@@ -235,6 +259,7 @@ class TickResult:
     linked: int = 0
     findings: list[Finding] = field(default_factory=list)
     actions: dict[str, int] = field(default_factory=lambda: {"save_only": 0, "review": 0, "notify": 0})
+    live: bool = False
 
 
 def adapters(conn: sqlite3.Connection):
@@ -270,13 +295,31 @@ def enqueue_for_review(conn, f: Finding) -> str:
     return "review"
 
 
+_live_tick = False    # 再生・リセット中は False（まとめ通知や日次判定を使わず、すぐ出す）
+
+
 def notify(conn, f: Finding, to: list[str | None]) -> str:
-    f.status = "notified"
-    db.save_finding(conn, f)
     names = "・".join(n for n in to if n) or "担当者"
     say(f"FINDING: {f.summary}（confidence {f.confidence:.2f}, severity {f.severity}）")
+    if _live_tick and f.severity != "high" and schedule(conn)["notify_batch_mode"] == "severity":
+        f.status = "queued"                             # 朝のまとめで通知する
+        db.save_finding(conn, f)
+        say(f"action: {names}へは {schedule(conn)['notify_digest_hour']} 時のまとめで通知（severity {f.severity}）")
+        return "notify"
+    f.status = "notified"
+    db.save_finding(conn, f)
     say(f"action: {names}に通知（画面表示のみ・外部送信なし）")
     return "notify"
+
+
+def release_digest(conn: sqlite3.Connection, reason: str = "定期") -> int:
+    """まとめ待ち（queued）の検知を通知済みにする"""
+    n = conn.execute("SELECT COUNT(*) FROM findings WHERE status='queued'").fetchone()[0]
+    if n:
+        conn.execute("UPDATE findings SET status='notified' WHERE status='queued'")
+        conn.commit()
+        say(f"action: 日次まとめ（{reason}）: 保留していた {n} 件を通知")
+    return n
 
 
 def decide_action(conn: sqlite3.Connection, f: Finding) -> str:
@@ -421,9 +464,18 @@ def stage_detect(conn, stats: TickResult, now: datetime | None = None) -> None:
                 pass
         db.mark_processed(conn, "detect", ch.id, {"finding": f.id if f else None, "explain": dict(detector.explain)})
 
-    for f in detector.detect_stalled(conn, now=now):
-        stats.findings.append(f)
-        stats.actions[decide_action(conn, f)] += 1
+    sch = schedule(conn)
+    run_stalled = True
+    if _live_tick and sch["stalled_check_mode"] == "daily":
+        run_stalled = _due_daily(conn, "stalled_check", int(sch["stalled_check_hour"]), now or datetime.now())
+        if run_stalled:
+            say(f"detect: 日次の停滞・期限チェック（{sch['stalled_check_hour']} 時）")
+    if run_stalled:
+        for f in detector.detect_stalled(conn, now=now):
+            stats.findings.append(f)
+            stats.actions[decide_action(conn, f)] += 1
+    if _live_tick and sch["notify_batch_mode"] == "severity" and _due_daily(conn, "notify_digest", int(sch["notify_digest_hour"]), now or datetime.now()):
+        release_digest(conn)
 
     for f, payload in detector.suggest_status_updates(conn):
         db.save_finding(conn, f, payload=payload)
@@ -501,9 +553,10 @@ def propose_agenda(conn, attendees: list[str], now: datetime | None = None, limi
 
 def tick(conn: sqlite3.Connection, now: datetime | None = None,
          events_override: list[Event] | None = None, trigger: str = "auto") -> TickResult:
-    global _log_conn
+    global _log_conn, _live_tick
     router.bind(conn)
     _log_conn = conn
+    _live_tick = events_override is None and trigger != "replay"
     stats = TickResult()
     label = {"auto": "自動", "manual": "手動", "event": "トリガー", "replay": "再生"}.get(trigger, trigger)
     say(f"巡回開始（{label}）" if events_override is None else f"再生: {now:%Y-%m-%d} の出来事を投入")
@@ -514,9 +567,10 @@ def tick(conn: sqlite3.Connection, now: datetime | None = None,
     stage_detect(conn, stats, now)                 # 5-6. 検知（新規 artifact_change＋定期）
     if events_override is None:
         stage_calendar(conn, stats, now)           # 7. 予定のリマインド（再生時は行わない）
+    stats.live = _live_tick
     for cb in on_tick_done:
         try:
-            cb(conn)
+            cb(conn, stats)
         except Exception as e:
             log.warning("on_tick_done failed: %s", e)
     say(f"巡回終了: 取込{stats.fetched} 抽出{stats.extracted} 紐付け{stats.linked} Finding{len(stats.findings)}")

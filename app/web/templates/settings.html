@@ -48,9 +48,34 @@
         <label class="block"><div class="text-gray-700">自動巡回の間隔（秒）</div>
           <input name="interval" value="{{ agent_state.interval }}" type="number" step="10" min="10" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
           <div class="text-xs text-gray-400 mt-0.5">感度の高いイベント（会議終了・投稿・成果物の新版）は間隔を待たず即時</div></label>
-        <label class="block"><div class="text-gray-700">Wiki の中身の定期整理（日ごと）</div>
+      </div>
+      <h2 class="font-semibold mt-6 mb-1">サブエージェントの動作タイミング</h2>
+      <p class="text-xs text-gray-500 mb-4">担当ごとに、いつ動くかを決めます。取込・紐付け・矛盾判定・high の通知はイベント駆動（投稿・保存・会議終了で即時）＋上の巡回間隔が保険です。</p>
+      <div class="grid grid-cols-2 gap-4 text-sm">
+        <label class="block"><div class="text-gray-700">判定係: 停滞・期限のチェック</div>
+          <select name="sched:stalled_check_mode" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5 bg-white">
+            <option value="daily" {% if sched.stalled_check_mode == 'daily' %}selected{% endif %}>日次（下の時刻に 1 回）</option>
+            <option value="tick" {% if sched.stalled_check_mode == 'tick' %}selected{% endif %}>毎巡回</option></select>
+          <div class="text-xs text-gray-400 mt-0.5">1 日単位でしか変わらないので日次で十分。矛盾の判定は成果物の保存時に即時</div></label>
+        <label class="block"><div class="text-gray-700">停滞チェックの時刻（時）</div>
+          <input name="sched:stalled_check_hour" value="{{ sched.stalled_check_hour }}" type="number" min="0" max="23" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
+          <div class="text-xs text-gray-400 mt-0.5">この時刻を過ぎた最初の巡回で実行</div></label>
+        <label class="block"><div class="text-gray-700">通知係: 通知のまとめ方</div>
+          <select name="sched:notify_batch_mode" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5 bg-white">
+            <option value="severity" {% if sched.notify_batch_mode == 'severity' %}selected{% endif %}>high は即時・それ以外は日次まとめ</option>
+            <option value="immediate" {% if sched.notify_batch_mode == 'immediate' %}selected{% endif %}>すべて即時</option></select>
+          <div class="text-xs text-gray-400 mt-0.5">細かい通知が続くと読まれなくなるため。まとめ待ちは検知一覧の「すべて」で見られる{% if queued %}。いま <b class="text-amber-700">{{ queued }} 件</b>{% endif %}</div></label>
+        <label class="block"><div class="text-gray-700">まとめ通知の時刻（時）</div>
+          <input name="sched:notify_digest_hour" value="{{ sched.notify_digest_hour }}" type="number" min="0" max="23" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
+          <div class="text-xs text-gray-400 mt-0.5">夜間の検知は翌朝この時刻にまとめて通知</div></label>
+        <label class="block"><div class="text-gray-700">資料係: 版の履歴の更新</div>
+          <select name="sched:wiki_history_mode" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5 bg-white">
+            <option value="event" {% if sched.wiki_history_mode == 'event' %}selected{% endif %}>成果物の保存・検知があったときだけ</option>
+            <option value="tick" {% if sched.wiki_history_mode == 'tick' %}selected{% endif %}>毎巡回</option></select>
+          <div class="text-xs text-gray-400 mt-0.5">LLM は使わないが、変化がないのに毎分書き直す無駄を省く</div></label>
+        <label class="block"><div class="text-gray-700">資料係: 中身の定期整理（日ごと）</div>
           <input name="wiki_digest_interval_days" value="{{ wiki_digest_days }}" type="number" step="1" min="1" class="mt-1 w-full border border-gray-300 rounded-lg px-3 py-1.5">
-          <div class="text-xs text-gray-400 mt-0.5">成果物の中身を読み直して構造化する間隔。前回から版が変わったファイルだけ LLM（mid）に渡す。版の履歴の更新は毎巡回・LLM 不使用</div></label>
+          <div class="text-xs text-gray-400 mt-0.5">成果物の中身を読み直して構造化する間隔。前回から版が変わったファイルだけ LLM（mid）に渡す</div></label>
       </div>
       <div class="mt-4 flex justify-end"><button class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm">保存</button></div>
     </div>
