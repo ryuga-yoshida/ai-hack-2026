@@ -169,13 +169,39 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
+def _library_url_for(url: str) -> str | None:
+    """外部ストレージ風の URL（デモの SharePoint 等）が指すファイルがライブラリにあれば、その最新版へのパスを返す。
+    デモデータの URL は実在しないドメインなので、そのまま開くと DNS エラーになる"""
+    from urllib.parse import unquote
+    from app.connectors.excel import version_series
+    name = unquote(url.rstrip("/").rsplit("/", 1)[-1].split("?")[0])
+    if "." not in name:
+        return None
+    stem, ext = name.rsplit(".", 1)
+    for base, series in version_series(LIB(), ext=None).items():
+        b = base.rsplit("/", 1)[-1]
+        if b.lower() == f"{stem}.{ext}".lower():
+            latest = series[-1][1]
+            return f"/artifacts?q={quote(stem)}#" + quote(str(latest.relative_to(LIB())))
+    return None
+
+
 def linkify(text: str) -> Markup:
     out, pos = [], 0
     for m in re.finditer(r"https?://[^\s<>\"']+", text or ""):
         out.append(escape(text[pos:m.start()]))
         url = m.group(0)
         label = url if len(url) < 60 else url[:57] + "…"
-        out.append(f'<a href="{escape(url)}" class="text-indigo-600 hover:underline break-all" target="_blank">{escape(label)}</a>')
+        internal = None
+        if not url.startswith(config.APP_BASE_URL):
+            try:
+                internal = _library_url_for(url)
+            except Exception:
+                internal = None
+        if internal:
+            out.append(f'<a href="{escape(internal)}" class="text-indigo-600 hover:underline break-all" title="ライブラリ内の同名ファイルを開く">{escape(label)}</a>')
+        else:
+            out.append(f'<a href="{escape(url)}" class="text-indigo-600 hover:underline break-all" target="_blank">{escape(label)}</a>')
         pos = m.end()
     out.append(escape((text or "")[pos:]))
     return Markup("".join(out))
