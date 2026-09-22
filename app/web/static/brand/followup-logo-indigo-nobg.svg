@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="260" viewBox="370 270 1000 260" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="200" viewBox="300 300 1060 200" role="img" aria-labelledby="title desc">
   <title id="title">Followup logo</title>
   <desc id="desc">Indigo Followup wordmark with a checkmark and circular follow-up arrow icon.</desc>
-  <g transform="translate(400 300)" fill="none" stroke="#4F46E5" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M162 58C137 11 82 0 40 25C-8 54-9 124 35 153C74 179 127 166 153 128"/>
-    <path d="M132 125L154 128L149 105"/>
-    <path d="M52 92L82 122L145 54"/>
+  <g transform="translate(304 300)" fill="none" stroke="#4F46E5" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M100 28C58 28 28 61 28 101C28 141 60 172 100 172C126 172 150 158 166 137"/>
+    <path d="M145 137L166 137L161 116"/>
+    <path d="M62 100L91 129L151 65"/>
   </g>
-  <text x="610" y="452" fill="#4F46E5" font-family="Inter, Manrope, Arial, sans-serif" font-size="180" font-weight="600" letter-spacing="-8">Followup</text>
+  <text x="514" y="452" fill="#4F46E5" font-family="Inter, Manrope, Arial, sans-serif" font-size="180" font-weight="600" letter-spacing="-8">Followup</text>
 </svg>

@@ -3,8 +3,8 @@
   <desc id="desc">White checkmark with a circular follow-up arrow inside an indigo rounded square.</desc>
   <rect width="256" height="256" rx="56" fill="#4F46E5"/>
   <g fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M196 82C169 31 107 17 61 45C9 76 9 149 57 181C99 209 157 195 185 152"/>
-    <path d="M164 150L186 152L181 129"/>
-    <path d="M75 116L110 151L184 69"/>
+    <path d="M128 36C75 36 40 77 40 128C40 177 79 216 128 216C160 216 189 197 207 170"/>
+    <path d="M184 170L207 170L201 147"/>
+    <path d="M80 126L116 162L188 84"/>
   </g>
 </svg>
