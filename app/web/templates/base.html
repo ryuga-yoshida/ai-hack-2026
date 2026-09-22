@@ -36,7 +36,7 @@
   <!-- サイドバー -->
   <div x-show="sidebar && mobile" x-cloak class="fixed inset-0 bg-black/30 z-30 md:hidden" @click="sidebar = false"></div>
   <aside class="w-60 shrink-0 bg-white border-r border-gray-200 flex-col max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl" :class="sidebar ? 'flex' : 'hidden'" x-cloak>
-    <a href="/" class="flex items-center gap-2 px-5 h-14 border-b border-gray-200">
+    <a href="/" class="flex items-center gap-2 px-5 h-14 shrink-0 border-b border-gray-200">
       <img src="/static/brand/followup-app-icon.svg" alt="" class="w-7 h-7 rounded-lg">
       <span class="flex flex-col leading-tight"><span class="font-bold text-[15px] text-indigo-700 tracking-tight">Followup</span><span class="text-[10px] text-gray-400">進行管理エージェント</span></span>
     </a>
@@ -101,7 +101,7 @@
 
   <!-- メイン -->
   <div class="flex-1 min-w-0 flex flex-col">
-    <header class="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
+    <header class="h-14 shrink-0 bg-white border-b border-gray-200 flex items-center px-4 gap-3">
       <button @click="sidebar = !sidebar; try { localStorage.setItem('sidebar', sidebar ? '1' : '0') } catch (e) {}" class="w-8 h-8 grid place-items-center rounded-lg text-gray-500 hover:bg-gray-100" title="サイドバー">☰</button>
       <h1 class="font-semibold">{% block heading %}{{ self.title() }}{% endblock %}</h1>
       <form method="get" action="/search" class="ml-4 hidden md:block"><input id="globalSearch" name="q" placeholder="検索（/）  ⌘K でどこへでも" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 w-52 focus:w-72 transition-all"></form>
