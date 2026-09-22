@@ -76,14 +76,20 @@
 </div>
 
 <div class="slide">
-  <h2>デモ: 会議 → Excel 保存 → 矛盾の通知（人の操作は 2 回）<small>0:50 – 2:10</small></h2>
+  <h2>利用の流れ: 人は普段どおり、進行管理は裏でエージェントが行う<small>0:50 – 1:10</small></h2>
+  <div class="shot" style="padding:8px"><img src="fig_flow.svg" alt="利用の流れ"></div>
+  <div class="t">利用の流れ</div><div class="n">4</div>
+</div>
+
+<div class="slide">
+  <h2>デモ: 会議 → Excel 保存 → 矛盾の通知（人の操作は 2 回）<small>1:10 – 2:20</small></h2>
   <div class="grid3">
     <div class="box"><b class="h">1. 会議室で話し、終了ボタンを押す</b>話者別に文字起こし → 決定とタスクを担当者つきで登録 → 議事録ページを Wiki に作成<br><span class="tag">抽出のみ LLM（mid）</span></div>
     <div class="box"><b class="h">2. Excel を編集して保存する</b>版として取り込み → 変わったセルの差分 → 担当タスクに紐付け<br><span class="tag">LLM 不使用</span></div>
     <div class="box"><b class="h">3. 8 秒後に通知が届く</b>保存した変更が 9/15 の決定と食い違っている、と根拠 3 点（決定・発言・変更）と判定理由つきで担当者へ<br><span class="tag">判定のみ LLM（high）</span></div>
   </div>
   <div class="shot" style="margin-top:28px"><img src="screenshots/findings_card.png" alt=""></div>
-  <div class="t">デモ</div><div class="n">4</div>
+  <div class="t">デモ</div><div class="n">5</div>
 </div>
 
 <div class="slide">
@@ -102,7 +108,7 @@
       <p style="font-size:19px;margin-top:14px;line-height:1.5">会議の発言も Excel のセル変更も、この 7 項目になる。すべての機能は同じ DB への処理。情報源の追加はアダプタ 1 つで、判定側は変わらない。</p>
     </div>
   </div>
-  <div class="t">アーキテクチャ</div><div class="n">5</div>
+  <div class="t">アーキテクチャ</div><div class="n">6</div>
 </div>
 
 <div class="slide">
@@ -126,7 +132,7 @@
       <p style="font-size:18px;color:#6b7280;margin-top:16px">評価セット 10 ケース（矛盾あり 6・許容 4）を判定を変えるたびに再生。悪化したら戻す。</p>
     </div>
   </div>
-  <div class="t">検知</div><div class="n">6</div>
+  <div class="t">検知</div><div class="n">7</div>
 </div>
 
 <div class="slide">
@@ -144,7 +150,7 @@
       <p style="font-size:18px;color:#6b7280;margin-top:14px">料金表は /v1/models から取得。ダッシュボードに常時表示。</p>
     </div>
   </div>
-  <div class="t">OrcaRouter</div><div class="n">7</div>
+  <div class="t">OrcaRouter</div><div class="n">8</div>
 </div>
 
 <div class="slide">
@@ -157,7 +163,7 @@
     <tr><th>権限</th><td>admin / member / viewer のロールで変更操作を制限。全変更を監査ログに記録。コネクタは読み取り専用スコープのみ</td></tr>
     <tr><th>置き場所</th><td>SQLite 1ファイル。社内サーバーで完結。鍵は .env のみ</td></tr>
   </table>
-  <div class="t">セキュリティ</div><div class="n">8</div>
+  <div class="t">セキュリティ</div><div class="n">9</div>
 </div>
 
 <div class="slide dark">

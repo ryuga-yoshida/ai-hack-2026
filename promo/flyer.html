@@ -48,6 +48,8 @@
   </div>
   <div class="content">
     <div class="quote"><div class="lab">矛盾を見つけたときの通知文（架空データでの実際の出力）</div>「9/15 の定例で『それ以外の数字は変更しない』と決まっていますが、山田さんが 9/18 に更新した見込み表では商品Aの第3四半期が 1200 → 1500 に変わっています。」</div>
+    <h2>使い方 <span style="font-size:8pt;color:#6b7280;font-weight:500;margin-left:3mm">上段＝人がすること　下段＝エージェントが自動でやること</span></h2>
+    <div class="shot" style="padding:1mm 2mm;margin-bottom:4mm"><img src="fig_flow.svg" alt="利用の流れ"></div>
     <div class="two">
       <div>
         <h2>解決する状況</h2>
@@ -57,26 +59,15 @@
           <li>_v3_final_修正.xlsx が増え、どれが最新か分からない</li>
           <li>Wiki の手順が古いまま</li>
           <li>会議で据え置きと決めた数字が翌週の資料で変わっている</li>
-        </ul>
-        <p style="margin:2mm 0 0;font-size:8.5pt;color:#4b5563">原因は共通。議事録・起票・進捗確認・版管理・Wiki・決定と成果物の照合が誰の担当でもない。</p></div>
-        <h2>デモ手順（人の操作は 2 回）</h2>
-        <div class="steps" style="grid-template-columns: 1fr">
-          <div class="step"><b>1. 会議室で話して終了ボタンを押す</b>話者別に文字起こしされ、決定とタスクが担当者つきで登録される</div>
-          <div class="step"><b>2. Excel を編集して保存する</b>版として取り込まれ、変わったセルの差分が担当タスクに紐付く</div>
-          <div class="step"><b>3. 数秒後に通知が届く</b>保存した変更が 9/15 の決定と食い違っている、と根拠 3 点つきで担当者に届く</div>
-        </div>
+        </ul></div>
       </div>
       <div>
-        <h2>画面</h2>
-        <div class="shot"><img src="screenshots/findings_card.png" alt="検知カード"></div>
-        <div class="cap">検知カード。決定 → 発言 → 変更の根拠が時系列で並び、判定理由と対応ボタン（タスク化・通知・確認済み・却下）がある</div>
-        <h2>通知する 4 種類</h2>
-        <div class="card"><ul>
-          <li><b>矛盾</b> — 決定と成果物の変更が食い違う（根拠と判定理由つき）</li>
-          <li><b>根拠のない変更</b> — どの決定にも紐付かない変更</li>
-          <li><b>停滞</b> — 7日以上動きのないタスク</li>
-          <li><b>状態更新の提案</b> — チャットの「直しました」「確認お願いします」からタスクの状態変更を提案</li>
-        </ul></div>
+        <h2>デモ手順（人の操作は 2 回）</h2>
+        <div class="steps" style="grid-template-columns: 1fr">
+          <div class="step"><b>1. 会議室で話して終了ボタンを押す</b>決定とタスクが担当者つきで登録される</div>
+          <div class="step"><b>2. Excel を編集して保存する</b>版として取り込まれ、差分が担当タスクに紐付く</div>
+          <div class="step"><b>3. 数秒後に通知が届く</b>9/15 の決定と食い違っている、と根拠 3 点つきで届く</div>
+        </div>
       </div>
     </div>
     <div class="nums">
