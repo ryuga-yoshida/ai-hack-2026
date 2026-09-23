@@ -674,9 +674,10 @@ def autonomy_stats(conn: sqlite3.Connection) -> dict:
 _reset_lock = threading.Lock()
 
 
-def reset_demo() -> dict:
+def reset_demo(blank: bool = False) -> dict:
     """DB を初期状態に戻し、キャッシュだけで replay する（LLM は呼ばない・約1分）。
-    fixtures/excel の版も git で戻す。展示で同じデモを何度も回すために使う"""
+    fixtures/excel の版も git で戻す。展示で同じデモを何度も回すために使う。
+    blank=True なら架空データを入れず、空の状態（サインインだけできる）にする"""
     if not _reset_lock.acquire(blocking=False):
         return {"ok": False, "reason": "リセット実行中"}
     try:
@@ -688,13 +689,18 @@ def reset_demo() -> dict:
         conn = db.connect()
         db.init_db(conn)
         _log_conn = conn
-        say("action: デモをリセットします（DB 初期化 → 版の復元 → キャッシュ再生）")
+        say("action: 空の状態にします（DB 初期化 → 成果物を全削除）" if blank else
+            "action: デモをリセットします（DB 初期化 → 版の復元 → キャッシュ再生）")
         root = config.LIBRARY_DIR
         try:
             subprocess.run(["git", "checkout", "--", str(root)], cwd=str(config.FIXTURES_DIR.parent), capture_output=True, timeout=30)
             subprocess.run(["git", "clean", "-fdq", str(root)], cwd=str(config.FIXTURES_DIR.parent), capture_output=True, timeout=30)
         except Exception as e:   # git が無い環境でも DB のリセットだけは行う
             log.warning("fixtures の復元に失敗: %s", e)
+        if blank:
+            import shutil
+            for p in sorted(root.glob("*")):
+                shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
         conn.execute("PRAGMA foreign_keys = OFF")
         for t in db.table_names(conn):
             if t.startswith("sqlite_"):
@@ -702,8 +708,17 @@ def reset_demo() -> dict:
             conn.execute(f"DELETE FROM {t}")
         conn.commit()
         conn.execute("PRAGMA foreign_keys = ON")
-        seed.run(conn)
         from app import auth
+        if blank:
+            auth.seed_demo_users(conn)
+            for a in adapters(conn):
+                db.update_sync_state(conn, a.name)
+            global _file_sig
+            _file_sig = _excel_signature()
+            say("action: 空の状態にしました（会議・チャット・タスク・成果物・Wiki はゼロ）")
+            state["enabled"] = was_enabled
+            return {"ok": True, "findings": 0, "blank": True}
+        seed.run(conn)
         auth.seed_demo_users(conn)
         results = replay(conn, speed=0, record=False)
         router.CACHE_ONLY = False
@@ -711,7 +726,6 @@ def reset_demo() -> dict:
         for a in adapters(conn):
             db.update_sync_state(conn, a.name)
         n = sum(len(r.findings) for r in results)
-        global _file_sig
         _file_sig = _excel_signature()   # 復元した版を「既知」にして二重取込を防ぐ
         say(f"action: リセット完了。Finding {n} 件を再生しました")
         state["enabled"] = was_enabled

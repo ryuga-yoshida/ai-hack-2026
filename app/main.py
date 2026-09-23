@@ -2587,12 +2587,14 @@ def meet_finalize(meeting_id: str, background: BackgroundTasks):
 # ---------- エージェント ----------
 
 @app.post("/api/agent/reset")
-def agent_reset(background: BackgroundTasks):
-    """展示用: DB を初期状態に戻してキャッシュ再生（LLM は呼ばない）。バックグラウンドで約1分"""
+def agent_reset(background: BackgroundTasks, blank: str = ""):
+    """展示用: DB を初期状態に戻してキャッシュ再生（LLM は呼ばない）。バックグラウンドで約1分。
+    blank=1 なら架空データを入れず、空の状態にする（まっさらからデモを始めるとき）"""
     from app import agent
     import threading
-    threading.Thread(target=agent.reset_demo, daemon=True).start()
-    return {"ok": True, "message": "リセットを開始しました（約1分）。ログに進捗が出ます"}
+    is_blank = blank in ("1", "true", "yes")
+    threading.Thread(target=lambda: agent.reset_demo(blank=is_blank), daemon=True).start()
+    return {"ok": True, "message": ("空の状態にしています（数秒）" if is_blank else "リセットを開始しました（約1分）。ログに進捗が出ます")}
 
 
 @app.get("/agent", response_class=HTMLResponse)

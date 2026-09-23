@@ -2,6 +2,7 @@
 {% block title %}エージェント{% endblock %}
 {% block actions %}
 <button onclick="if (confirm('デモを初期状態に戻します（DB を初期化してキャッシュから再生・約1分・LLM は呼びません）。よろしいですか？')) fetch('/api/agent/reset', { method: 'POST' }).then(r => r.json()).then(j => Alpine.$data(document.body).toast(j.message))" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="展示で同じデモを何度も回すために、初期状態に戻す">↺ デモをリセット</button>
+<button onclick="if (confirm('すべて消して空の状態にします（会議・チャット・タスク・成果物・Wiki がゼロになります）。よろしいですか？')) fetch('/api/agent/reset?blank=1', { method: 'POST' }).then(r => r.json()).then(j => Alpine.$data(document.body).toast(j.message))" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="まっさらな状態からデモを始めるとき">空にする</button>
 {% endblock %}
 {% block content %}
 <div class="grid grid-cols-3 gap-6" x-data="agentPage()" x-init="start()">
