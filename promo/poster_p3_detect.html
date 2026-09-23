@@ -1,0 +1,85 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>Followup POINT 3</title><style>
+  @page { size: 594mm 841mm; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { width: 594mm; height: 841mm; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #111827; background: #fff; overflow: hidden; position: relative; }
+  .hero { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #4f46e5 100%); color: #fff; padding: 16mm 30mm 16mm; position: relative; }
+  .hero .kicker { font-size: 30px; letter-spacing: .3em; color: #c7d2fe; font-weight: 600; }
+  .hero .logo { width: 120mm; display: block; margin: 5mm 0 0 -3mm; }
+  .hero .no { position: absolute; right: 30mm; top: 16mm; font-size: 30px; color: #c7d2fe; letter-spacing: .2em; text-align: right; line-height: 1.4; }
+  .hero .no b { display: block; font-size: 120px; color: #fde68a; line-height: 1; letter-spacing: 0; }
+  .hero h1 { font-size: 100px; line-height: 1.12; margin: 6mm 0 6mm; font-weight: 800; letter-spacing: -.01em; }
+  .hero h1 em { font-style: normal; color: #fde68a; }
+  .hero .sub { font-size: 38px; color: #e0e7ff; line-height: 1.5; }
+  .hero .sub b { color: #fff; }
+  .sec { padding: 8mm 30mm 0; zoom: 1.38; }
+  h2 { font-size: 44px; margin: 0 0 7mm; padding-left: 16px; border-left: 14px solid #4f46e5; line-height: 1.2; }
+  .pts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9mm; margin-top: 9mm; }
+  .pt { background: #fff; border: 5px solid #e0e7ff; border-radius: 26px; padding: 9mm 10mm; }
+  .pt b { display: block; font-size: 40px; color: #1e1b4b; line-height: 1.25; margin-bottom: 4mm; }
+  .pt p { margin: 0; font-size: 29px; line-height: 1.45; color: #374151; }
+  .foot { position: absolute; left: 0; right: 0; bottom: 0; background: #111827; color: #fff; padding: 10mm 30mm; display: flex; align-items: center; gap: 16mm; }
+  .foot .qr { background: #fff; padding: 4mm; border-radius: 12px; text-align: center; }
+  .foot .qr img { width: 46mm; height: 46mm; display: block; }
+  .foot .qr span { display: block; font-size: 22px; color: #111827; margin-top: 2mm; }
+  .foot .txt { font-size: 28px; line-height: 1.6; color: #d1d5db; }
+  .foot .txt b { color: #fff; font-size: 34px; display: block; }
+  .foot .cta { margin-left: auto; text-align: right; font-size: 34px; color: #fde68a; line-height: 1.5; font-weight: 700; }
+  .foot .cta span { display: block; font-size: 26px; color: #d1d5db; font-weight: 400; }
+
+  .cmp { display: grid; grid-template-columns: 1fr 0.42fr 1fr; gap: 6mm; align-items: stretch; margin-top: 4mm; }
+  .box { background: #fff; border: 5px solid #e5e7eb; border-radius: 26px; padding: 8mm 9mm; }
+  .box .lab { font-size: 24px; letter-spacing: .15em; font-weight: 800; color: #6b7280; margin-bottom: 4mm; }
+  .box .big { font-size: 40px; font-weight: 800; line-height: 1.3; }
+  .box q { display: block; margin-top: 5mm; font-size: 30px; color: #374151; background: #f9fafb; border-left: 6px solid #a5b4fc; padding: 4mm 6mm; border-radius: 0 12px 12px 0; quotes: none; line-height: 1.5; }
+  .box .meta { font-size: 24px; color: #6b7280; margin-top: 4mm; }
+  .box.chg { border-color: #fdba74; } .box.chg .lab { color: #9a3412; }
+  .box .cell { font-family: ui-monospace, Menlo, monospace; font-size: 34px; background: #fff7ed; border: 3px solid #fdba74; border-radius: 12px; padding: 4mm 6mm; margin-top: 5mm; }
+  .box .cell b { color: #b91c1c; }
+  .mid { display: grid; place-items: center; }
+  .mid .ag { background: #4f46e5; color: #fff; border-radius: 50%; width: 62mm; height: 62mm; display: grid; place-items: center; text-align: center; font-size: 28px; font-weight: 800; line-height: 1.3; box-shadow: 0 0 0 10mm #eef2ff; }
+  .mid .ag img { width: 30mm; display: block; margin: 0 auto 2mm; }
+  .alert { margin-top: 9mm; background: #fff7f7; border: 6px solid #fca5a5; border-radius: 28px; padding: 9mm 11mm; }
+  .alert .lab { font-size: 26px; letter-spacing: .15em; color: #b91c1c; font-weight: 800; margin-bottom: 4mm; }
+  .alert .msg { font-size: 40px; line-height: 1.45; }
+  .alert .msg b { color: #b91c1c; }
+  .alert .ev { margin-top: 5mm; font-size: 30px; color: #374151; line-height: 1.6; }
+  .alert .ev b { color: #9a3412; }
+  .alert .btns { margin-top: 5mm; display: flex; gap: 4mm; }
+  .alert .btns span { border: 4px solid #d1d5db; border-radius: 14px; padding: 3mm 7mm; font-size: 28px; font-weight: 700; background: #fff; }
+</style></head><body>
+
+  <div class="hero">
+    <div class="kicker">AI HACK 2026 ｜ 自律型エージェント</div>
+    <img class="logo" src="followup-logo-white.svg" alt="Followup">
+    <div class="no">POINT<b>3</b></div>
+    <h1>AI が会話を巡回し、<br>決定と成果物の<em>矛盾を指摘。</em></h1>
+    <div class="sub">人が「確認して」と頼む前に。会議で決めたことと、保存された成果物を<b>自分で突き合わせて</b>、根拠つきで知らせる。</div>
+  </div>
+  <div class="sec">
+    <div class="cmp">
+      <div class="box"><div class="lab">会議で決めたこと</div><div class="big">第4四半期の見込みは 450 で据え置き</div><q>得意先から増量の要望が来ても、今期の見込みは 450 から変更しないでください。</q><div class="meta">9/22 キックオフ・鈴木の発言（原文）</div></div>
+      <div class="mid"><div class="ag"><img src="followup-app-icon.svg" alt="">巡回して<br>突き合わせ</div></div>
+      <div class="box chg"><div class="lab">保存された成果物</div><div class="big">商品X_売上見込.xlsx が v2 に</div><div class="cell">売上見込!E2　450 → <b>500</b></div><div class="meta">9/22 14:05・山田が保存。チャットには数字の変更が書かれていない</div></div>
+    </div>
+    <div class="alert">
+      <div class="lab">エージェントからの通知（実際の出力）</div>
+      <div class="msg">決定「第4四半期の見込みは 450 で確定し、変更しない」と、成果物の変更「商品Xの第4四半期が <b>450 → 500</b>」が食い違っています。</div>
+      <div class="ev"><b>根拠 3 点</b>　① 9/22 会議の発言（原文）　② 9/22 チャットでの共有　③ セル 売上見込!E2 の差分</div>
+      <div class="btns"><span>タスク化</span><span>通知</span><span>確認済みにする</span><span>却下</span></div>
+    </div>
+    <div class="pts">
+      <div class="pt"><b>LLM は最後だけ</b><p>関係する決定をコードで絞り込み、残った 1 組だけを Claude Opus が判定。誤検知 0 の評価セットを毎回通す</p></div>
+      <div class="pt"><b>書き換えない</b><p>エージェントは通知と提案まで。タスク・成果物・Wiki の変更は人が承認する</p></div>
+      <div class="pt"><b>理由が書いてあれば黙る</b><p>チャットで理由が共有されていれば確信度を下げる。「黙って数字が変わった」ときに一番強く指摘する</p></div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <div class="qr"><img src="qr_github.png" alt="GitHub"><span>GitHub</span></div>
+    <div class="qr"><img src="qr_zenn.png" alt="Zenn"><span>Zenn 記事</span></div>
+    <div class="txt"><b>github.com/ryuga-yoshida/ai-hack-2026</b>git clone → 3 コマンドで動きます。API キー不要の replay で同じ検知結果を再現できます</div>
+    <div class="cta">ブースで触れます →<span>Excel を保存すると、数秒後に矛盾の通知が届きます</span></div>
+  </div>
+
+</body></html>

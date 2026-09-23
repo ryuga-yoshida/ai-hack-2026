@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><title>Followup summary</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { width: 1600px; height: 900px; font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color: #fff;
+         background: linear-gradient(135deg, #1e1b4b 0%, #312e81 45%, #4f46e5 100%); position: relative; overflow: hidden; }
+  .logo { position: absolute; left: 64px; top: 48px; width: 300px; }
+  .tag { position: absolute; right: 64px; top: 56px; font-size: 20px; letter-spacing: .25em; color: #c7d2fe; font-weight: 600; }
+  h1 { position: absolute; left: 64px; top: 128px; margin: 0; font-size: 76px; line-height: 1.15; font-weight: 800; letter-spacing: -.01em; }
+  h1 em { font-style: normal; color: #fde68a; }
+  .sub { position: absolute; left: 64px; top: 320px; font-size: 26px; color: #e0e7ff; }
+  .sub b { color: #fff; }
+  .grid { position: absolute; left: 64px; right: 64px; top: 385px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 20px; }
+  .t { background: rgba(255,255,255,.10); border: 2px solid rgba(255,255,255,.22); border-radius: 22px; padding: 40px 16px 36px; text-align: center; backdrop-filter: blur(2px); }
+  .t svg { width: 88px; height: 88px; display: block; margin: 0 auto 18px; }
+  .t b { display: block; font-size: 30px; font-weight: 800; margin-bottom: 8px; letter-spacing: -.01em; }
+  .t span { display: block; font-size: 18px; color: #c7d2fe; line-height: 1.4; }
+  .t.hot { background: rgba(254,226,226,.14); border-color: #fca5a5; }
+  .t.hot b { color: #fecaca; }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 44px; display: flex; align-items: center; gap: 28px; font-size: 24px; color: #e0e7ff; }
+  .foot .lab { background: #fde68a; color: #1e1b4b; font-weight: 800; border-radius: 999px; padding: 8px 22px; font-size: 22px; white-space: nowrap; }
+  .foot b { color: #fff; }
+</style></head>
+<body>
+  <img class="logo" src="followup-logo-white.svg" alt="Followup">
+  <div class="tag">AI HACK 2026 ｜ 進行管理エージェント</div>
+  <h1>進行管理を、<br>エージェントに<em>任せる。</em></h1>
+  <div class="sub">会議・チャット・成果物を見張って、<b>人の指示なしで</b> 6 つの作業をこなします</div>
+
+  <div class="grid">
+    <div class="t"><svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="6" width="20" height="32" rx="10"/><path d="M12 30a20 20 0 0 0 40 0M32 50v8M22 58h20"/></svg><b>議事録化</b><span>会議を話者別に文字起こし、決定とタスクを抽出</span></div>
+    <div class="t"><svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="48" height="48" rx="8"/><path d="M20 32l8 8 16-16"/></svg><b>タスク登録</b><span>担当者を発言から読み取り、会議終了と同時に登録</span></div>
+    <div class="t"><svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12h44v30H26l-10 10V42h-6z"/><path d="M20 22h24M20 32h16"/></svg><b>進捗追跡</b><span>チャットの「直しました」から状態変更を提案</span></div>
+    <div class="t"><svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="10" width="48" height="44" rx="6"/><path d="M8 24h48M8 38h48M24 10v44M40 10v44"/></svg><b>版管理</b><span>保存のたびに版を採番、セル・段落の差分を記録</span></div>
+    <div class="t"><svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12c8-4 16-4 24 0v40c-8-4-16-4-24 0zM56 12c-8-4-16-4-24 0v40c8-4 16-4 24 0z"/></svg><b>Wiki 更新</b><span>成果物の中身を構造化して自動で最新化</span></div>
+    <div class="t hot"><svg viewBox="0 0 64 64" fill="none" stroke="#fecaca" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M32 8L58 54H6z"/><path d="M32 24v14M32 46v.5"/></svg><b>矛盾検知</b><span>決定と食い違う変更を、人が聞く前に根拠つきで通知</span></div>
+  </div>
+
+  <div class="foot"><span class="lab">人がすること</span><span>会議で話す ・ チャットに書く ・ ファイルを保存する ・ 提案を<b>承認する</b>だけ</span></div>
+</body></html>
