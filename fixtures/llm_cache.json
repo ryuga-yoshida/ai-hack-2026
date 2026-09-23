@@ -23646,5 +23646,57 @@
    "claude_cache_creation_1_h_tokens": 0
   },
   "task": "extract"
+ },
+ "d2b0686e39949a50c8c6c6d0": {
+  "tier": "mid",
+  "content": "{\n  \"items\": [\n    {\n      \"kind\": \"decision\",\n      \"text\": \"初回ロットを300ケースで確定する\",\n      \"actor\": \"<PERSON_1>\",\n      \"quote\": \"分かりました。初回ロットは300ケースで確定します。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"decision\",\n      \"text\": \"第4四半期の売上見込を450ケースで確定する\",\n      \"actor\": \"<PERSON_1>\",\n      \"quote\": \"では第4四半期は450で確定。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"売上見込表の初版を今週中に作成してライブラリにアップロードする\",\n      \"actor\": \"<PERSON_2>\",\n      \"quote\": \"<PERSON_2>さん、売上見込表の初版を今週中に作ってライブラリに上げてください。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"原価試算を来週の定例までに作成する\",\n      \"actor\": \"<PERSON_3>\",\n      \"quote\": \"<PERSON_3>さん、原価試算を来週の定例までにお願いします。\",\n      \"confidence\": 1.0\n    },\n    {\n      \"kind\": \"task\",\n      \"text\": \"主要得意先3社にヒアリングを実施し、その結果を来週共有する\",\n      \"actor\": \"<PERSON_4>\",\n      \"quote\": \"<PERSON_4>さんは主要得意先3社にヒアリングして、結果を来週共有してください。\",\n      \"confidence\": 1.0\n    }\n  ]\n}",
+  "usage": {
+   "prompt_tokens": 584,
+   "completion_tokens": 1631,
+   "total_tokens": 2215,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 584,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 417,
+    "audio_tokens": 0,
+    "reasoning_tokens": 1214
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "extract"
+ },
+ "95aaddd750ff6957e1aaa4e6": {
+  "tier": "mid",
+  "content": "{\n  \"purpose\": \"商品X（青葉りんごソーダ）立ち上げに伴う数字および担当の決定。\",\n  \"agenda\": [\n    {\n      \"topic\": \"初回ロットの決定\",\n      \"summary\": \"製造条件の上限に基づき協議。\",\n      \"outcome\": \"決定 / 300ケースで確定\"\n    },\n    {\n      \"topic\": \"売上見込の確認\",\n      \"summary\": \"第3四半期は0、第4四半期は450ケースとし、得意先からの増量要望があっても変更しない方針を確認。\",\n      \"outcome\": \"決定 / 第4四半期450ケースで確定\"\n    }\n  ],\n  \"open_issues\": [],\n  \"next\": [\n    \"PERSON_2: 今週中に売上見込表の初版を作成しライブラリへ格納\",\n    \"PERSON_3: 来週の定例までに原価試算を実施\",\n    \"PERSON_4: 来週までに主要得意先3社へヒアリングし結果を共有\"\n  ],\n  \"mood\": \"円滑かつ定型的\"\n}",
+  "usage": {
+   "prompt_tokens": 605,
+   "completion_tokens": 1034,
+   "total_tokens": 1639,
+   "prompt_tokens_details": {
+    "cached_tokens": 0,
+    "text_tokens": 605,
+    "audio_tokens": 0,
+    "image_tokens": 0
+   },
+   "completion_tokens_details": {
+    "text_tokens": 260,
+    "audio_tokens": 0,
+    "reasoning_tokens": 774
+   },
+   "input_tokens": 0,
+   "output_tokens": 0,
+   "input_tokens_details": null,
+   "claude_cache_creation_5_m_tokens": 0,
+   "claude_cache_creation_1_h_tokens": 0
+  },
+  "task": "summarize"
  }
 }

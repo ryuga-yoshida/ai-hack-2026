@@ -2558,9 +2558,17 @@ def meet_video_get(meeting_id: str, video_id: str):
 def _finalize_job(meeting_id: str) -> None:
     conn = get_conn()
     try:
-        transcript = meet.finalize(conn, meeting_id)
+        meet.finalize(conn, meeting_id)
     except Exception:
         return   # 失敗は meetings.status='failed' に記録済み
+    _post_finalize(meeting_id)
+
+
+def _post_finalize(meeting_id: str) -> None:
+    """文字起こしが確定したあと: チャットに知らせて即時巡回（音声からでも貼り付けからでも同じ）"""
+    conn = get_conn()
+    r = conn.execute("SELECT transcript FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+    transcript = (r["transcript"] if r else "") or ""
     m = conn.execute("SELECT title, channel FROM meetings WHERE id=?", (meeting_id,)).fetchone()
     if m and m["channel"]:
         n = transcript.count("\n[")
@@ -2571,6 +2579,42 @@ def _finalize_job(meeting_id: str) -> None:
             tagmod.link(conn, t["name"], "meeting", meeting_id)
     from app import agent
     agent.request_tick(f"会議終了（{m['title'] if m else meeting_id}）")
+
+
+@app.post("/meet/{meeting_id}/transcript")
+def meet_transcript(request: Request, meeting_id: str, background: BackgroundTasks, text: str = Form(...)):
+    """文字起こしを貼り付けて議事録を作る（声を出せない場所、Teams / Zoom の文字起こしを持ち込む場合）。
+    1行の形式は「[10:12] 鈴木: 発言」。時刻が無い行は前の行の時刻を引き継ぐ"""
+    conn = get_conn()
+    m = conn.execute("SELECT * FROM meetings WHERE id=?", (meeting_id,)).fetchone()
+    if not m:
+        raise HTTPException(404)
+    started = db.from_iso(m["started_at"]) or datetime.now()
+    lines, hm = [], f"{started:%H:%M}"
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        t = re.match(r"^\[?(\d{1,2}):(\d{2})\]?\s*(.*)$", line)
+        if t:
+            hm, line = f"{int(t[1]):02d}:{t[2]}", t[3].strip()
+        if not line:
+            continue
+        who_, _, body = line.partition(":") if ":" in line else line.partition("：")
+        if not body.strip():
+            who_, body = (lines[-1][1] if lines else "参加者"), line
+        lines.append((hm, who_.strip()[:20], body.strip()))
+    if not lines:
+        raise HTTPException(400, "文字起こしが空です")
+    body_text = "\n".join([f"# meeting: {m['title']}", f"# date: {started:%Y-%m-%d %H:%M}"] +
+                          [f"[{hm}] {who_}: {t}" for hm, who_, t in lines])
+    conn.execute("UPDATE meetings SET status='done', transcript=?, ended_at=? WHERE id=?",
+                 (body_text, datetime.now().replace(microsecond=0).isoformat(), meeting_id))
+    for hm, who_, t in lines:
+        meet.add_caption(conn, meeting_id, who_, t)
+    conn.commit()
+    background.add_task(_post_finalize, meeting_id)
+    return RedirectResponse(f"/meet/{meeting_id}", status_code=303)
 
 
 @app.post("/meet/{meeting_id}/finalize")

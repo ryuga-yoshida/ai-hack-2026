@@ -6,11 +6,25 @@
 {% block actions %}
 {% if m.status == 'recording' and me %}
 <button id="copyBtn" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50">{{ icon('link') }} 招待リンクをコピー</button>
+<button type="button" @click="$dispatch('open-paste')" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white hover:bg-gray-50" title="声を出せない場所や、Teams / Zoom の文字起こしを持ち込むとき">文字起こしを貼り付ける</button>
 <button id="endBtn" class="text-sm bg-red-600 text-white rounded-lg px-3 py-1.5 hover:bg-red-700">会議を終了して議事録を作る</button>
 {% endif %}
 {% endblock %}
 {% block main_class %}p-0{% endblock %}
 {% block content %}
+{% if m.status == 'recording' and me %}
+<div x-data="{ open: false }" @open-paste.window="open = true" x-cloak>
+  <div x-show="open" class="fixed inset-0 bg-black/40 z-40" @click="open = false"></div>
+  <div x-show="open" class="fixed inset-0 z-50 grid place-items-center p-6 pointer-events-none">
+    <form method="post" action="/meet/{{ m.id }}/transcript" class="bg-white rounded-xl shadow-xl p-6 w-[720px] max-w-full pointer-events-auto space-y-3" @keydown.escape.window="open = false">
+      <h3 class="font-semibold">文字起こしを貼り付けて議事録を作る</h3>
+      <p class="text-xs text-gray-500 leading-relaxed">声を出せない場所や、Teams / Zoom で録った文字起こしを持ち込むときに使います。1行の形式は <code class="bg-gray-100 px-1 rounded">[10:12] 鈴木: 発言</code>。時刻は省略できます（前の行の時刻を引き継ぎます）。貼り付けると会議は終了し、決定・タスクの抽出が始まります。</p>
+      <textarea name="text" rows="12" required placeholder="[10:00] 鈴木: 商品Xの立ち上げキックオフを始めます。&#10;[10:02] 田中: 初回ロットは300ケースが上限です。&#10;鈴木: では第4四半期は450で確定。今期の見込みは450から変更しないでください。" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"></textarea>
+      <div class="flex justify-end gap-2"><button type="button" @click="open = false" class="text-sm px-3 py-1.5 rounded-lg border border-gray-300">キャンセル</button><button class="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 text-white">この内容で議事録を作る</button></div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% if m.status == 'recording' %}
   {% if not me %}
   <div class="grid place-items-center h-[calc(100vh-3.5rem)] text-sm text-gray-500">左下の「名前を設定」から名前を選ぶと参加できます。</div>
